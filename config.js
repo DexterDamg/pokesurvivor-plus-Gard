@@ -22,7 +22,7 @@
  *   databaseURL: 'https://your-project-default-rtdb.europe-west1.firebasedatabase.app'
  * };
  */
-const firebaseConfig = {
+window.PS_FIREBASE = {
   apiKey: "AIzaSyC21Y0BXVvifmfiCNhGkrXfYLA_ozPGJQs",
   authDomain: "pokesurvivor-e5802.firebaseapp.com",
   projectId: "pokesurvivor-e5802",
