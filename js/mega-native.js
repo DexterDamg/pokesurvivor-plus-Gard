@@ -43,8 +43,12 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  // Origin Pulse is a 'chain' move like Hex: it locks on to the nearest foe (tracking) and arcs
  // lightning-style beams from foe to foe (each jump does 85% of the previous one).
  const SIGNATURE_MOVES={
-   '383-primal':{id:'precipice-blades',name:'Precipice Blades',type:'ground',kind:'nova',desc:'Jagged blades of stone erupt outward in every direction.',cd:3.0,dmg:30,speed:260,count:16,pierce:3,life:1.3,size:16},
-   '382-primal':{id:'origin-pulse',name:'Origin Pulse',type:'water',kind:'chain',desc:'Beams of blue light lock on to a foe and arc from foe to foe.',cd:1.3,dmg:30,count:8,radius:230}
+   // Both are granted already at MAX level (see grantSignature). Numbers below are level-1 base values;
+   // max level adds: nova +8 projectiles, +40% dmg, +1 pierce, -25% cooldown;
+   //                 chain +4 jumps, ~2x dmg, -25% cooldown.
+   '383-primal':{id:'precipice-blades',name:'Precipice Blades',type:'ground',kind:'nova',desc:'Jagged blades of stone erupt outward in every direction.',cd:2.6,dmg:40,speed:260,count:16,pierce:3,life:1.3,size:16},
+   // chains: how many separate lightning chains fire at once (each starts on a different foe).
+   '382-primal':{id:'origin-pulse',name:'Origin Pulse',type:'water',kind:'chain',desc:'Four beams of blue light lock on to different foes and arc from foe to foe.',cd:1.4,dmg:16,count:6,radius:230,chains:4}
  };
  function registerSignatureMoves(){
    const m=getBridge()?.moves;
@@ -70,7 +74,13 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    // Bonus slot: the signature move never uses up one of your normal move slots,
    // so it always fits, even with a full move bar.
    p.maxMoves=Math.max(previousMax,p.slots?.length||0)+1;
-   if(!p.addMove(def.id)){
+   const learned=p.addMove(def.id);
+   if(learned){
+     // Signature moves arrive fully upgraded.
+     const m=getBridge()?.moves,inst=p.moves?.find(v=>v.id===def.id);
+     if(m&&inst&&typeof m.levelUp==='function'){let guard=20;while(guard-->0&&m.levelUp(inst));}
+   }
+   if(!learned){
      p.maxMoves=previousMax;
      // Fallback: the game's own "learn this move / choose a move to forget" prompt (pauses the run).
      try{getBridge()?.game?.runTm?.(def.id);}catch(e){console.warn('Primal move prompt:',e);}
@@ -103,6 +113,10 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(!activePrimal)return;
    const p=getPlayer();
    if(!p||p!==activePrimal.player){clearPrimal();return;}
+   // Keep the signature move at max level (covers the "forget a move" prompt path too).
+   const form=Object.keys(WEATHER).find(k=>WEATHER[k]===activePrimal.cfg),def=SIGNATURE_MOVES[form],mv=getBridge()?.moves;
+   const inst=def&&p.moves?.find(v=>v.id===def.id);
+   if(inst&&mv&&typeof mv.levelUp==='function'&&inst.lvl<(def.maxLvl||1)){let guard=20;while(guard-->0&&mv.levelUp(inst));}
    const w=weatherApi();if(!w)return;
    const cur=w.current, kind=activePrimal.cfg.kind, now=performance.now();
    // Something else replaced or cleared the weather: put Primal weather back.
