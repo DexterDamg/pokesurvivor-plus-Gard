@@ -27,17 +27,14 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  const PRIMAL_BALANCE={atk:1.8,spa:1.8,hp:1.6,spd:1.1};
  const PRIMAL_RADIUS=430; // world units: size of the visual weather domain around the player
 
- // Primal weather takes over the game's own weather system (the same one natural rain/sun use).
- // Why: the engine then applies the type multiplier itself, to every kind of move (projectiles,
- // melee, beams, auras, chains...) and to enemy attacks; it never stacks with natural weather
- // (only one weather can exist at a time); and it ends cleanly.
+ // Primal weather tables. The engine applies these to every kind of move (projectiles, melee,
+ // beams, auras, chains...) and to enemy attacks on the Primal player.
  // ONLY the types listed in 'mult' change. Every other type stays at exactly 1x.
  const WEATHER={
   '383-primal':{name:'Desolate Land',kind:'harsh',hint:'Fire moves deal 1.5x, Water moves evaporate (0.1x)',mult:{fire:1.5,water:0.1},ring:'#ffb347',fx:'sun'},
   '382-primal':{name:'Primordial Sea',kind:'storm',hint:'Water moves deal 1.5x, Fire moves fizzle out (0.1x)',mult:{water:1.5,fire:0.1},ring:'#54cfff',fx:'rain'}
  };
- const PRIMAL_WEATHER_DUR=1e9; // effectively "until the run ends"
- let activePrimal=null; // {player,cfg,saved,lastForce}
+ let activePrimal=null; // {player,cfg}
 
  // Signature moves: real entries in the game's move database, learned on Primal Reversion.
  // Origin Pulse is a 'chain' move like Hex: it locks on to the nearest foe (tracking) and arcs
@@ -96,42 +93,59 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    };
  }
 
- // ---- Weather takeover ----
- function weatherApi(){const w=getBridge()?.weather;return w&&w.KINDS&&typeof w.force==='function'?w:null;}
+ // ---- Primal weather ----
+ // Natural weather (rain, sun, sandstorm, snow, fields...) keeps happening normally for the world,
+ // but it does NOT affect the Primal player:
+ //  - the Primal player's attacks AND the hits they take use only the Primal weather table below,
+ //    never the natural weather's numbers (no stacking, no cancelling);
+ //  - natural weather chip damage / healing skip the Primal player (engine flag 'primalImmune');
+ //  - natural fields (Misty/Electric) don't block the Primal player's burns, stuns, etc.
+ // The HUD shows the Primal weather while it is active.
+ function weatherApi(){const w=getBridge()?.weather;return w&&w.KINDS&&typeof w.mult==='function'?w:null;}
+ let weatherHooked=false;
+ function hookWeather(){
+   const w=weatherApi();if(!w||weatherHooked)return;
+   const nativeMult=w.mult.bind(w),nativeBlocks=typeof w.blocks==='function'?w.blocks.bind(w):()=>false;
+   const desc=Object.getOwnPropertyDescriptor(w,'current');
+   w.mult=function(type){
+     if(activePrimal&&getPlayer()===activePrimal.player){const m=activePrimal.cfg.mult[type];return Number.isFinite(m)?m:1;}
+     return nativeMult(type);
+   };
+   w.blocks=function(what){
+     if(activePrimal&&getPlayer()===activePrimal.player)return false;
+     return nativeBlocks(what);
+   };
+   if(desc&&desc.get&&desc.configurable){
+     Object.defineProperty(w,'current',{configurable:true,enumerable:true,get(){
+       if(activePrimal&&getPlayer()===activePrimal.player){
+         const c=activePrimal.cfg,k=w.KINDS[c.kind]||{};
+         return {kind:'primal-'+c.kind,name:c.name,hint:c.hint,icon:k.icon,color:k.color||c.ring,tint:k.tint||[0,0,0,0],mult:Object.assign({},c.mult),left:Infinity,t:0,dur:Infinity};
+       }
+       return desc.get.call(w);
+     }});
+   }
+   weatherHooked=true;
+ }
  function startPrimalWeather(p,cfg){
-   const w=weatherApi();
-   activePrimal={player:p,cfg,saved:null,lastForce:performance.now()};
-   if(!w)return;
-   const native=w.KINDS[cfg.kind]||{};
-   activePrimal.saved={kind:cfg.kind,entry:w.KINDS[cfg.kind]};
-   // Keep the native look (icon, tint, rain/sun particles) but REPLACE the multiplier table
-   // and drop any side effects (chip damage, healing, slowing, status blocking).
-   w.KINDS[cfg.kind]={name:cfg.name,hint:cfg.hint,icon:native.icon,color:native.color||cfg.ring,tint:native.tint||[0,0,0,0],mult:Object.assign({},cfg.mult)};
-   w.force(cfg.kind,PRIMAL_WEATHER_DUR);
+   hookWeather();
+   activePrimal={player:p,cfg};
+   p.primalImmune=true;
  }
  function keepPrimalWeather(){
+   hookWeather();
    if(!activePrimal)return;
    const p=getPlayer();
    if(!p||p!==activePrimal.player){clearPrimal();return;}
+   p.primalImmune=true;
    // Keep the signature move at max level (covers the "forget a move" prompt path too).
    const form=Object.keys(WEATHER).find(k=>WEATHER[k]===activePrimal.cfg),def=SIGNATURE_MOVES[form],mv=getBridge()?.moves;
    const inst=def&&p.moves?.find(v=>v.id===def.id);
    if(inst&&mv&&typeof mv.levelUp==='function'&&inst.lvl<(def.maxLvl||1)){let guard=20;while(guard-->0&&mv.levelUp(inst));}
-   const w=weatherApi();if(!w)return;
-   const cur=w.current, kind=activePrimal.cfg.kind, now=performance.now();
-   // Something else replaced or cleared the weather: put Primal weather back.
-   // (current is briefly null while weather fades in, hence the 4s grace period.)
-   if((cur&&cur.kind!==kind)||(!cur&&getBridge()?.game?.state==='playing'&&now-activePrimal.lastForce>4000)){
-     activePrimal.lastForce=now;w.force(kind,PRIMAL_WEATHER_DUR);
-   }
  }
  function clearPrimal(){
    if(!activePrimal)return;
-   const w=weatherApi(),s=activePrimal.saved;activePrimal=null;
-   if(w&&s){
-     w.KINDS[s.kind]=s.entry; // restore the natural weather entry exactly as it was
-     const cur=w.current;if(!cur||cur.kind===s.kind)w.clear();
-   }
+   try{delete activePrimal.player.primalImmune;}catch(e){}
+   activePrimal=null;
  }
 
  // ---- Domain visuals: rain (Kyogre) / harsh UV sunlight (Groudon) ----
@@ -340,4 +354,36 @@ function start(){
  panel.append(title,status,btn,hint,close);document.body.append(mini,panel,ring);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();keepPrimalWeather();},60);refresh();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();
+// ================= CUSTOM ACCOUNT SKINS =================
+// Gives specific accounts their own sprite for a Pokemon. Only that account sees it in their runs.
+//   username (lowercase)  ->  { dex number : sprite folder inside assets/pokemon/ }
+// 'anims' lists the sheets that exist in the skin folder. Each must have the SAME size/grid as the
+// original (e.g. Gardevoir Idle/Walk = 128x320: 4 frames x 8 directions of 32x40).
+// Any animation NOT listed (Attack, Shoot, Charge, Hurt, Faint) plays the skin's Idle frames instead,
+// so the skin is always visible. Mega/Primal forms keep their own sprites.
+(function(){
+ const SKINS={
+   'lovergare':{'282':{key:'282-lovergare',anims:['Idle','Walk']}} // Bikini Gardevoir
+ };
+ const bridge=()=>window.PS_MEGA_BRIDGE_V5;
+ function skinFor(b,p){
+   const user=String(b.user||'').trim().toLowerCase();
+   const map=SKINS[user];if(!map||p.megaForm)return null;
+   return map[String(Number(p.dex))]||null;
+ }
+ function apply(){
+   const b=bridge(),p=b?.game?.player;
+   if(!b||!p||!b.sprites?.Animator||!b.spriteMeta)return;
+   const skin=skinFor(b,p);if(!skin)return;const key=skin.key;
+   if(p.anim&&p.anim.dex===key)return;
+   if(!b.spriteMeta[key]){
+     const base=b.spriteMeta[String(Number(p.dex))];if(!base)return;
+     const meta=JSON.parse(JSON.stringify(base));delete meta.sh;delete meta.sa; // skin has no shiny variant
+     for(const a of Object.keys(meta.a||{}))if(!skin.anims.includes(a))delete meta.a[a]; // unlisted -> Idle
+     b.spriteMeta[key]=meta;
+   }
+   try{p.anim=new b.sprites.Animator(key,Number(p.anim?.scale)||Number(p.scale)||1,false);}catch(e){console.warn('Skin:',e);}
+ }
+ setInterval(apply,200);
 })();
