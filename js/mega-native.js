@@ -5,7 +5,7 @@ const FORM_DATA={"3":[{"key":"3-mega","name":"Mega-Venusaur","en":"Mega Venusaur
 const SPRITE_META={"6-mega-x":{"s":2,"a":{"Idle":{"w":48,"h":56,"n":4,"r":8,"d":[15,15,15,15],"ax":23.5,"ay":31.5},"Walk":{"w":48,"h":56,"n":4,"r":8,"d":[8,10,8,10],"ax":23.5,"ay":31.5},"Attack":{"w":88,"h":96,"n":14,"r":8,"d":[2,2,2,2,4,1,1,2,2,2,2,2,2,2],"ax":43.5,"ay":50.5},"Shoot":{"w":56,"h":64,"n":11,"r":8,"d":[4,6,2,2,2,2,2,2,2,2,2],"ax":27.5,"ay":34.5},"Charge":{"w":48,"h":56,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":24.5,"ay":31.5},"Hurt":{"w":64,"h":64,"n":2,"r":8,"d":[2,8],"ax":31.5,"ay":33.5},"Faint":{"w":64,"h":64,"n":2,"r":8,"d":[2,8],"ax":31.5,"ay":33.5}},"sh":1,"sa":{"Idle":{"w":48,"h":48,"n":4,"r":8,"d":[15,15,15,15],"ax":23.5,"ay":27.5},"Walk":{"w":48,"h":48,"n":4,"r":8,"d":[8,10,8,10],"ax":23.5,"ay":27.5},"Attack":{"w":80,"h":88,"n":14,"r":8,"d":[2,2,2,2,4,1,1,2,2,2,2,2,2,2],"ax":39.5,"ay":46.5},"Charge":{"w":48,"h":48,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":24.5,"ay":27.5}}},"65-mega":{"s":1,"a":{"Idle":{"w":40,"h":64,"n":8,"r":8,"d":[6,6,6,6,6,6,6,6],"ax":19.5,"ay":35.5},"Walk":{"w":40,"h":64,"n":8,"r":8,"d":[8,10,8,10,8,10,8,10],"ax":19.5,"ay":35.5},"Attack":{"w":80,"h":96,"n":11,"r":8,"d":[4,2,4,1,1,1,2,2,2,2,4],"ax":39.5,"ay":51.5},"Shoot":{"w":40,"h":72,"n":12,"r":8,"d":[2,2,4,6,2,2,2,2,2,2,2,4],"ax":19.5,"ay":39.5},"Charge":{"w":40,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":35.5},"Hurt":{"w":48,"h":72,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":36.5},"Faint":{"w":48,"h":72,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":36.5}},"sh":1},"80-mega":{"s":1,"a":{"Idle":{"w":32,"h":64,"n":5,"r":8,"d":[40,4,2,6,6],"ax":15.5,"ay":35.5},"Walk":{"w":48,"h":64,"n":8,"r":8,"d":[6,6,10,4,4,4,6,8],"ax":23.5,"ay":35.5},"Attack":{"w":80,"h":96,"n":14,"r":8,"d":[2,2,6,1,1,2,2,2,2,2,2,2,2,2],"ax":38.5,"ay":51.5},"Shoot":{"w":32,"h":56,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":16.5,"ay":31.5},"Charge":{"w":32,"h":56,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":16.5,"ay":31.5},"Hurt":{"w":32,"h":64,"n":5,"r":8,"d":[40,4,2,6,6],"ax":15.5,"ay":35.5},"Faint":{"w":32,"h":64,"n":5,"r":8,"d":[40,4,2,6,6],"ax":15.5,"ay":35.5}},"sh":1},"94-mega":{"s":2,"a":{"Idle":{"w":40,"h":40,"n":8,"r":8,"d":[40,4,3,3,3,3,3,4],"ax":19.5,"ay":23.5},"Walk":{"w":40,"h":40,"n":4,"r":8,"d":[8,10,8,10],"ax":19.5,"ay":23.5},"Attack":{"w":80,"h":80,"n":11,"r":8,"d":[4,2,4,1,1,1,2,2,2,2,4],"ax":39.5,"ay":43.5},"Shoot":{"w":64,"h":64,"n":12,"r":8,"d":[2,4,1,1,10,2,2,2,2,2,2,2],"ax":31.5,"ay":32.5},"Charge":{"w":48,"h":40,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":24.5,"ay":23.5},"Hurt":{"w":48,"h":48,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":25.5},"Faint":{"w":48,"h":48,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":25.5}},"sh":1},"115-mega":{"s":2,"a":{"Idle":{"w":40,"h":56,"n":5,"r":8,"d":[30,3,4,3,20],"ax":19.5,"ay":31.5},"Walk":{"w":40,"h":56,"n":4,"r":8,"d":[16,10,16,10],"ax":19.5,"ay":31.5},"Attack":{"w":72,"h":96,"n":13,"r":8,"d":[1,2,3,2,1,1,1,1,2,2,2,2,2],"ax":35.5,"ay":51.5},"Shoot":{"w":48,"h":56,"n":16,"r":8,"d":[2,1,1,1,1,1,6,2,2,2,2,2,2,2,2,2],"ax":23.5,"ay":30.5},"Charge":{"w":32,"h":48,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":16.5,"ay":27.5},"Hurt":{"w":40,"h":64,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":33.5},"Faint":{"w":40,"h":64,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":33.5}},"sh":1},"142-mega":{"s":1,"a":{"Idle":{"w":40,"h":64,"n":8,"r":8,"d":[8,8,8,8,8,8,8,8],"ax":19.5,"ay":35.5},"Walk":{"w":40,"h":64,"n":4,"r":8,"d":[8,8,8,8],"ax":19.5,"ay":35.5},"Attack":{"w":72,"h":80,"n":13,"r":8,"d":[2,2,6,1,2,2,2,2,2,2,2,2,2],"ax":35.5,"ay":43.5},"Shoot":{"w":56,"h":72,"n":12,"r":8,"d":[2,2,6,1,1,2,2,2,2,2,2,2],"ax":27.5,"ay":38.5},"Charge":{"w":40,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":35.5},"Hurt":{"w":40,"h":72,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":37.5},"Faint":{"w":40,"h":72,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":37.5}},"sh":1},"150-mega-y":{"s":1,"a":{"Idle":{"w":48,"h":56,"n":8,"r":8,"d":[20,15,12,12,12,15,12,15],"ax":23.5,"ay":34.5},"Walk":{"w":40,"h":56,"n":6,"r":8,"d":[12,8,8,12,8,8],"ax":20.5,"ay":31.5},"Attack":{"w":80,"h":88,"n":11,"r":8,"d":[2,3,4,1,1,1,2,2,2,2,2],"ax":39.5,"ay":46.5},"Shoot":{"w":48,"h":56,"n":9,"r":8,"d":[3,5,5,5,5,5,5,5,3],"ax":19.5,"ay":31.5},"Charge":{"w":40,"h":56,"n":10,"r":8,"d":[4,4,4,4,4,4,4,4,4,4],"ax":20.5,"ay":32.5},"Hurt":{"w":48,"h":64,"n":2,"r":8,"d":[2,8],"ax":22.5,"ay":30.5},"Faint":{"w":48,"h":64,"n":2,"r":8,"d":[2,8],"ax":22.5,"ay":30.5}},"sh":1},"208-mega":{"s":2,"a":{"Idle":{"w":64,"h":136,"n":4,"r":8,"d":[16,12,16,12],"ax":31.5,"ay":71.5},"Walk":{"w":72,"h":128,"n":4,"r":8,"d":[10,14,10,14],"ax":35.5,"ay":67.5},"Attack":{"w":120,"h":176,"n":11,"r":8,"d":[2,6,1,1,1,2,2,2,2,2,2],"ax":59.5,"ay":90.5},"Shoot":{"w":96,"h":136,"n":12,"r":8,"d":[2,2,6,2,2,2,2,2,2,2,2,2],"ax":47.5,"ay":69.5},"Charge":{"w":64,"h":128,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":32.5,"ay":67.5},"Hurt":{"w":64,"h":128,"n":2,"r":8,"d":[2,8],"ax":31.5,"ay":65.5},"Faint":{"w":64,"h":128,"n":2,"r":8,"d":[2,8],"ax":31.5,"ay":65.5}},"sh":1},"227-mega":{"s":1,"a":{"Idle":{"w":48,"h":72,"n":7,"r":8,"d":[40,4,4,4,4,4,4],"ax":23.5,"ay":39.5},"Walk":{"w":48,"h":80,"n":9,"r":8,"d":[4,4,4,4,8,8,8,8,8],"ax":23.5,"ay":43.5},"Attack":{"w":88,"h":96,"n":14,"r":8,"d":[3,3,3,3,3,2,2,3,3,3,3,3,8,2],"ax":43.5,"ay":50.5},"Shoot":{"w":48,"h":64,"n":8,"r":8,"d":[3,6,6,3,3,3,10,3],"ax":23.5,"ay":35.5},"Charge":{"w":48,"h":56,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":23.5,"ay":31.5},"Hurt":{"w":48,"h":80,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":41.5},"Faint":{"w":48,"h":80,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":41.5}}},"229-mega":{"s":1,"a":{"Idle":{"w":40,"h":64,"n":14,"r":8,"d":[60,10,2,2,2,2,2,2,2,2,2,2,2,10],"ax":19.5,"ay":35.5},"Walk":{"w":40,"h":64,"n":4,"r":8,"d":[8,12,8,12],"ax":19.5,"ay":35.5},"Attack":{"w":64,"h":88,"n":10,"r":8,"d":[2,4,1,1,1,2,2,2,2,2],"ax":31.5,"ay":46.5},"Shoot":{"w":48,"h":64,"n":12,"r":8,"d":[6,2,6,1,1,2,2,2,2,2,2,2],"ax":23.5,"ay":33.5},"Charge":{"w":40,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":35.5},"Hurt":{"w":48,"h":64,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":31.5},"Faint":{"w":48,"h":64,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":31.5}},"sh":1},"248-mega":{"s":1,"a":{"Idle":{"w":40,"h":56,"n":4,"r":8,"d":[14,24,14,24],"ax":19.5,"ay":31.5},"Walk":{"w":40,"h":56,"n":4,"r":8,"d":[10,16,10,16],"ax":19.5,"ay":31.5},"Attack":{"w":64,"h":88,"n":11,"r":8,"d":[2,2,4,1,2,2,2,2,2,2,2],"ax":31.5,"ay":46.5},"Shoot":{"w":48,"h":56,"n":13,"r":8,"d":[2,3,6,1,2,2,2,2,2,2,2,2,2],"ax":23.5,"ay":29.5},"Charge":{"w":40,"h":48,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":27.5},"Hurt":{"w":48,"h":56,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":31.5},"Faint":{"w":48,"h":56,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":31.5}}},"282-mega":{"s":1,"a":{"Idle":{"w":32,"h":48,"n":4,"r":8,"d":[6,12,6,12],"ax":15.5,"ay":27.5},"Walk":{"w":32,"h":40,"n":4,"r":8,"d":[8,12,8,12],"ax":15.5,"ay":23.5},"Attack":{"w":72,"h":80,"n":10,"r":8,"d":[2,4,1,1,1,2,2,2,2,2],"ax":35.5,"ay":42.5},"Shoot":{"w":32,"h":48,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":16.5,"ay":27.5},"Charge":{"w":32,"h":48,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":16.5,"ay":27.5},"Hurt":{"w":40,"h":56,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":30.5},"Faint":{"w":40,"h":56,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":30.5}},"sh":1},"302-mega":{"s":2,"a":{"Idle":{"w":40,"h":56,"n":2,"r":8,"d":[40,20],"ax":19.5,"ay":31.5},"Walk":{"w":32,"h":56,"n":4,"r":8,"d":[6,8,6,8],"ax":15.5,"ay":31.5},"Attack":{"w":72,"h":96,"n":10,"r":8,"d":[2,6,1,1,1,2,2,2,2,2],"ax":35.5,"ay":50.5},"Shoot":{"w":40,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":35.5},"Charge":{"w":40,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":35.5},"Hurt":{"w":56,"h":72,"n":2,"r":8,"d":[2,8],"ax":27.5,"ay":35.5},"Faint":{"w":56,"h":72,"n":2,"r":8,"d":[2,8],"ax":27.5,"ay":35.5}},"sh":1},"303-mega":{"s":1,"a":{"Idle":{"w":56,"h":56,"n":13,"r":8,"d":[40,2,2,2,4,6,4,6,4,2,2,2,4],"ax":27.5,"ay":31.5},"Walk":{"w":48,"h":56,"n":4,"r":8,"d":[8,10,8,10],"ax":23.5,"ay":31.5},"Attack":{"w":72,"h":96,"n":10,"r":8,"d":[2,6,1,1,1,2,2,2,2,2],"ax":35.5,"ay":50.5},"Shoot":{"w":72,"h":72,"n":15,"r":8,"d":[1,1,1,2,6,1,1,2,2,2,4,2,2,1,1],"ax":35.5,"ay":39.5},"Charge":{"w":56,"h":56,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":28.5,"ay":31.5},"Hurt":{"w":64,"h":64,"n":2,"r":8,"d":[2,8],"ax":31.5,"ay":33.5},"Faint":{"w":40,"h":48,"n":4,"r":8,"d":[8,12,4,10],"ax":19.5,"ay":27.5}},"sh":1},"308-mega":{"s":1,"a":{"Idle":{"w":32,"h":56,"n":6,"r":8,"d":[40,8,8,8,8,8],"ax":15.5,"ay":31.5},"Walk":{"w":32,"h":56,"n":8,"r":8,"d":[6,6,6,6,6,6,6,6],"ax":15.5,"ay":31.5},"Attack":{"w":72,"h":80,"n":11,"r":8,"d":[2,2,4,2,2,2,2,2,2,2,2],"ax":35.5,"ay":43.5},"Shoot":{"w":40,"h":56,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":31.5},"Charge":{"w":40,"h":56,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":31.5},"Hurt":{"w":48,"h":72,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":35.5},"Faint":{"w":48,"h":72,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":35.5}}},"310-mega":{"s":1,"a":{"Idle":{"w":40,"h":56,"n":14,"r":8,"d":[60,10,2,2,2,2,2,2,2,2,2,2,2,10],"ax":19.5,"ay":31.5},"Walk":{"w":40,"h":56,"n":4,"r":8,"d":[8,10,8,10],"ax":19.5,"ay":31.5},"Attack":{"w":72,"h":88,"n":13,"r":8,"d":[2,2,6,2,2,2,2,2,2,2,2,2,2],"ax":35.5,"ay":44.5},"Shoot":{"w":48,"h":64,"n":11,"r":8,"d":[2,6,2,2,2,2,2,2,2,2,2],"ax":23.5,"ay":33.5},"Charge":{"w":40,"h":56,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":31.5},"Hurt":{"w":48,"h":64,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":31.5},"Faint":{"w":48,"h":64,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":31.5}},"sh":1},"319-mega":{"s":1,"a":{"Idle":{"w":40,"h":48,"n":4,"r":8,"d":[16,16,16,16],"ax":19.5,"ay":27.5},"Walk":{"w":40,"h":56,"n":8,"r":8,"d":[10,8,8,8,10,8,8,8],"ax":19.5,"ay":31.5},"Attack":{"w":80,"h":80,"n":10,"r":8,"d":[2,4,1,1,1,2,2,2,2,2],"ax":39.5,"ay":42.5},"Shoot":{"w":80,"h":80,"n":10,"r":8,"d":[2,4,1,1,1,2,2,2,2,2],"ax":39.5,"ay":42.5},"Charge":{"w":40,"h":48,"n":4,"r":8,"d":[16,16,16,16],"ax":19.5,"ay":27.5},"Hurt":{"w":40,"h":48,"n":4,"r":8,"d":[16,16,16,16],"ax":19.5,"ay":27.5},"Faint":{"w":40,"h":48,"n":4,"r":8,"d":[16,16,16,16],"ax":19.5,"ay":27.5}},"sh":1},"323-mega":{"s":1,"a":{"Idle":{"w":40,"h":48,"n":4,"r":8,"d":[8,20,8,20],"ax":19.5,"ay":27.5},"Walk":{"w":40,"h":48,"n":4,"r":8,"d":[8,10,8,10],"ax":19.5,"ay":27.5},"Attack":{"w":72,"h":80,"n":10,"r":8,"d":[2,6,1,1,1,2,2,2,2,2],"ax":35.5,"ay":42.5},"Shoot":{"w":48,"h":48,"n":11,"r":8,"d":[2,6,2,2,2,2,2,2,2,2,2],"ax":23.5,"ay":25.5},"Charge":{"w":40,"h":48,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":27.5},"Hurt":{"w":40,"h":64,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":33.5},"Faint":{"w":40,"h":64,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":33.5}},"sh":1},"334-mega":{"s":2,"a":{"Idle":{"w":64,"h":104,"n":8,"r":8,"d":[12,12,12,12,12,12,12,12],"ax":31.5,"ay":55.5},"Walk":{"w":64,"h":104,"n":10,"r":8,"d":[6,6,8,8,6,6,6,8,8,6],"ax":31.5,"ay":55.5},"Attack":{"w":72,"h":128,"n":15,"r":8,"d":[2,2,2,2,2,4,1,1,2,2,2,2,2,2,2],"ax":35.5,"ay":67.5},"Shoot":{"w":80,"h":120,"n":14,"r":8,"d":[2,2,2,2,6,1,1,2,2,2,2,2,2,2],"ax":39.5,"ay":63.5},"Charge":{"w":64,"h":112,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":32.5,"ay":59.5},"Hurt":{"w":72,"h":120,"n":2,"r":8,"d":[2,8],"ax":35.5,"ay":59.5},"Faint":{"w":72,"h":120,"n":2,"r":8,"d":[2,8],"ax":35.5,"ay":59.5}},"sh":1},"354-mega":{"s":1,"a":{"Idle":{"w":32,"h":64,"n":9,"r":8,"d":[50,6,6,6,6,6,6,6,6],"ax":15.5,"ay":35.5},"Walk":{"w":32,"h":64,"n":4,"r":8,"d":[8,10,8,10],"ax":15.5,"ay":35.5},"Attack":{"w":72,"h":80,"n":10,"r":8,"d":[2,4,1,1,1,2,2,2,2,2],"ax":35.5,"ay":42.5},"Shoot":{"w":32,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":16.5,"ay":35.5},"Charge":{"w":32,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":16.5,"ay":35.5},"Hurt":{"w":56,"h":80,"n":2,"r":8,"d":[2,8],"ax":27.5,"ay":41.5},"Faint":{"w":56,"h":80,"n":2,"r":8,"d":[2,8],"ax":27.5,"ay":41.5}},"sh":1},"359-mega":{"s":1,"a":{"Idle":{"w":40,"h":56,"n":2,"r":8,"d":[30,30],"ax":19.5,"ay":31.5},"Walk":{"w":40,"h":56,"n":4,"r":8,"d":[8,10,8,10],"ax":19.5,"ay":31.5},"Attack":{"w":72,"h":80,"n":10,"r":8,"d":[2,4,1,1,1,2,2,2,2,2],"ax":35.5,"ay":42.5},"Shoot":{"w":72,"h":80,"n":10,"r":8,"d":[2,4,1,1,1,2,2,2,2,2],"ax":35.5,"ay":42.5},"Charge":{"w":40,"h":56,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":31.5},"Hurt":{"w":40,"h":56,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":29.5},"Faint":{"w":40,"h":56,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":29.5}},"sh":1},"362-mega":{"s":2,"a":{"Idle":{"w":32,"h":72,"n":8,"r":8,"d":[6,6,6,6,6,6,6,6],"ax":15.5,"ay":39.5},"Walk":{"w":32,"h":72,"n":8,"r":8,"d":[6,6,6,6,6,6,6,6],"ax":15.5,"ay":39.5},"Attack":{"w":72,"h":104,"n":10,"r":8,"d":[2,6,1,1,1,2,2,2,2,2],"ax":35.5,"ay":54.5},"Shoot":{"w":48,"h":72,"n":11,"r":8,"d":[2,6,2,2,2,2,2,2,2,2,2],"ax":23.5,"ay":37.5},"Charge":{"w":40,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":35.5},"Hurt":{"w":48,"h":80,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":39.5},"Faint":{"w":48,"h":80,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":39.5}},"sh":1},"380-mega":{"s":2,"a":{"Idle":{"w":72,"h":72,"n":6,"r":8,"d":[8,8,8,8,8,8],"ax":35.5,"ay":39.5},"Walk":{"w":72,"h":72,"n":12,"r":8,"d":[4,4,4,4,4,4,4,4,4,4,4,4],"ax":35.5,"ay":39.5},"Attack":{"w":88,"h":80,"n":11,"r":8,"d":[2,2,6,1,1,1,2,2,2,2,2],"ax":43.5,"ay":42.5},"Shoot":{"w":80,"h":88,"n":12,"r":8,"d":[2,6,1,1,2,2,2,2,2,2,2,2],"ax":39.5,"ay":45.5},"Charge":{"w":80,"h":88,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":40.5,"ay":47.5},"Hurt":{"w":80,"h":96,"n":2,"r":8,"d":[2,8],"ax":39.5,"ay":49.5},"Faint":{"w":80,"h":96,"n":2,"r":8,"d":[2,8],"ax":39.5,"ay":49.5}},"sh":1},"381-mega":{"s":2,"a":{"Idle":{"w":80,"h":80,"n":6,"r":8,"d":[8,8,8,8,8,8],"ax":39.5,"ay":43.5},"Walk":{"w":80,"h":80,"n":12,"r":8,"d":[4,4,4,4,4,4,4,4,4,4,4,4],"ax":39.5,"ay":43.5},"Attack":{"w":96,"h":88,"n":11,"r":8,"d":[2,2,6,1,1,1,2,2,2,2,2],"ax":47.5,"ay":46.5},"Shoot":{"w":88,"h":96,"n":12,"r":8,"d":[2,6,1,1,2,2,2,2,2,2,2,2],"ax":43.5,"ay":49.5},"Charge":{"w":88,"h":88,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":44.5,"ay":47.5},"Hurt":{"w":80,"h":104,"n":2,"r":8,"d":[2,8],"ax":39.5,"ay":53.5},"Faint":{"w":80,"h":104,"n":2,"r":8,"d":[2,8],"ax":39.5,"ay":53.5}},"sh":1},"382-primal":{"s":2,"a":{"Idle":{"w":64,"h":72,"n":10,"r":8,"d":[10,14,14,14,14,10,14,14,14,14],"ax":31.5,"ay":39.5},"Walk":{"w":64,"h":72,"n":10,"r":8,"d":[8,8,8,8,8,8,8,8,8,8],"ax":31.5,"ay":39.5},"Attack":{"w":80,"h":72,"n":10,"r":8,"d":[2,6,1,1,2,2,2,2,2,2],"ax":39.5,"ay":38.5},"Shoot":{"w":72,"h":72,"n":11,"r":8,"d":[2,6,2,2,2,2,2,2,2,2,2],"ax":35.5,"ay":37.5},"Charge":{"w":64,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":32.5,"ay":35.5},"Hurt":{"w":64,"h":88,"n":2,"r":8,"d":[2,8],"ax":31.5,"ay":43.5},"Faint":{"w":64,"h":88,"n":2,"r":8,"d":[2,8],"ax":31.5,"ay":43.5}},"sh":1},"383-primal":{"s":2,"a":{"Idle":{"w":72,"h":80,"n":14,"r":8,"d":[60,10,2,2,2,2,2,2,2,2,2,2,2,10],"ax":35.5,"ay":43.5},"Walk":{"w":72,"h":80,"n":4,"r":8,"d":[10,12,10,12],"ax":35.5,"ay":43.5},"Attack":{"w":88,"h":104,"n":10,"r":8,"d":[2,6,1,1,2,2,2,2,2,2],"ax":43.5,"ay":54.5},"Shoot":{"w":80,"h":88,"n":12,"r":8,"d":[2,2,6,2,2,2,2,2,2,2,2,2],"ax":39.5,"ay":45.5},"Charge":{"w":64,"h":80,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":32.5,"ay":43.5},"Hurt":{"w":72,"h":80,"n":2,"r":8,"d":[2,8],"ax":35.5,"ay":39.5},"Faint":{"w":72,"h":80,"n":2,"r":8,"d":[2,8],"ax":35.5,"ay":39.5}},"sh":1},"384-mega":{"s":2,"a":{"Idle":{"w":144,"h":136,"n":10,"r":8,"d":[10,14,14,14,14,10,14,14,14,14],"ax":71.5,"ay":71.5},"Walk":{"w":144,"h":128,"n":4,"r":8,"d":[16,16,16,16],"ax":71.5,"ay":67.5},"Attack":{"w":176,"h":144,"n":10,"r":8,"d":[2,4,1,1,1,2,2,2,2,2],"ax":87.5,"ay":74.5},"Shoot":{"w":120,"h":136,"n":11,"r":8,"d":[2,6,2,2,2,2,2,2,2,2,2],"ax":59.5,"ay":69.5},"Charge":{"w":128,"h":136,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":64.5,"ay":71.5},"Hurt":{"w":104,"h":144,"n":2,"r":8,"d":[2,8],"ax":51.5,"ay":73.5},"Faint":{"w":104,"h":144,"n":2,"r":8,"d":[2,8],"ax":51.5,"ay":73.5}},"sh":1},"428-mega":{"s":1,"a":{"Idle":{"w":40,"h":56,"n":7,"r":8,"d":[20,4,2,4,4,2,6],"ax":19.5,"ay":31.5},"Walk":{"w":40,"h":64,"n":9,"r":8,"d":[6,2,2,4,4,4,4,6,4],"ax":19.5,"ay":33.5},"Attack":{"w":72,"h":80,"n":10,"r":8,"d":[2,2,6,1,2,2,4,4,2,2],"ax":35.5,"ay":41.5},"Shoot":{"w":48,"h":56,"n":12,"r":8,"d":[2,2,6,1,2,2,2,2,2,2,2,2],"ax":23.5,"ay":30.5},"Charge":{"w":40,"h":48,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":27.5},"Hurt":{"w":48,"h":56,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":29.5},"Faint":{"w":48,"h":56,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":29.5}},"sh":1},"448-mega":{"s":1,"a":{"Idle":{"w":32,"h":48,"n":10,"r":8,"d":[40,2,2,2,2,2,2,2,2,12],"ax":15.5,"ay":27.5},"Walk":{"w":32,"h":48,"n":4,"r":8,"d":[8,10,8,10],"ax":15.5,"ay":27.5},"Attack":{"w":64,"h":80,"n":13,"r":8,"d":[2,2,2,2,1,1,1,1,2,2,2,2,2],"ax":32.5,"ay":41.5},"Shoot":{"w":64,"h":80,"n":13,"r":8,"d":[2,2,2,2,1,1,1,1,2,2,2,2,2],"ax":32.5,"ay":41.5},"Charge":{"w":32,"h":48,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":16.5,"ay":27.5},"Hurt":{"w":40,"h":56,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":29.5},"Faint":{"w":40,"h":56,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":29.5}},"sh":1},"475-mega":{"s":1,"a":{"Idle":{"w":24,"h":64,"n":5,"r":8,"d":[60,2,6,2,26],"ax":11.5,"ay":35.5},"Walk":{"w":24,"h":48,"n":4,"r":8,"d":[12,12,12,12],"ax":11.5,"ay":27.5},"Attack":{"w":64,"h":80,"n":13,"r":8,"d":[2,2,6,1,1,1,2,2,2,2,2,1,2],"ax":31.5,"ay":41.5},"Shoot":{"w":40,"h":56,"n":12,"r":8,"d":[2,2,6,1,2,2,2,2,2,2,2,2],"ax":19.5,"ay":30.5},"Charge":{"w":24,"h":56,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":12.5,"ay":31.5},"Hurt":{"w":40,"h":56,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":29.5},"Faint":{"w":40,"h":56,"n":2,"r":8,"d":[2,8],"ax":19.5,"ay":29.5}},"sh":1},"491-mega":{"s":2,"a":{"Idle":{"w":96,"h":96,"n":11,"r":8,"d":[10,5,10,5,10,5,10,5,10,5,15],"ax":47.5,"ay":51.5},"Walk":{"w":96,"h":96,"n":6,"r":8,"d":[10,10,10,10,10,10],"ax":47.5,"ay":51.5},"Attack":{"w":104,"h":136,"n":10,"r":8,"d":[3,3,2,2,2,2,4,4,4,2],"ax":51.5,"ay":71.5},"Shoot":{"w":96,"h":96,"n":12,"r":8,"d":[3,5,6,3,3,4,4,4,4,4,2,2],"ax":47.5,"ay":49.5},"Charge":{"w":88,"h":80,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":43.5,"ay":43.5},"Hurt":{"w":88,"h":104,"n":2,"r":8,"d":[2,8],"ax":43.5,"ay":53.5},"Faint":{"w":88,"h":104,"n":2,"r":8,"d":[2,8],"ax":43.5,"ay":53.5}}},"530-mega":{"s":2,"a":{"Idle":{"w":72,"h":64,"n":4,"r":8,"d":[48,18,28,24],"ax":35.5,"ay":35.5},"Walk":{"w":64,"h":64,"n":4,"r":8,"d":[10,16,10,16],"ax":31.5,"ay":35.5},"Attack":{"w":120,"h":104,"n":11,"r":8,"d":[2,2,2,6,2,2,2,2,2,2,2],"ax":59.5,"ay":54.5},"Shoot":{"w":80,"h":72,"n":13,"r":8,"d":[2,3,6,1,2,2,2,2,2,2,2,2,2],"ax":39.5,"ay":37.5},"Charge":{"w":72,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":36.5,"ay":35.5},"Hurt":{"w":80,"h":64,"n":2,"r":8,"d":[2,8],"ax":39.5,"ay":33.5},"Faint":{"w":80,"h":64,"n":2,"r":8,"d":[2,8],"ax":39.5,"ay":33.5}},"sh":1},"560-mega":{"s":1,"a":{"Idle":{"w":32,"h":48,"n":1,"r":8,"d":[8],"ax":15.5,"ay":27.5},"Walk":{"w":32,"h":48,"n":4,"r":8,"d":[8,10,8,10],"ax":15.5,"ay":27.5},"Attack":{"w":72,"h":96,"n":14,"r":8,"d":[2,2,2,2,4,1,1,2,2,2,2,2,2,2],"ax":35.5,"ay":50.5},"Shoot":{"w":72,"h":96,"n":14,"r":8,"d":[2,2,2,2,4,1,1,2,2,2,2,2,2,2],"ax":35.5,"ay":50.5},"Charge":{"w":32,"h":48,"n":1,"r":8,"d":[8],"ax":15.5,"ay":27.5},"Hurt":{"w":32,"h":48,"n":1,"r":8,"d":[8],"ax":15.5,"ay":27.5},"Faint":{"w":32,"h":48,"n":1,"r":8,"d":[8],"ax":15.5,"ay":27.5}},"sh":1},"604-mega":{"s":2,"a":{"Idle":{"w":80,"h":72,"n":10,"r":8,"d":[10,14,14,14,14,10,14,14,14,14],"ax":39.5,"ay":39.5},"Walk":{"w":80,"h":72,"n":10,"r":8,"d":[8,8,8,8,8,8,8,8,8,8],"ax":39.5,"ay":39.5},"Attack":{"w":88,"h":104,"n":14,"r":8,"d":[2,2,6,1,2,2,2,2,2,2,2,2,2,2],"ax":43.5,"ay":53.5},"Shoot":{"w":88,"h":64,"n":12,"r":8,"d":[2,2,6,1,2,2,2,2,2,2,2,2],"ax":43.5,"ay":34.5},"Charge":{"w":72,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":36.5,"ay":35.5},"Hurt":{"w":80,"h":72,"n":2,"r":8,"d":[2,8],"ax":39.5,"ay":37.5},"Faint":{"w":80,"h":72,"n":2,"r":8,"d":[2,8],"ax":39.5,"ay":37.5}},"sh":1},"670-mega":{"s":1,"a":{"Idle":{"w":80,"h":120,"n":18,"r":8,"d":[10,14,14,14,14,10,2,2,2,2,2,2,2,14,14,14,14,14],"ax":39.5,"ay":63.5},"Walk":{"w":80,"h":112,"n":10,"r":8,"d":[8,8,8,8,8,8,8,8,8,8],"ax":39.5,"ay":59.5},"Attack":{"w":128,"h":112,"n":15,"r":8,"d":[2,2,1,3,1,3,2,1,2,2,2,2,2,2,10],"ax":63.5,"ay":58.5},"Shoot":{"w":112,"h":112,"n":13,"r":8,"d":[2,3,4,4,1,1,2,2,2,2,2,2,8],"ax":55.5,"ay":57.5},"Charge":{"w":104,"h":64,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":52.5,"ay":35.5},"Hurt":{"w":88,"h":112,"n":2,"r":8,"d":[2,8],"ax":43.5,"ay":55.5},"Faint":{"w":88,"h":112,"n":2,"r":8,"d":[2,8],"ax":43.5,"ay":55.5}},"sh":1},"691-mega":{"s":1,"a":{"Idle":{"w":48,"h":80,"n":10,"r":8,"d":[10,14,14,14,14,10,14,14,14,14],"ax":23.5,"ay":43.5},"Walk":{"w":56,"h":72,"n":5,"r":8,"d":[10,10,12,10,12],"ax":27.5,"ay":39.5},"Attack":{"w":88,"h":96,"n":10,"r":8,"d":[2,4,1,1,1,2,2,2,2,2],"ax":43.5,"ay":50.5},"Shoot":{"w":56,"h":80,"n":11,"r":8,"d":[2,6,1,2,2,2,2,2,2,2,2],"ax":27.5,"ay":41.5},"Charge":{"w":48,"h":72,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":24.5,"ay":39.5},"Hurt":{"w":56,"h":88,"n":2,"r":8,"d":[2,8],"ax":27.5,"ay":45.5},"Faint":{"w":56,"h":88,"n":2,"r":8,"d":[2,8],"ax":27.5,"ay":45.5}},"sh":1},"718-mega":{"s":2,"a":{"Idle":{"w":120,"h":200,"n":10,"r":8,"d":[10,14,14,14,14,10,14,14,14,14],"ax":59.5,"ay":103.5},"Walk":{"w":120,"h":200,"n":10,"r":8,"d":[8,8,8,8,8,8,8,8,8,8],"ax":59.5,"ay":103.5},"Attack":{"w":160,"h":224,"n":14,"r":8,"d":[2,2,6,1,1,1,2,2,2,2,2,2,2,2],"ax":79.5,"ay":113.5},"Shoot":{"w":128,"h":184,"n":14,"r":8,"d":[2,10,1,2,2,2,2,2,2,2,2,2,2,4],"ax":63.5,"ay":93.5},"Charge":{"w":120,"h":184,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":60.5,"ay":95.5},"Hurt":{"w":120,"h":184,"n":2,"r":8,"d":[2,8],"ax":59.5,"ay":91.5},"Faint":{"w":120,"h":184,"n":2,"r":8,"d":[2,8],"ax":59.5,"ay":91.5}},"sh":1},"719-mega":{"s":1,"a":{"Idle":{"w":64,"h":88,"n":4,"r":8,"d":[16,12,16,12],"ax":31.5,"ay":47.5},"Walk":{"w":56,"h":88,"n":9,"r":8,"d":[4,4,4,4,4,4,4,4,4],"ax":27.5,"ay":47.5},"Attack":{"w":80,"h":104,"n":14,"r":8,"d":[2,2,6,1,1,1,2,2,2,2,2,2,1,2],"ax":39.5,"ay":53.5},"Shoot":{"w":56,"h":88,"n":12,"r":8,"d":[2,2,6,1,2,2,2,2,2,2,2,2],"ax":27.5,"ay":46.5},"Charge":{"w":64,"h":96,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":32.5,"ay":51.5},"Hurt":{"w":48,"h":88,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":45.5},"Faint":{"w":48,"h":88,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":45.5}},"sh":1},"780-mega":{"s":2,"a":{"Idle":{"w":64,"h":104,"n":10,"r":8,"d":[10,14,14,14,14,10,14,14,14,14],"ax":31.5,"ay":55.5},"Walk":{"w":64,"h":104,"n":10,"r":8,"d":[8,8,6,6,6,8,8,6,6,6],"ax":31.5,"ay":55.5},"Attack":{"w":120,"h":120,"n":14,"r":8,"d":[2,2,6,1,1,1,2,2,2,2,2,2,2,2],"ax":59.5,"ay":61.5},"Shoot":{"w":88,"h":112,"n":11,"r":8,"d":[2,6,2,2,2,2,2,2,2,2,2],"ax":43.5,"ay":57.5},"Charge":{"w":64,"h":112,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":32.5,"ay":59.5},"Hurt":{"w":80,"h":136,"n":2,"r":8,"d":[2,8],"ax":39.5,"ay":67.5},"Faint":{"w":80,"h":136,"n":2,"r":8,"d":[2,8],"ax":39.5,"ay":67.5}},"sh":1},"807-mega":{"s":1,"a":{"Idle":{"w":48,"h":48,"n":10,"r":8,"d":[40,2,2,2,2,2,2,2,2,12],"ax":23.5,"ay":27.5},"Walk":{"w":48,"h":48,"n":4,"r":8,"d":[6,6,6,6],"ax":23.5,"ay":27.5},"Attack":{"w":64,"h":72,"n":15,"r":8,"d":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"ax":31.5,"ay":38.5},"Shoot":{"w":64,"h":72,"n":15,"r":8,"d":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"ax":31.5,"ay":38.5},"Charge":{"w":48,"h":48,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":24.5,"ay":27.5},"Hurt":{"w":48,"h":56,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":29.5},"Faint":{"w":48,"h":56,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":29.5}},"sh":1},"978-mega":{"s":1,"a":{"Idle":{"w":40,"h":48,"n":8,"r":8,"d":[8,8,8,8,8,8,8,8],"ax":19.5,"ay":27.5},"Walk":{"w":40,"h":48,"n":8,"r":8,"d":[6,6,6,6,6,6,6,6],"ax":19.5,"ay":27.5},"Attack":{"w":88,"h":72,"n":10,"r":8,"d":[2,6,1,1,1,2,2,2,2,2],"ax":43.5,"ay":38.5},"Shoot":{"w":48,"h":48,"n":11,"r":8,"d":[2,6,2,2,2,2,2,2,2,2,2],"ax":23.5,"ay":25.5},"Charge":{"w":40,"h":48,"n":10,"r":8,"d":[2,2,2,2,2,2,2,2,2,2],"ax":20.5,"ay":27.5},"Hurt":{"w":48,"h":64,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":31.5},"Faint":{"w":48,"h":64,"n":2,"r":8,"d":[2,8],"ax":23.5,"ay":31.5}},"sh":1}};
 let current=null, used=false, restore=null;
 let lastLevel=0, rewardPending=false;
-const ROLL_CHANCE=0.50;
+const ROLL_CHANCE=0.50; // TESTING: 50%. For release, set to 0.01 (1%).
 let stoneOwned=false;
 function allowMegaByLevel(player, forms){
   const lv=Number(player?.level||1);
@@ -13,7 +13,7 @@ function allowMegaByLevel(player, forms){
   if(!player||used||!forms.length||lv<10||rewardPending||stoneOwned)return;
   if(lastLevel<1){lastLevel=lv;return;}
   if(lv>lastLevel){
-    // Each level-up at level 10+ gives one roll, mirroring the source's 2% odds.
+    // Each level-up at level 10+ gives one roll, using ROLL_CHANCE.
     for(let newLv=Math.max(10,lastLevel+1);newLv<=lv;newLv++){
       if(Math.random()<ROLL_CHANCE){rewardPending=true;break;}
     }
@@ -21,19 +21,30 @@ function allowMegaByLevel(player, forms){
   lastLevel=lv;
 }
 const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
- const PRIMAL_RADIUS=430; // world units: persistent, player-centered AOE, not global
- const WEATHER={
-  '383-primal':{name:'DESOLATE LAND',boost:['fire','ground','rock'],weaken:['water','ice'],radius:PRIMAL_RADIUS,ring:'#f5ac45',fill:'rgba(255,149,45,.13)'},
-  '382-primal':{name:'PRIMORDIAL SEA',boost:['water','ice'],weaken:['fire','rock'],radius:PRIMAL_RADIUS,ring:'#54cfff',fill:'rgba(45,155,235,.13)'}
- };
- let activePrimal=null;
- const tracked=new WeakMap();
+ // ================= PRIMAL REVERSION =================
+ // Tuning knobs: edit these numbers to rebalance Primal Kyogre / Groudon.
+ // Multipliers are relative to the Pokemon's stats right before Primal Reversion.
+ const PRIMAL_BALANCE={atk:1.8,spa:1.8,hp:1.6,spd:1.1};
+ const PRIMAL_RADIUS=430; // world units: size of the visual weather domain around the player
 
- // Native move entries: created in the real move database and learned upon Primal Reversion.
- // They use the engine's standard cooldown, weapon slot, auto-attacks and upgrade display.
+ // Primal weather takes over the game's own weather system (the same one natural rain/sun use).
+ // Why: the engine then applies the type multiplier itself, to every kind of move (projectiles,
+ // melee, beams, auras, chains...) and to enemy attacks; it never stacks with natural weather
+ // (only one weather can exist at a time); and it ends cleanly.
+ // ONLY the types listed in 'mult' change. Every other type stays at exactly 1x.
+ const WEATHER={
+  '383-primal':{name:'Desolate Land',kind:'harsh',hint:'Fire moves deal 1.5x, Water moves evaporate (0.1x)',mult:{fire:1.5,water:0.1},ring:'#ffb347',fx:'sun'},
+  '382-primal':{name:'Primordial Sea',kind:'storm',hint:'Water moves deal 1.5x, Fire moves fizzle out (0.1x)',mult:{water:1.5,fire:0.1},ring:'#54cfff',fx:'rain'}
+ };
+ const PRIMAL_WEATHER_DUR=1e9; // effectively "until the run ends"
+ let activePrimal=null; // {player,cfg,saved,lastForce}
+
+ // Signature moves: real entries in the game's move database, learned on Primal Reversion.
+ // Origin Pulse is a 'chain' move like Hex: it locks on to the nearest foe (tracking) and arcs
+ // lightning-style beams from foe to foe (each jump does 85% of the previous one).
  const SIGNATURE_MOVES={
-   '383-primal':{id:'precipice-blades',name:'Precipice Blades',type:'ground',kind:'nova',desc:'A powerful eruption of jagged ground blades around Groudon.',cd:3.7,dmg:36,speed:250,count:16,pierce:3,life:1.4,size:18},
-   '382-primal':{id:'origin-pulse',name:'Origin Pulse',type:'water',kind:'nova',desc:'Blue water pulses radiate outward in every direction.',cd:2.6,dmg:34,speed:390,count:16,pierce:3,life:1.7,size:14}
+   '383-primal':{id:'precipice-blades',name:'Precipice Blades',type:'ground',kind:'nova',desc:'Jagged blades of stone erupt outward in every direction.',cd:3.0,dmg:30,speed:260,count:16,pierce:3,life:1.3,size:16},
+   '382-primal':{id:'origin-pulse',name:'Origin Pulse',type:'water',kind:'chain',desc:'Beams of blue light lock on to a foe and arc from foe to foe.',cd:1.3,dmg:30,count:8,radius:230}
  };
  function registerSignatureMoves(){
    const m=getBridge()?.moves;
@@ -54,12 +65,19 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  function grantSignature(p,form){
    const def=SIGNATURE_MOVES[form];
    if(!def||!registerSignatureMoves()||typeof p.addMove!=='function')return null;
-   const previousMax=p.maxMoves;
-   p.maxMoves=Math.max(Number(previousMax)||4,(p.slots?.length||0)+1);
-   const granted=p.addMove(def.id);
-   if(!granted){p.maxMoves=previousMax;return null;}
+   if(typeof p.hasMove==='function'&&p.hasMove(def.id))return null;
+   const previousMax=Number(p.maxMoves)||4;
+   // Bonus slot: the signature move never uses up one of your normal move slots,
+   // so it always fits, even with a full move bar.
+   p.maxMoves=Math.max(previousMax,p.slots?.length||0)+1;
+   if(!p.addMove(def.id)){
+     p.maxMoves=previousMax;
+     // Fallback: the game's own "learn this move / choose a move to forget" prompt (pauses the run).
+     try{getBridge()?.game?.runTm?.(def.id);}catch(e){console.warn('Primal move prompt:',e);}
+     return null;
+   }
    return ()=>{
-     // Remove the temporary signature slot without altering existing learned moves.
+     // Remove the bonus signature slot without altering the normal learned moves.
      const i=p.slots?.findIndex(slot=>Array.isArray(slot)&&slot.some(move=>move.id===def.id))??-1;
      if(i>=0){const slot=p.slots.splice(i,1)[0];for(const move of slot)p.moves=p.moves.filter(v=>v!==move);}
      p.maxMoves=previousMax;
@@ -67,64 +85,116 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      if(p.slots?.length)p.active=Math.min(Number(p.active)||0,p.slots.length-1);
    };
  }
- function attackType(obj,b){
-   const explicit=obj?.mtype||obj?.moveType||obj?.type||obj?.vis?.pal;
-   if(typeof explicit==='string')return explicit.toLowerCase();
-   const def=b?.moves?.BY_ID?.[obj?.mid]||b?.moves?.BY_ID?.[obj?.moveId];
-   return typeof def?.type==='string'?def.type.toLowerCase():null;
+
+ // ---- Weather takeover ----
+ function weatherApi(){const w=getBridge()?.weather;return w&&w.KINDS&&typeof w.force==='function'?w:null;}
+ function startPrimalWeather(p,cfg){
+   const w=weatherApi();
+   activePrimal={player:p,cfg,saved:null,lastForce:performance.now()};
+   if(!w)return;
+   const native=w.KINDS[cfg.kind]||{};
+   activePrimal.saved={kind:cfg.kind,entry:w.KINDS[cfg.kind]};
+   // Keep the native look (icon, tint, rain/sun particles) but REPLACE the multiplier table
+   // and drop any side effects (chip damage, healing, slowing, status blocking).
+   w.KINDS[cfg.kind]={name:cfg.name,hint:cfg.hint,icon:native.icon,color:native.color||cfg.ring,tint:native.tint||[0,0,0,0],mult:Object.assign({},cfg.mult)};
+   w.force(cfg.kind,PRIMAL_WEATHER_DUR);
  }
- function prismMultiplier(type,cfg){return cfg.boost.includes(type)?1.5:cfg.weaken.includes(type)?0.8:1;}
- function clearPrimal(){
-   if(activePrimal){restoreProjectileDamage(getBridge());activePrimal=null;}
- }
- function restoreProjectileDamage(b){
-   const arr=b?.projectiles?.all?.()||[];
-   for(const q of arr){const state=tracked.get(q);if(state&&Number.isFinite(q.dmg)){q.dmg=state.base;if(Number.isFinite(state.origRadius))q.r=state.origRadius;tracked.delete(q);}}
- }
- function updatePrimalDamage(b,p){
-   if(!activePrimal||!p||p!==activePrimal.player){clearPrimal();return;}
-   const cfg=activePrimal.cfg,all=b?.projectiles?.all?.();if(!Array.isArray(all))return;
-   for(const q of all){
-     if(!q||!Number.isFinite(q.dmg)||!Number.isFinite(q.x)||!Number.isFinite(q.y))continue;
-     const previous=tracked.get(q);
-     const base=previous?.base??q.dmg;
-     // If game code altered damage independently, update baseline without multiplying repeatedly.
-     if(previous && Math.abs(q.dmg - previous.base*previous.factor)>Math.max(0.001,Math.abs(q.dmg)*.002)){
-       tracked.set(q,{...previous,base:q.dmg,factor:1});
-     }
-     const trueBase=tracked.get(q)?.base??base;
-     const dx=q.x-p.x,dy=q.y-p.y;
-     const inside=dx*dx+dy*dy<=cfg.radius*cfg.radius;
-     const type=attackType(q,b);
-     const isFriendly=q.owner===p || q.friendly===true || q.team==='player';
-     if(isFriendly){
-       const radiusState=tracked.get(q);
-       if(radiusState && radiusState.origRadius!==undefined){
-         if(Number.isFinite(q.r))q.r=radiusState.origRadius*1.65;
-       }else if(Number.isFinite(q.r)){
-         const first=tracked.get(q)||{base:trueBase,factor:1};
-         tracked.set(q,{...first,origRadius:q.r});
-         q.r*=1.65;
-       }
-     }
-     const factor=(isFriendly?2:1)*(inside&&type?prismMultiplier(type,cfg):1);
-     // For hostile attacks, use the same elemental modifiers while inside the aura.
-     q.dmg=trueBase*factor;
-     tracked.set(q,{...tracked.get(q),base:trueBase,factor});
+ function keepPrimalWeather(){
+   if(!activePrimal)return;
+   const p=getPlayer();
+   if(!p||p!==activePrimal.player){clearPrimal();return;}
+   const w=weatherApi();if(!w)return;
+   const cur=w.current, kind=activePrimal.cfg.kind, now=performance.now();
+   // Something else replaced or cleared the weather: put Primal weather back.
+   // (current is briefly null while weather fades in, hence the 4s grace period.)
+   if((cur&&cur.kind!==kind)||(!cur&&getBridge()?.game?.state==='playing'&&now-activePrimal.lastForce>4000)){
+     activePrimal.lastForce=now;w.force(kind,PRIMAL_WEATHER_DUR);
    }
  }
- const ring=document.createElement('div');ring.id='ps-primal-aura-ring';
- ring.style.cssText='display:none;position:fixed;pointer-events:none;z-index:20;width:780px;height:780px;border-radius:50%;border:4px solid #f5ac45;box-shadow:0 0 0 5px #ffffff16,inset 0 0 46px #ffffff10;opacity:.65;box-sizing:border-box;transform:translate(-50%,-50%)';
- function displayPrimalRing(){
-   if(!activePrimal){ring.style.display='none';return;}
-   const canvases=[...document.querySelectorAll('canvas')].filter(c=>{const r=c.getBoundingClientRect();return r.width>400&&r.height>250;}).sort((a,b)=>{const aR=a.getBoundingClientRect(),bR=b.getBoundingClientRect();return bR.width*bR.height-aR.width*aR.height;});
-   const box=canvases[0]?.getBoundingClientRect();
-   if(!box){ring.style.display='none';return;}
-   ring.style.left=(box.left+box.width/2)+'px';ring.style.top=(box.top+box.height/2)+'px';
-   ring.style.borderColor=activePrimal.cfg.ring;
-   ring.style.background=activePrimal.cfg.fill;
-   ring.style.display='block';
+ function clearPrimal(){
+   if(!activePrimal)return;
+   const w=weatherApi(),s=activePrimal.saved;activePrimal=null;
+   if(w&&s){
+     w.KINDS[s.kind]=s.entry; // restore the natural weather entry exactly as it was
+     const cur=w.current;if(!cur||cur.kind===s.kind)w.clear();
+   }
  }
+
+ // ---- Domain visuals: rain (Kyogre) / harsh UV sunlight (Groudon) ----
+ const ring=document.createElement('canvas');ring.id='ps-primal-aura-ring';
+ ring.style.cssText='display:none;position:fixed;left:0;top:0;pointer-events:none;z-index:20';
+ const fx={drops:[],ripples:[],motes:[],last:0};
+ function gameCanvas(){
+   return [...document.querySelectorAll('canvas')].filter(c=>c!==ring&&c.width>0).map(c=>({c,r:c.getBoundingClientRect()})).filter(o=>o.r.width>400&&o.r.height>250).sort((a,b)=>b.r.width*b.r.height-a.r.width*a.r.height)[0]||null;
+ }
+ function domainOnScreen(p){
+   const g=gameCanvas(),cam=getBridge()?.camera;if(!g||!p)return null;
+   const css=g.r.width/g.c.width; // canvas pixels -> CSS pixels
+   let x,y,rad;
+   if(cam&&typeof cam.left==='function'&&Number.isFinite(cam.scale)){
+     x=g.r.left+(p.x-cam.left())*cam.scale*css;
+     y=g.r.top+(p.y-cam.top())*cam.scale*css;
+     rad=PRIMAL_RADIUS*cam.scale*css;
+   }else{x=g.r.left+g.r.width/2;y=g.r.top+g.r.height/2;rad=390;}
+   return {x,y,rad,box:g.r};
+ }
+ function drawPrimalDomain(ts){
+   requestAnimationFrame(drawPrimalDomain);
+   const p=getPlayer();
+   const on=activePrimal&&p===activePrimal.player&&getBridge()?.game?.state==='playing';
+   if(!on){if(ring.style.display!=='none')ring.style.display='none';fx.drops.length=fx.ripples.length=fx.motes.length=0;return;}
+   const d=domainOnScreen(p);if(!d){ring.style.display='none';return;}
+   const dpr=Math.min(2,window.devicePixelRatio||1),W=innerWidth,H=innerHeight;
+   if(ring.width!==Math.round(W*dpr)||ring.height!==Math.round(H*dpr)){ring.width=Math.round(W*dpr);ring.height=Math.round(H*dpr);ring.style.width=W+'px';ring.style.height=H+'px';}
+   ring.style.display='block';
+   const ctx=ring.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+   const dt=Math.min(0.05,fx.last?(ts-fx.last)/1000:0.016);fx.last=ts;const t=ts/1000;
+   const {x,y,rad}=d,cfg=activePrimal.cfg;
+   // Clip everything to the domain circle and the game area.
+   ctx.save();ctx.beginPath();ctx.rect(d.box.left,d.box.top,d.box.width,d.box.height);ctx.clip();
+   ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.clip();
+   if(cfg.fx==='sun'){
+     // Harsh UV sunlight: hot white core, orange haze, violet UV fringe, rotating light shafts.
+     const pulse=0.85+0.15*Math.sin(t*2.2);
+     let g=ctx.createRadialGradient(x,y,0,x,y,rad);
+     g.addColorStop(0,`rgba(255,248,215,${0.22*pulse})`);g.addColorStop(0.45,`rgba(255,170,60,${0.13*pulse})`);
+     g.addColorStop(0.85,'rgba(255,110,30,0.08)');g.addColorStop(0.97,`rgba(190,90,255,${0.18*pulse})`);g.addColorStop(1,'rgba(190,90,255,0)');
+     ctx.fillStyle=g;ctx.fillRect(x-rad,y-rad,rad*2,rad*2);
+     ctx.globalCompositeOperation='lighter';
+     for(let i=0;i<10;i++){
+       const a=t*0.12+i*Math.PI*2/10,w=0.07+0.03*Math.sin(t*1.3+i);
+       ctx.fillStyle=`rgba(255,220,140,${0.05+0.03*Math.sin(t*1.7+i*2)})`;
+       ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,rad,a-w,a+w);ctx.closePath();ctx.fill();
+     }
+     // Heat motes rising.
+     while(fx.motes.length<Math.round(rad/7)){const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*rad;fx.motes.push({x:x+Math.cos(a)*r,y:y+Math.sin(a)*r,vy:-(25+Math.random()*45),life:1+Math.random()*1.6,t:0,c:Math.random()<0.25?'#d9a3ff':(Math.random()<0.5?'#ffd27a':'#fff2c4')});}
+     for(let i=fx.motes.length-1;i>=0;i--){const m=fx.motes[i];m.t+=dt;m.y+=m.vy*dt;m.x+=Math.sin(t*3+i)*8*dt;
+       if(m.t>m.life){fx.motes.splice(i,1);continue;}
+       ctx.globalAlpha=Math.sin(Math.PI*m.t/m.life)*0.8;ctx.fillStyle=m.c;ctx.fillRect(Math.round(m.x),Math.round(m.y),3,3);}
+     ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+   }else{
+     // Primordial Sea: dark heavy-rain domain with splash ripples.
+     let g=ctx.createRadialGradient(x,y,rad*0.2,x,y,rad);
+     g.addColorStop(0,'rgba(20,60,140,0.10)');g.addColorStop(0.8,'rgba(15,45,120,0.18)');g.addColorStop(1,'rgba(80,190,255,0.22)');
+     ctx.fillStyle=g;ctx.fillRect(x-rad,y-rad,rad*2,rad*2);
+     while(fx.drops.length<Math.round(rad/2.2)){fx.drops.push({x:x-rad+Math.random()*rad*2.4,y:y-rad-Math.random()*rad*2,v:900+Math.random()*400,len:14+Math.random()*12});}
+     ctx.strokeStyle='rgba(185,225,255,0.55)';ctx.lineWidth=1.5;ctx.beginPath();
+     for(let i=fx.drops.length-1;i>=0;i--){const r=fx.drops[i];r.y+=r.v*dt;r.x-=r.v*0.22*dt;
+       if(r.y>y+rad){ if(Math.random()<0.5){const a=Math.random()*Math.PI*2,rr=Math.sqrt(Math.random())*rad*0.95;fx.ripples.push({x:x+Math.cos(a)*rr,y:y+Math.sin(a)*rr,t:0});}
+         r.x=x-rad+Math.random()*rad*2.4;r.y=y-rad-Math.random()*60;continue;}
+       ctx.moveTo(r.x,r.y);ctx.lineTo(r.x+r.len*0.22,r.y-r.len);}
+     ctx.stroke();
+     for(let i=fx.ripples.length-1;i>=0;i--){const q=fx.ripples[i];q.t+=dt;if(q.t>0.5){fx.ripples.splice(i,1);continue;}
+       ctx.strokeStyle=`rgba(200,235,255,${0.6*(1-q.t/0.5)})`;ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(q.x,q.y,4+q.t*28,(4+q.t*28)*0.4,0,0,Math.PI*2);ctx.stroke();}
+     if(fx.ripples.length>160)fx.ripples.splice(0,fx.ripples.length-160);
+   }
+   ctx.restore();
+   // Domain edge.
+   ctx.save();ctx.beginPath();ctx.rect(d.box.left,d.box.top,d.box.width,d.box.height);ctx.clip();
+   ctx.strokeStyle=cfg.ring;ctx.globalAlpha=0.55+0.15*Math.sin(t*3);ctx.lineWidth=4;ctx.setLineDash([18,10]);ctx.lineDashOffset=-t*30;
+   ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.stroke();ctx.restore();
+ }
+ requestAnimationFrame(drawPrimalDomain);
 
 const getPlayer=()=>{const g=getBridge()?.game;return g?.player||null;};
 const elt=(tag,txt)=>{const e=document.createElement(tag);if(txt)e.textContent=txt;return e;};
@@ -196,21 +266,23 @@ function start(){
      if(typeof b.sprites.bodyHeight==='function')p.bodyH=b.sprites.bodyHeight(f.key);
    }
    if(WEATHER[f.key]){
-     // Multipliers relative to pre-transform stats, not compounded level-up multipliers.
-     if(Number.isFinite(baseline.baseAtk))p.baseAtk=baseline.baseAtk*2.5;
-     if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa*2.5;
+     // Primal stats: multipliers relative to the stats right before transforming (see PRIMAL_BALANCE).
+     const B=PRIMAL_BALANCE;
+     if(Number.isFinite(baseline.baseAtk))p.baseAtk=baseline.baseAtk*B.atk;
+     if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa*B.spa;
+     if(Number.isFinite(baseline.baseSpd))p.baseSpd=baseline.baseSpd*B.spd;
      if(Number.isFinite(baseline.maxHp)){
-       p.maxHp=Math.max(1,Math.round(baseline.maxHp*2.5));
+       p.maxHp=Math.max(1,Math.round(baseline.maxHp*B.hp));
        p.hp=Math.min(p.maxHp,baseline.hp+(p.maxHp-baseline.maxHp));
      }
-     if(Number.isFinite(baseline.r))p.r=Math.max(baseline.r,baseline.r*1.6);
-     if(Number.isFinite(baseline.bodyH))p.bodyH=Math.max(baseline.bodyH,baseline.bodyH*1.45);
+     // Hitbox is left at the sprite's own size (a bigger hitbox would just make you easier to hit).
+     if(Number.isFinite(baseline.bodyH))p.bodyH=Math.max(p.bodyH||0,baseline.bodyH*1.45);
    }
    const undoSignature=grantSignature(p,f.key);
    p.megaForm=f.key;used=true;rewardPending=false;stoneOwned=false;
-   if(WEATHER[f.key])activePrimal={player:p,cfg:WEATHER[f.key]};
+   if(WEATHER[f.key])startPrimalWeather(p,WEATHER[f.key]);
    restore=()=>{if(undoSignature)undoSignature();clearPrimal();p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa;p.maxHp=baseline.maxHp;p.hp=Math.min(p.hp,baseline.maxHp);p.r=baseline.r;p.bodyH=baseline.bodyH;delete p.megaForm;};
-   hint.textContent=WEATHER[f.key]?'Primal Reversion! Local weather aura enabled.':'Mega Evolution activated!';
+   hint.textContent=WEATHER[f.key]?'Primal Reversion! '+WEATHER[f.key].name+' is active.'+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':''):'Mega Evolution activated!';
  }catch(err){clearPrimal();console.error('Mega Evolution:',err);p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;p.maxHp=baseline.maxHp;p.hp=baseline.hp;p.r=baseline.r;p.bodyH=baseline.bodyH;hint.textContent='Mega error: '+err.message;}
  refresh();
  };
@@ -251,7 +323,7 @@ function start(){
    cards.appendChild(card);
  }
 
- panel.append(title,status,btn,hint,close);document.body.append(mini,panel,ring);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();updatePrimalDamage(getBridge(),getPlayer());displayPrimalRing();},60);refresh();
+ panel.append(title,status,btn,hint,close);document.body.append(mini,panel,ring);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();keepPrimalWeather();},60);refresh();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
