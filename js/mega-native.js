@@ -39,6 +39,14 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const m=getBridge()?.moves;
    if(!m||!m.BY_ID||!Array.isArray(m.ALL))return false;
    for(const def of Object.values(SIGNATURE_MOVES)){
+     // The engine adds 'ups' (upgrade table) and 'maxLvl' to every move at boot.
+     // Moves injected later must get them too, or the level-up reward screen
+     // crashes on def.ups[lvl-1] and freezes the game.
+     if(!Array.isArray(def.ups)){
+       const tpl=m.ALL.find(x=>x!==def&&x.kind===def.kind&&Array.isArray(x.ups));
+       def.ups=tpl?tpl.ups:[];
+       def.maxLvl=def.ups.length+1;
+     }
      if(!m.BY_ID[def.id]){m.ALL.push(def);m.BY_ID[def.id]=def;}
    }
    return true;
@@ -161,7 +169,7 @@ function start(){
  mini.textContent=used?'✦':stoneOwned?'✦':'◇';
  mini.style.background=stoneOwned&&!used?'#755221':'#141c2c';
  mini.style.borderColor=stoneOwned&&!used?'#ffd267':'#657a96';
- mini.innerHTML=primal ? '<img src="assets/mega/'+(Number(p?.dex)===383?'red-orb-48.png':'blue-orb-48.png')+'" width="44" height="44" style="image-rendering:pixelated;pointer-events:none" alt="Primal Orb">' : megaIcon(list[0],stoneOwned);mini.setAttribute('aria-label',stoneOwned?'Activate Mega Evolution':'Mega stone not acquired');
+ mini.innerHTML=primal ? orbIcon(Number(p?.dex)===383,40) : megaIcon(list[0],stoneOwned);mini.setAttribute('aria-label',stoneOwned?'Activate Mega Evolution':'Mega stone not acquired');
  mini.title=primal?(stoneOwned&&!used?'Primal Orb obtained. Activate Primal Reversion.':'Primal HUD slot'):(stoneOwned&&!used?'Mega Stone obtained. Activate Mega Evolution.':'Mega Stone HUD slot');
   mini.setAttribute('aria-label',primal?'Primal Reversion':'Mega Evolution');
   if(primal){mini.innerHTML+='<span style="display:block;font:bold 9px monospace;color:#ffe5a4;line-height:1">PRIMAL</span>';}
@@ -207,6 +215,11 @@ function start(){
  refresh();
  };
 
+ function orbIcon(red,size){
+   // Pixel-art Red Orb (Groudon) / Blue Orb (Kyogre), drawn inline so no image files are needed.
+   const c=red?['#7a1414','#d42a2a','#ff7a5a']:['#123a7a','#2a6ad4','#7ac8ff'];
+   return `<svg viewBox="0 0 16 16" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" style="pointer-events:none"><rect x="5" y="1" width="6" height="1" fill="${c[0]}"/><rect x="3" y="2" width="10" height="2" fill="${c[0]}"/><rect x="2" y="4" width="12" height="8" fill="${c[0]}"/><rect x="3" y="12" width="10" height="2" fill="${c[0]}"/><rect x="5" y="14" width="6" height="1" fill="${c[0]}"/><rect x="4" y="3" width="8" height="10" fill="${c[1]}"/><rect x="3" y="5" width="10" height="6" fill="${c[1]}"/><rect x="5" y="4" width="3" height="2" fill="${c[2]}"/><rect x="5" y="4" width="1" height="1" fill="#fff"/><rect x="7" y="7" width="2" height="2" fill="${c[0]}"/></svg>`;
+ }
  function megaIcon(form,owned){
    // Pixel-art Keystone icon, with a gem colored for the chosen Mega form.
    const gem= form?.key?.startsWith('282-')?'#f9a9bb':form?.key?.startsWith('448-')?'#6fb4ff':'#efdca1';
@@ -233,7 +246,7 @@ function start(){
    card.style.cssText='border:2px solid #e8c96b;border-radius:12px;background:#182234;color:#fff4ce;min-height:142px;padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer;';
    const primalReward=!!WEATHER[f.key];
    const rewardLabel=primalReward?(Number(p.dex)===382?'Blue Orb':'Red Orb'):'Mega Stone';
-   card.innerHTML='<img src="assets/mega/'+(primalReward?(Number(p.dex)===383?'red-orb-48.png':'blue-orb-48.png'):'mega-stone-96.png')+'" alt="Stone" width="64" height="64" style="width:64px;height:64px;object-fit:contain;image-rendering:pixelated">'+'<b>'+rewardLabel+'</b><small>Claim '+(primalReward?'Primal Orb':'Mega Stone')+' (50% test)</small>';
+   card.innerHTML=(primalReward?orbIcon(Number(p.dex)===383,64):megaIcon(f,true).replace('width="44" height="44"','width="64" height="64"'))+'<b>'+rewardLabel+'</b><small>Claim '+(primalReward?'Primal Orb':'Mega Stone')+' (50% test)</small>';
    card.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();stoneOwned=true;rewardPending=false;card.remove();refresh();});
    cards.appendChild(card);
  }
