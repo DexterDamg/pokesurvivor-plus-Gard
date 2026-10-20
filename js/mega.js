@@ -1,4 +1,4 @@
-/* PokéSurvivor+ Mega V8 form-display transformation test battle bridge. No Firebase writes. */
+/* PokéSurvivor+ Mega V9 battlefield-overlay transformation test battle bridge. No Firebase writes. */
 (()=>{
 'use strict';
 const KEY='ps.mega.v5.unlocks';
@@ -8,9 +8,9 @@ let playerSeen=null,used=false,boost=null;
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(unlock));}catch(_){}};
 const el=(tag,label)=>{const e=document.createElement(tag);if(label)e.textContent=label;return e;};
 function boot(){
- if(document.getElementById('ps-mega-v8'))return;
- const root=el('aside');root.id='ps-mega-v8';root.style.cssText='pointer-events:auto;position:fixed;right:12px;bottom:12px;z-index:2147483000;background:#201632;color:white;border:2px solid #b991ff;padding:12px;width:290px;max-width:calc(100vw - 24px);border-radius:12px;font:13px/1.5 system-ui,sans-serif;box-shadow:0 5px 20px #000a';
- const title=el('strong','✦ MEGA LUCARIO V8');title.style.cssText='display:block;color:#e6d4ff;font-size:16px';
+ if(document.getElementById('ps-mega-v9'))return;
+ const root=el('aside');root.id='ps-mega-v9';root.style.cssText='pointer-events:auto;position:fixed;right:12px;bottom:12px;z-index:2147483000;background:#201632;color:white;border:2px solid #b991ff;padding:12px;width:290px;max-width:calc(100vw - 24px);border-radius:12px;font:13px/1.5 system-ui,sans-serif;box-shadow:0 5px 20px #000a';
+ const title=el('strong','✦ MEGA LUCARIO V9');title.style.cssText='display:block;color:#e6d4ff;font-size:16px';
  const info=el('div');info.style.cssText='white-space:pre-line;margin:9px 0';
  const feedback=el('div');feedback.style.cssText='font-size:12px;color:#e1ccff';
  const btn=(txt,fn)=>{const b=el('button',txt);b.type='button';b.style.cssText='background:#8654d3;color:white;border:0;border-radius:6px;padding:7px;margin:3px;cursor:pointer';b.addEventListener('click',e=>{e.stopPropagation();fn();});return b;};
@@ -50,8 +50,37 @@ function boot(){
   boost={atk:p.baseAtk,spd:p.baseSpd,hp:p.maxHp};
   p.baseAtk*=1.5;p.baseSpd*=1.2;
   const extra=Math.round(p.maxHp*.2);p.maxHp+=extra;p.hp=Math.min(p.maxHp,p.hp+extra);
-  used=true;feedback.textContent='Mega Lucario ACTIVE! Form artwork now appears in the Mega panel. The on-map sprite is unchanged.';flash();update();
+  used=true;feedback.textContent='Mega Lucario ACTIVE! Form artwork now appears in the Mega panel. An experimental on-screen sprite overlay is also shown (not a native sprite swap).';flash();update();
  }
+
+ // V9 visual overlay: intentionally does not intercept or rewrite the game's canvas renderer.
+ // It follows the center of the largest visible game canvas; a player-camera-centered game
+ // typically draws the player there. User can calibrate position with the offsets below.
+ let offsetX=0,offsetY=0;
+ try { const o=JSON.parse(localStorage.getItem('ps.mega.v9.offset')||'{}');offsetX=Number(o.x)||0;offsetY=Number(o.y)||0; }catch(_){}
+ const battleSprite=el('img'); battleSprite.src='https://play.pokemonshowdown.com/sprites/ani/lucario-mega.gif';
+ battleSprite.alt='Mega Lucario overlay';
+ battleSprite.style.cssText='pointer-events:none;position:fixed;width:80px;height:80px;object-fit:contain;z-index:2147482900;display:none;filter:drop-shadow(0 0 8px #b785ff)';
+ battleSprite.onerror=()=>{battleSprite.style.display='none'; feedback.textContent='Mega sprite artwork could not load; stat boosts still work.';};
+ document.body.append(battleSprite);
+ const calibrate=el('div');calibrate.style.cssText='font-size:12px;margin-top:4px';
+ const hint=el('div','Sprite overlay is placed at screen center. Adjust if your character is elsewhere.');hint.style.cssText='color:#dcc5ff;font-size:11px';
+ const move=(label,dx,dy)=>btn(label,()=>{offsetX+=dx;offsetY+=dy;try{localStorage.setItem('ps.mega.v9.offset',JSON.stringify({x:offsetX,y:offsetY}));}catch(_){};placeSprite();});
+ calibrate.append(move('←',-15,0),move('→',15,0),move('↑',0,-15),move('↓',0,15));
+ const reset=btn('Reset position',()=>{offsetX=offsetY=0;placeSprite();});calibrate.append(reset);
+ function placeSprite(){
+   const p=current(); const shown=!!(boost&&p&&p===playerSeen);
+   if(!shown || !battleSprite.complete || !battleSprite.naturalWidth){battleSprite.style.display='none';return;}
+   const canvases=[...document.querySelectorAll('canvas')].filter(c=>{const r=c.getBoundingClientRect();return r.width>150&&r.height>150;});
+   canvases.sort((a,b)=>{const ra=a.getBoundingClientRect(),rb=b.getBoundingClientRect();return rb.width*rb.height-ra.width*ra.height;});
+   const r=canvases[0]?.getBoundingClientRect();
+   if(!r){battleSprite.style.display='none';return;}
+   battleSprite.style.left=(r.left+r.width/2+offsetX-40)+'px';
+   battleSprite.style.top=(r.top+r.height/2+offsetY-40)+'px';
+   battleSprite.style.display='block';
+ }
+ root.append(hint,calibrate);
+ setInterval(()=>{if(root.isConnected)placeSprite();},100);
  root.addEventListener('pointerdown',e=>e.stopPropagation());root.append(title,portrait,info,bracelet,stone,mega,reason,hide,feedback);document.body.append(root);update();setInterval(()=>{if(root.isConnected)update();},500);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
