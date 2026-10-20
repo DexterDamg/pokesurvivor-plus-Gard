@@ -46,16 +46,27 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    // Precipice Blades: a Tectonic Rage-style eruption. Rings of volcanic stone spikes burst out of the
    // ground around Groudon in waves (custom art: assets/fx/precipice-spikes.png). Each wave can hit a foe
    // once. 'count' (+8 at max level) adds a 4th, wider wave once it reaches 24.
-   '383-primal':{id:'precipice-blades',name:'Precipice Blades',type:'ground',kind:'nova',eruption:true,desc:'Waves of volcanic stone blades erupt from the ground around Groudon.',cd:2.6,dmg:40,speed:260,count:16,pierce:3,life:1.3,size:16,knock:140},
+   '383-primal':{id:'precipice-blades',name:'Precipice Blades',type:'ground',kind:'nova',psCast:'eruption',desc:'Waves of volcanic stone blades erupt from the ground around Groudon.',cd:2.6,dmg:40,speed:260,count:16,pierce:3,life:1.3,size:16,knock:140},
    // chains: how many separate lightning chains fire at once (each starts on a different foe).
    '382-primal':{id:'origin-pulse',name:'Origin Pulse',type:'water',kind:'chain',desc:'Four beams of blue light lock on to different foes and arc from foe to foe.',cd:1.4,dmg:16,count:6,radius:230,chains:4}
  };
  // ---- Mega kits (js/mega-kits.js): each Mega's signature move is built from a game move template ----
  const MEGA_KITS=window.PS_MEGA_KITS||{};
+ // Mega stat rules (tuning knobs): minimum damage gain over the base form, and max HP multiplier.
+ const MEGA_STATS={atkFloor:1.25,hp:1.15};
  let kitMovesBuilt=false;
+ const BOND_MOVES={}; // form -> bond move def (fires together with the signature move in the same slot)
+ function fromTemplate(m,mv){
+   const tpl=m.BY_ID[mv.from];if(!tpl)return null;
+   const def={};
+   for(const k in tpl){if(['ups','maxLvl','evoMods','evoText','id','name','desc'].includes(k))continue;def[k]=tpl[k];}
+   for(const k in mv){if(k!=='from')def[k]=mv[k];}
+   def.kind=tpl.kind;return def;
+ }
  function buildKitMoves(m){
    if(kitMovesBuilt)return;
    for(const [form,kit] of Object.entries(MEGA_KITS)){
+     if(kit&&kit.bond&&!BOND_MOVES[form]){const d=fromTemplate(m,kit.bond);if(d)BOND_MOVES[form]=d;else console.warn('Mega kit: unknown bond template',kit.bond.from);}
      const mv=kit&&kit.move;if(!mv||SIGNATURE_MOVES[form])continue;
      const tpl=m.BY_ID[mv.from];if(!tpl){console.warn('Mega kit: unknown template',mv.from,'for',form);continue;}
      const def={};
@@ -70,7 +81,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const m=getBridge()?.moves;
    if(!m||!m.BY_ID||!Array.isArray(m.ALL))return false;
    buildKitMoves(m);
-   for(const def of Object.values(SIGNATURE_MOVES)){
+   for(const def of [...Object.values(SIGNATURE_MOVES),...Object.values(BOND_MOVES)]){
      // The engine adds 'ups' (upgrade table) and 'maxLvl' to every move at boot.
      // Moves injected later must get them too, or the level-up reward screen
      // crashes on def.ups[lvl-1] and freezes the game.
@@ -96,6 +107,16 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      // Signature moves arrive fully upgraded.
      const m=getBridge()?.moves,inst=p.moves?.find(v=>v.id===def.id);
      if(m&&inst&&typeof m.levelUp==='function'){let guard=20;while(guard-->0&&m.levelUp(inst));}
+     // Bond move: joins the signature's slot so both fire at the same time (uses the game's bond system).
+     const bond=BOND_MOVES[form];
+     if(bond&&typeof p.learnBond==='function'){
+       const idx=p.slots.findIndex(sl=>Array.isArray(sl)&&sl.some(v=>v.id===def.id));
+       const prevBonds=Number(p.bonds)||0;p.bonds=prevBonds+1;
+       if(idx>=0&&p.learnBond(bond.id,idx)){
+         const bi=p.moves.find(v=>v.id===bond.id);
+         if(m&&bi&&typeof m.levelUp==='function'){let guard=20;while(guard-->0&&m.levelUp(bi));}
+       }else p.bonds=prevBonds;
+     }
    }
    if(!learned){
      p.maxMoves=previousMax;
@@ -182,6 +203,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  window.PS_CAST=function(player,move,hit,ghost){
    if(!player||!move)return;
    const waves=(Number(move.count)||16)>=24?4:3;
+   if(move.psCast==='blackhole'){castBlackhole(player,move,hit,ghost);return;}
    eruptions.push({x:player.x,y:player.y,player,move,hit,ghost:!!ghost,t:0,next:0,waves});
    try{getBridge()?.camera?.kick?.(0.06);}catch(e){}
  };
@@ -243,6 +265,107 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    for(const d of debris){ctx.fillStyle=d.c;ctx.globalAlpha=Math.max(0,1-d.t/0.9);const q=Math.max(2,2*px);ctx.fillRect(Math.round(sx(d.x)),Math.round(sy(d.y)-d.z*k),q,q);}
    ctx.restore();
  }
+ // ---- Blackhole (Mega Gardevoir bond move with True Moon Blast) ----
+ // Opens on the densest group of foes, pulls everything nearby inward for ~1s with small damage
+ // ticks, then collapses into a dark blast that deals 3x damage ('mult' in mega-kits.js).
+ const holes=[];
+ const HOLE_PULL_T=1.05,HOLE_LIFE=1.55,HOLE_TICK=0.25;
+ function castBlackhole(player,move,hit,ghost){
+   const E=getBridge()?.enemies;if(!E||typeof E.all!=='function')return;
+   const alive=E.all().filter(e=>e&&!e.dead&&typeof e.hurt==='function');
+   const range=340,near=alive.filter(e=>Math.hypot(e.x-player.x,e.y-player.y)<range);
+   if(!near.length)return;
+   const n=Math.max(1,Math.min(2,Math.round(Number(move.count)||1)));
+   const used=[];
+   for(let h=0;h<n;h++){
+     let best=null,bestScore=-1;
+     for(const c of near){
+       if(used.some(u=>Math.hypot(u.x-c.x,u.y-c.y)<150))continue;
+       let score=0;for(const o of alive)if(Math.hypot(o.x-c.x,o.y-c.y)<130)score++;
+       score-=Math.hypot(c.x-player.x,c.y-player.y)/1000;
+       if(score>bestScore){bestScore=score;best=c;}
+     }
+     if(!best)break;
+     used.push({x:best.x,y:best.y});
+     holes.push({x:best.x,y:best.y,R:Number(move.radius)||170,player,move,hit,ghost:!!ghost,t:0,tick:0,boom:false,seed:Math.random()*6.28,parts:[]});
+   }
+   try{getBridge()?.camera?.kick?.(0.05);}catch(e){}
+ }
+ function updateHoles(dt){
+   const E=getBridge()?.enemies;
+   for(let i=holes.length-1;i>=0;i--){
+     const h=holes[i];h.t+=dt;
+     const all=E&&typeof E.all==='function'?E.all():[];
+     const atk=Number(h.player.atk)||1,mult=Number(h.move.mult)||3;
+     if(h.t<HOLE_PULL_T){
+       // pull foes inward (bosses resist), stronger near the centre
+       for(const en of all){
+         if(!en||en.dead)continue;
+         const dx=h.x-en.x,dy=h.y-en.y,d=Math.hypot(dx,dy);
+         if(d>h.R||d<6)continue;
+         const pull=(140+260*(1-d/h.R))*(en.boss?0.3:1)*dt;
+         en.x+=dx/d*Math.min(pull,d-6);en.y+=dy/d*Math.min(pull,d-6);
+       }
+       h.tick+=dt;
+       if(h.tick>=HOLE_TICK){h.tick-=HOLE_TICK;
+         if(!h.ghost&&typeof h.hit==='function')for(const en of all){
+           if(!en||en.dead||typeof en.hurt!=='function')continue;
+           if(Math.hypot(en.x-h.x,en.y-h.y)>h.R*0.6)continue;
+           try{h.hit(h.player,en,h.move.dmg*atk*0.12,'#7a3cff',0,0,0,h.move);}catch(e){}
+         }
+       }
+       // infalling particles
+       if(h.parts.length<70)for(let k=0;k<4;k++){const a=Math.random()*6.283,r=h.R*(0.6+Math.random()*0.5);h.parts.push({a,r,w:2.2+Math.random()*2,c:Math.random()<0.35?'#d7b4ff':(Math.random()<0.5?'#7a3cff':'#2a0f4a')});}
+     }else if(!h.boom){
+       h.boom=true;
+       if(!h.ghost&&typeof h.hit==='function')for(const en of all){
+         if(!en||en.dead||typeof en.hurt!=='function')continue;
+         const dx=en.x-h.x,dy=en.y-h.y,d=Math.hypot(dx,dy);
+         if(d>h.R*0.8)continue;
+         try{h.hit(h.player,en,h.move.dmg*atk*mult,'#b07cff',dx||1,dy,h.move.knock||160,h.move);}catch(e){console.warn('Blackhole hit:',e);}
+       }
+       try{getBridge()?.camera?.kick?.(0.14);}catch(e){}
+     }
+     for(let k=h.parts.length-1;k>=0;k--){const q=h.parts[k];q.a+=q.w*dt*(1+40/(q.r+10));q.r-=(80+h.R*0.6)*dt;if(q.r<4)h.parts.splice(k,1);}
+     if(h.t>HOLE_LIFE)holes.splice(i,1);
+   }
+ }
+ function drawHoles(ctx,box){
+   if(!holes.length)return;
+   const cam=getBridge()?.camera,g=gameCanvas();if(!cam||!g||typeof cam.left!=='function')return;
+   const css=Number(cam._cw)>0?g.r.width/cam._cw:1,k=cam.scale*css;
+   ctx.save();ctx.beginPath();ctx.rect(box.left,box.top,box.width,box.height);ctx.clip();
+   for(const h of holes){
+     const X=g.r.left+(h.x-cam.left())*k,Y=g.r.top+(h.y-cam.top())*k,R=h.R*k;
+     if(h.t<HOLE_PULL_T){
+       const grow=Math.min(1,h.t/0.25),core=(16+10*Math.sin(h.t*9))*k*grow+10*k*grow;
+       // dark lens
+       let gr=ctx.createRadialGradient(X,Y,0,X,Y,R);
+       gr.addColorStop(0,'rgba(10,0,20,0.55)');gr.addColorStop(0.35,'rgba(60,20,110,0.28)');gr.addColorStop(1,'rgba(60,20,110,0)');
+       ctx.fillStyle=gr;ctx.beginPath();ctx.arc(X,Y,R*grow,0,6.283);ctx.fill();
+       // accretion ring (rotating arcs)
+       ctx.lineWidth=Math.max(2,3*k);
+       for(let j=0;j<5;j++){const a0=h.seed+h.t*(3.2+j*0.4)+j*1.26,rr=core*(1.7+j*0.32);
+         ctx.strokeStyle=j%2?'rgba(215,180,255,0.85)':'rgba(140,70,255,0.9)';
+         ctx.beginPath();ctx.ellipse(X,Y,rr,rr*0.62,0,a0,a0+1.6);ctx.stroke();}
+       // infalling particles
+       for(const q of h.parts){ctx.fillStyle=q.c;const qx=X+Math.cos(q.a)*q.r*k,qy=Y+Math.sin(q.a)*q.r*k*0.62,sz=Math.max(2,2*k);ctx.fillRect(Math.round(qx),Math.round(qy),sz,sz);}
+       // event horizon
+       ctx.fillStyle='#000';ctx.beginPath();ctx.arc(X,Y,core,0,6.283);ctx.fill();
+       ctx.strokeStyle='rgba(230,200,255,0.9)';ctx.lineWidth=Math.max(1.5,2*k);ctx.beginPath();ctx.arc(X,Y,core+1.5*k,0,6.283);ctx.stroke();
+     }else{
+       // collapse -> dark blast shockwave
+       const u=Math.min(1,(h.t-HOLE_PULL_T)/(HOLE_LIFE-HOLE_PULL_T)),rr=R*(0.15+0.95*u);
+       ctx.globalAlpha=1-u;
+       let gr=ctx.createRadialGradient(X,Y,0,X,Y,rr);
+       gr.addColorStop(0,'rgba(255,255,255,0.9)');gr.addColorStop(0.25,'rgba(176,124,255,0.75)');gr.addColorStop(0.7,'rgba(40,0,80,0.55)');gr.addColorStop(1,'rgba(40,0,80,0)');
+       ctx.fillStyle=gr;ctx.beginPath();ctx.arc(X,Y,rr,0,6.283);ctx.fill();
+       ctx.strokeStyle='rgba(215,180,255,0.95)';ctx.lineWidth=Math.max(2,5*k*(1-u));ctx.beginPath();ctx.arc(X,Y,rr,0,6.283);ctx.stroke();
+       ctx.globalAlpha=1;
+     }
+   }
+   ctx.restore();
+ }
  function domainOnScreen(p){
    const g=gameCanvas(),cam=getBridge()?.camera;if(!g||!p)return null;
    // The camera works in CSS pixels (cam._cw = canvas CSS width), NOT device pixels, so this
@@ -259,14 +382,19 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  function drawPrimalDomain(ts){
    requestAnimationFrame(drawPrimalDomain);
    const p=getPlayer();
-   const on=activePrimal&&p===activePrimal.player&&getBridge()?.game?.state==='playing';
-   if(!on){if(ring.style.display!=='none')ring.style.display='none';fx.drops.length=fx.ripples.length=fx.motes.length=0;return;}
+   const playing=getBridge()?.game?.state==='playing';
+   const on=activePrimal&&p===activePrimal.player&&playing;
+   // Custom move effects (Precipice Blades, Blackhole...) draw on this overlay too, Primal or not.
+   const fxActive=playing&&(eruptions.length||spikes.length||debris.length||holes.length);
+   if(!on){fx.drops.length=fx.ripples.length=fx.motes.length=0;}
+   if(!on&&!fxActive){if(ring.style.display!=='none')ring.style.display='none';return;}
    const d=domainOnScreen(p);if(!d){ring.style.display='none';return;}
    const dpr=Math.min(2,window.devicePixelRatio||1),W=innerWidth,H=innerHeight;
    if(ring.width!==Math.round(W*dpr)||ring.height!==Math.round(H*dpr)){ring.width=Math.round(W*dpr);ring.height=Math.round(H*dpr);ring.style.width=W+'px';ring.style.height=H+'px';}
    ring.style.display='block';
    const ctx=ring.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
    const dt=Math.min(0.05,fx.last?(ts-fx.last)/1000:0.016);fx.last=ts;const t=ts/1000;
+   if(on){
    const {x,y,rad}=d,cfg=activePrimal.cfg;
    // Clip everything to the domain circle and the game area.
    ctx.save();ctx.beginPath();ctx.rect(d.box.left,d.box.top,d.box.width,d.box.height);ctx.clip();
@@ -311,7 +439,9 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    ctx.save();ctx.beginPath();ctx.rect(d.box.left,d.box.top,d.box.width,d.box.height);ctx.clip();
    ctx.strokeStyle=cfg.ring;ctx.globalAlpha=0.55+0.15*Math.sin(t*3);ctx.lineWidth=4;ctx.setLineDash([18,10]);ctx.lineDashOffset=-t*30;
    ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.stroke();ctx.restore();
+   }
    updateEruptions(dt);drawEruptions(ctx,d.box);
+   updateHoles(dt);drawHoles(ctx,d.box);
  }
  requestAnimationFrame(drawPrimalDomain);
 
@@ -421,7 +551,7 @@ function start(){
  const visible=isRunScreen();
  mini.style.display=visible?'block':'none';
  if(!visible)panel.style.display='none';
- setLines(status,(!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(f0?'\nForm: '+(f0.en||f0.name)+(f0.spr?'':' (no sprite yet: keeps the normal look)'):'')+(f0&&MEGA_KITS[f0.key]?'\n\nPassive \u2013 '+MEGA_KITS[f0.key].passive.name+':\n'+describePassive(MEGA_KITS[f0.key].passive)+'\nSignature move: '+MEGA_KITS[f0.key].move.name+' (max level)\n'+(MEGA_KITS[f0.key].move.desc||''):'')).split('\n'));
+ setLines(status,(!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(f0?'\nForm: '+(f0.en||f0.name)+(f0.spr?'':' (no sprite yet: keeps the normal look)'):'')+(f0&&MEGA_KITS[f0.key]?'\n\nPassive \u2013 '+MEGA_KITS[f0.key].passive.name+':\n'+describePassive(MEGA_KITS[f0.key].passive)+'\nSignature move: '+MEGA_KITS[f0.key].move.name+' (max level)\n'+(MEGA_KITS[f0.key].move.desc||'')+(MEGA_KITS[f0.key].bond?'\nBond move: '+MEGA_KITS[f0.key].bond.name+' (fires together with '+MEGA_KITS[f0.key].move.name+')\n'+(MEGA_KITS[f0.key].bond.desc||''):''):'')).split('\n'));
 
  // Species is fixed to the current player; no clickable Pokémon/form selector.
 
@@ -448,10 +578,25 @@ function start(){
    if(f.spr&&SPRITE_META[f.key])b.spriteMeta[f.key]=SPRITE_META[f.key];
    const oldMon=p.mon||{};
    p.mon={...oldMon,name:f.en||f.name,types:f.types,mega:f.key};
-   if(Number.isFinite(f.atk)&&Number.isFinite(Number(oldMon.atk))&&Number(oldMon.atk)>0)p.baseAtk=baseline.baseAtk*(f.atk/oldMon.atk);
-   if(Number.isFinite(f.spd)&&Number.isFinite(Number(oldMon.spd))&&Number(oldMon.spd)>0)p.baseSpd=baseline.baseSpd*(f.spd/oldMon.spd);
-   if(Number.isFinite(f.spa)&&Number.isFinite(baseline.baseSpa)&&Number(oldMon.spa)>0)p.baseSpa=baseline.baseSpa*(f.spa/oldMon.spa);
-   if(Number.isFinite(f.hp)&&Number.isFinite(Number(oldMon.hp))){const increase=Math.round(f.hp-oldMon.hp);p.maxHp=Math.max(1,baseline.maxHp+increase);p.hp=Math.min(p.maxHp,baseline.hp+Math.max(0,increase));}
+   // Mega stats (reworked). Base Pokemon have ONE attack stat (their best of Atk/SpA), so compare
+   // against the Mega's best of atk/spa (the old code used physical atk only, which made 25 Megas,
+   // e.g. Mega Gardevoir, hit WEAKER than their base form). Every Mega gets at least MEGA_STATS.atkFloor
+   // more damage, MEGA_STATS.hp more max HP, and never loses speed. Per-Mega 'stats' in mega-kits.js
+   // multiply on top. (Primal Kyogre/Groudon use PRIMAL_BALANCE further below instead.)
+   {
+     const ks=(MEGA_KITS[f.key]&&MEGA_KITS[f.key].stats)||{};
+     const oAtk=Number(oldMon.atk),mBest=Math.max(Number(f.atk)||0,Number(f.spa)||0);
+     const atkR=(oAtk>0&&mBest>0?Math.max(MEGA_STATS.atkFloor,mBest/oAtk):MEGA_STATS.atkFloor)*(ks.atk||1);
+     if(Number.isFinite(baseline.baseAtk))p.baseAtk=baseline.baseAtk*atkR;
+     if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa*atkR;
+     const oSpd=Number(oldMon.spd),spdR=(oSpd>0&&Number(f.spd)>0?Math.max(1,f.spd/oSpd):1)*(ks.spd||1);
+     if(Number.isFinite(baseline.baseSpd))p.baseSpd=baseline.baseSpd*spdR;
+     if(Number.isFinite(baseline.maxHp)){
+       const hpGain=Math.max(0,Math.round((Number(f.hp)||0)-(Number(oldMon.hp)||0)));
+       p.maxHp=Math.max(1,Math.round(baseline.maxHp*MEGA_STATS.hp*(ks.hp||1))+hpGain);
+       p.hp=Math.min(p.maxHp,baseline.hp+(p.maxHp-baseline.maxHp));
+     }
+   }
    if(f.spr&&SPRITE_META[f.key]){
      p.anim=new b.sprites.Animator(f.key,Number(p.scale)||1,Boolean(p.shiny||p.isShiny||p.anim?.shiny));
      if(typeof b.sprites.playerRadius==='function')p.r=b.sprites.playerRadius(f.key);

@@ -10,6 +10,8 @@
 //    lowHp: { below: 0.5, deal: 1.4 }   extra damage while HP is below that fraction
 //    highHp:{ above: 0.9, take: 0.5 }   less damage taken while HP is above that fraction
 //
+//  stats: { atk, hp, spd } optional extra multipliers for this Mega's stats (on top of the normal Mega boost)
+//  bond:  optional second move that shares the signature move's slot (both fire at once), same format as move.
 //  move: a new move built from an existing game move ('from'), then the listed fields are changed.
 //    Signature moves are learned at MAX level in a bonus slot when you Mega Evolve.
 //    Kinds available via 'from': tackle/shadow-ball (projectile), dark-pulse (nova),
@@ -86,7 +88,10 @@ window.PS_MEGA_KITS = {
  '260-mega':{passive:{name:'Swift Swim',deal:{water:1.3,ground:1.3},spd:1.1},
    move:{from:'dark-pulse',id:'muddy-torrent',name:'Muddy Torrent',type:'water',desc:'Muddy water bursts out and slows foes.',dmg:18,count:14,speed:230,pierce:1,size:10,slow:0.4,cd:1.1}},
  '282-mega':{passive:{name:'Pixilate',deal:{fairy:2,psychic:2},take:{ghost:0.75,dark:0.75,steel:0.75}},
-   move:{from:'meteor-mash',id:'true-moon-blast',name:'True Moon Blast',type:'fairy',desc:'A gigantic blast of moonlight crashes down on foes. Double damage.',dmg:68,count:1,radius:150,knock:140,cd:2.0}},
+   move:{from:'meteor-mash',id:'true-moon-blast',name:'True Moon Blast',type:'fairy',desc:'A gigantic blast of moonlight crashes down on foes. Double damage.',dmg:68,count:1,radius:150,knock:140,cd:2.0},
+   // Bond move: shares True Moon Blast's slot, so both fire at the same time.
+   // psCast:'blackhole' = custom effect: pulls nearby foes in for ~1s, then a dark blast for 'mult' x damage.
+   bond:{from:'meteor-mash',id:'blackhole',name:'Blackhole',type:'dark',psCast:'blackhole',desc:'A black hole opens on the biggest group of foes, sucks them in, then collapses in a dark blast for triple damage.',dmg:68,mult:3,count:1,radius:170,knock:170,cd:3.2}},
  '302-mega':{passive:{name:'Magic Bounce',deal:{ghost:1.2,dark:1.2},take:{all:0.8}},
    move:{from:'will-o-wisp',id:'gem-sentinel',name:'Gem Sentinel',type:'dark',desc:'Two floating gems shoot at foes for a while.',dmg:22,count:2,rate:0.4,dur:8,range:300,speed:320,size:8,burn:0,cd:3.5}},
  '303-mega':{passive:{name:'Huge Power',deal:{all:1.35}},
