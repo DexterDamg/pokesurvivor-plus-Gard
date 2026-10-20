@@ -364,7 +364,9 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // so the skin is always visible. Mega/Primal forms keep their own sprites.
 (function(){
  const SKINS={
-   'lovergare':{'282':{key:'282-lovergare',anims:['Idle','Walk']}} // Bikini Gardevoir
+   // res: the sheets are drawn at this many times the normal resolution (4 = 512x1280 sheet,
+   // 128x160 per frame). The sprite stays the same size on screen but shows 4x more detail.
+   'lovergare':{'282':{key:'282-lovergare',anims:['Idle','Walk'],res:4}} // Bikini Gardevoir
  };
  const bridge=()=>window.PS_MEGA_BRIDGE_V5;
  function skinFor(b,p){
@@ -381,9 +383,12 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
      const base=b.spriteMeta[String(Number(p.dex))];if(!base)return;
      const meta=JSON.parse(JSON.stringify(base));delete meta.sh;delete meta.sa; // skin has no shiny variant
      for(const a of Object.keys(meta.a||{}))if(!skin.anims.includes(a))delete meta.a[a]; // unlisted -> Idle
+     const k=Number(skin.res)||1;
+     if(k!==1)for(const a of Object.values(meta.a||{})){a.w*=k;a.h*=k;a.ax*=k;a.ay*=k;}
      b.spriteMeta[key]=meta;
    }
-   try{p.anim=new b.sprites.Animator(key,Number(p.anim?.scale)||Number(p.scale)||1,false);}catch(e){console.warn('Skin:',e);}
+   const baseScale=Number(p.anim?.scale)||Number(p.scale)||1;
+   try{p.anim=new b.sprites.Animator(key,baseScale/(Number(skin.res)||1),false);}catch(e){console.warn('Skin:',e);}
  }
  setInterval(apply,200);
 })();
