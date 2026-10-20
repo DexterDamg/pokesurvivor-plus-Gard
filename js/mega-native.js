@@ -21,7 +21,7 @@ function allowMegaByLevel(player, forms){
   lastLevel=lv;
 }
 const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
- const PRIMAL_RADIUS=275; // world units: persistent, player-centered AOE, not global
+ const PRIMAL_RADIUS=430; // world units: persistent, player-centered AOE, not global
  const WEATHER={
   '383-primal':{name:'DESOLATE LAND',boost:['fire','ground','rock'],weaken:['water','ice'],radius:PRIMAL_RADIUS,ring:'#f5ac45',fill:'rgba(255,149,45,.13)'},
   '382-primal':{name:'PRIMORDIAL SEA',boost:['water','ice'],weaken:['fire','rock'],radius:PRIMAL_RADIUS,ring:'#54cfff',fill:'rgba(45,155,235,.13)'}
@@ -59,13 +59,13 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const now=performance.now()/1000;
    if(now-primalMoveLast<spec.cd)return;
    primalMoveLast=now;
-   const power=Math.max(12,Number(p.baseAtk||p.baseSpa||22)*2.5);
+   const power=Math.max(12,Number(p.baseAtk||p.baseSpa||22)*1.6);
    if(spec.type==='ground'){
      // Precipice Blades: 12 outward-traveling jagged ground strikes (wide-range ground burst).
-     for(let i=0;i<12;i++){
-       const a=(i/12)*Math.PI*2;
+     for(let i=0;i<16;i++){
+       const a=(i/16)*Math.PI*2;
        b.projectiles.spawn({x:p.x+Math.cos(a)*28,y:p.y+Math.sin(a)*28,
-         vx:Math.cos(a)*210,vy:Math.sin(a)*210,dmg:power,r:14,life:1.35,
+         vx:Math.cos(a)*250,vy:Math.sin(a)*250,dmg:power,r:22,life:1.6,
          pierce:3,friendly:true,owner:p,mtype:'ground',color:spec.color,knock:130});
      }
    }else{
@@ -73,10 +73,10 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      // Direction uses last movement, with a right-facing fallback.
      let facing=Math.atan2(Number(p.vy)||0,Number(p.vx)||0);
      if(!Number.isFinite(facing)||((Number(p.vx)||0)===0&&(Number(p.vy)||0)===0))facing=0;
-     for(let i=-4;i<=4;i++){
-       const a=facing+i*.125;
+     for(let i=-6;i<=6;i++){
+       const a=facing+i*.105;
        b.projectiles.spawn({x:p.x+Math.cos(a)*23,y:p.y+Math.sin(a)*23,
-         vx:Math.cos(a)*390,vy:Math.sin(a)*390,dmg:power*1.18,r:10,life:1.2,
+         vx:Math.cos(a)*440,vy:Math.sin(a)*440,dmg:power*1.18,r:17,life:1.5,
          pierce:2,friendly:true,owner:p,mtype:'water',color:spec.color,knock:95});
      }
    }
@@ -101,7 +101,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  }
  function restoreProjectileDamage(b){
    const arr=b?.projectiles?.all?.()||[];
-   for(const q of arr){const state=tracked.get(q);if(state&&Number.isFinite(q.dmg)){q.dmg=state.base;tracked.delete(q);}}
+   for(const q of arr){const state=tracked.get(q);if(state&&Number.isFinite(q.dmg)){q.dmg=state.base;if(Number.isFinite(state.origRadius))q.r=state.origRadius;tracked.delete(q);}}
  }
  function updatePrimalDamage(b,p){
    if(!activePrimal||!p||p!==activePrimal.player){clearPrimal();return;}
@@ -112,20 +112,31 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      const base=previous?.base??q.dmg;
      // If game code altered damage independently, update baseline without multiplying repeatedly.
      if(previous && Math.abs(q.dmg - previous.base*previous.factor)>Math.max(0.001,Math.abs(q.dmg)*.002)){
-       tracked.set(q,{base:q.dmg,factor:1});
+       tracked.set(q,{...previous,base:q.dmg,factor:1});
      }
      const trueBase=tracked.get(q)?.base??base;
      const dx=q.x-p.x,dy=q.y-p.y;
      const inside=dx*dx+dy*dy<=cfg.radius*cfg.radius;
      const type=attackType(q,b);
-     const factor=inside&&type?prismMultiplier(type,cfg):1;
+     const isFriendly=q.owner===p || q.friendly===true || q.team==='player';
+     if(isFriendly){
+       const radiusState=tracked.get(q);
+       if(radiusState && radiusState.origRadius!==undefined){
+         if(Number.isFinite(q.r))q.r=radiusState.origRadius*1.65;
+       }else if(Number.isFinite(q.r)){
+         const first=tracked.get(q)||{base:trueBase,factor:1};
+         tracked.set(q,{...first,origRadius:q.r});
+         q.r*=1.65;
+       }
+     }
+     const factor=(isFriendly?2:1)*(inside&&type?prismMultiplier(type,cfg):1);
      // For hostile attacks, use the same elemental modifiers while inside the aura.
      q.dmg=trueBase*factor;
-     tracked.set(q,{base:trueBase,factor});
+     tracked.set(q,{...tracked.get(q),base:trueBase,factor});
    }
  }
  const ring=document.createElement('div');ring.id='ps-primal-aura-ring';
- ring.style.cssText='display:none;position:fixed;pointer-events:none;z-index:20;width:520px;height:520px;border-radius:50%;border:4px solid #f5ac45;box-shadow:0 0 0 5px #ffffff16,inset 0 0 46px #ffffff10;opacity:.65;box-sizing:border-box;transform:translate(-50%,-50%)';
+ ring.style.cssText='display:none;position:fixed;pointer-events:none;z-index:20;width:780px;height:780px;border-radius:50%;border:4px solid #f5ac45;box-shadow:0 0 0 5px #ffffff16,inset 0 0 46px #ffffff10;opacity:.65;box-sizing:border-box;transform:translate(-50%,-50%)';
  function displayPrimalRing(){
    if(!activePrimal){ring.style.display='none';return;}
    const canvases=[...document.querySelectorAll('canvas')].filter(c=>{const r=c.getBoundingClientRect();return r.width>400&&r.height>250;}).sort((a,b)=>{const aR=a.getBoundingClientRect(),bR=b.getBoundingClientRect();return bR.width*bR.height-aR.width*aR.height;});
@@ -149,10 +160,10 @@ function start(){
  const hint=elt('div');hint.style.cssText='margin-top:8px;color:#d5c39b;font-size:12px';
  const close=elt('button','×');close.style.cssText='position:absolute;top:4px;right:6px;background:none;border:0;color:white;font-size:22px;cursor:pointer';
  const mini=elt('button','✦ Mega');mini.style.cssText='position:fixed;z-index:2147482999;width:66px;height:66px;background:#141c2c;color:#f8eab3;border:3px solid #657a96;border-radius:12px;padding:4px;cursor:pointer;image-rendering:pixelated;font:bold 28px monospace;box-shadow:inset 0 0 0 2px #2c3f59';
- panel.style.display='none';close.onclick=()=>{panel.style.display='none';};mini.onclick=e=>{e.preventDefault();e.stopPropagation();if(!isRunScreen())return;panel.style.display=panel.style.display==='none'?'block':'none';};
- for(const target of [panel,mini]){
+ panel.style.display='none';close.onclick=()=>{panel.style.display='none';};mini.onclick=e=>{e.preventDefault();e.stopPropagation();if(!getPlayer())return;panel.style.display=panel.style.display==='none'?'block':'none';};
+ for(const target of [panel,mini,moveBtn]){
   for(const type of ['pointerdown','pointerup','mousedown','mouseup','click','dblclick','touchstart','touchend']){
-   target.addEventListener(type,e=>e.stopPropagation());
+   target.addEventListener(type,e=>{e.stopPropagation();if(['pointerdown','mousedown','touchstart'].includes(type))e.preventDefault();});
   }
  }
  function resetIfNew(){const p=getPlayer();if(p!==current){clearPrimal();rewardPending=false;stoneOwned=false;lastLevel=Number(p?.level||1);if(restore){try{restore();}catch(e){console.warn('Mega restore:',e);}restore=null;}current=p;used=false;}return p;}
@@ -169,7 +180,7 @@ function start(){
  btn.textContent=primal?'✦ Primal Reversion':'✦ Mega Evolve';
  const visible=isRunScreen();
  mini.style.display=visible?'block':'none';
- if(!visible)panel.style.display='none';
+ if(!getPlayer())panel.style.display='none';
  status.textContent=!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`;
 
  // Species is fixed to the current player; no clickable Pokémon/form selector.
@@ -179,7 +190,7 @@ function start(){
  mini.textContent=used?'✦':stoneOwned?'✦':'◇';
  mini.style.background=stoneOwned&&!used?'#755221':'#141c2c';
  mini.style.borderColor=stoneOwned&&!used?'#ffd267':'#657a96';
- mini.innerHTML=megaIcon(list[0],stoneOwned);mini.setAttribute('aria-label',stoneOwned?'Activate Mega Evolution':'Mega stone not acquired');
+ mini.innerHTML=primal ? '<img src="assets/mega/'+(Number(p?.dex)===383?'red-orb-48.png':'blue-orb-48.png')+'" width="44" height="44" style="image-rendering:pixelated;pointer-events:none" alt="Primal Orb">' : megaIcon(list[0],stoneOwned);mini.setAttribute('aria-label',stoneOwned?'Activate Mega Evolution':'Mega stone not acquired');
  mini.title=primal?(stoneOwned&&!used?'Primal Orb obtained. Activate Primal Reversion.':'Primal HUD slot'):(stoneOwned&&!used?'Mega Stone obtained. Activate Mega Evolution.':'Mega Stone HUD slot');
   mini.setAttribute('aria-label',primal?'Primal Reversion':'Mega Evolution');
   if(primal){mini.innerHTML+='<span style="display:block;font:bold 9px monospace;color:#ffe5a4;line-height:1">PRIMAL</span>';}
@@ -204,6 +215,17 @@ function start(){
      p.anim=new b.sprites.Animator(f.key,Number(p.scale)||1,Boolean(p.shiny||p.isShiny||p.anim?.shiny));
      if(typeof b.sprites.playerRadius==='function')p.r=b.sprites.playerRadius(f.key);
      if(typeof b.sprites.bodyHeight==='function')p.bodyH=b.sprites.bodyHeight(f.key);
+   }
+   if(WEATHER[f.key]){
+     // Multipliers relative to pre-transform stats, not compounded level-up multipliers.
+     if(Number.isFinite(baseline.baseAtk))p.baseAtk=baseline.baseAtk*2.5;
+     if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa*2.5;
+     if(Number.isFinite(baseline.maxHp)){
+       p.maxHp=Math.max(1,Math.round(baseline.maxHp*2.5));
+       p.hp=Math.min(p.maxHp,baseline.hp+(p.maxHp-baseline.maxHp));
+     }
+     if(Number.isFinite(baseline.r))p.r=Math.max(baseline.r,baseline.r*1.6);
+     if(Number.isFinite(baseline.bodyH))p.bodyH=Math.max(baseline.bodyH,baseline.bodyH*1.45);
    }
    p.megaForm=f.key;used=true;rewardPending=false;stoneOwned=false;
    if(WEATHER[f.key])activePrimal={player:p,cfg:WEATHER[f.key]};
@@ -239,7 +261,7 @@ function start(){
    card.style.cssText='border:2px solid #e8c96b;border-radius:12px;background:#182234;color:#fff4ce;min-height:142px;padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer;';
    const primalReward=!!WEATHER[f.key];
    const rewardLabel=primalReward?(Number(p.dex)===382?'Blue Orb':'Red Orb'):'Mega Stone';
-   card.innerHTML='<img src="assets/mega/mega-stone-96.png" alt="Stone" width="64" height="64" style="width:64px;height:64px;object-fit:contain;image-rendering:pixelated">'+'<b>'+rewardLabel+'</b><small>Claim '+(primalReward?'Primal Orb':'Mega Stone')+' (50% test)</small>';
+   card.innerHTML='<img src="assets/mega/'+(primalReward?(Number(p.dex)===383?'red-orb-48.png':'blue-orb-48.png'):'mega-stone-96.png')+'" alt="Stone" width="64" height="64" style="width:64px;height:64px;object-fit:contain;image-rendering:pixelated">'+'<b>'+rewardLabel+'</b><small>Claim '+(primalReward?'Primal Orb':'Mega Stone')+' (50% test)</small>';
    card.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();stoneOwned=true;rewardPending=false;card.remove();refresh();});
    cards.appendChild(card);
  }
