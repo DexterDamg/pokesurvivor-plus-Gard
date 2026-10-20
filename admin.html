@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>PokéSurvivor+ Admin</title>
+  <style>
+    body {
+      background: #101725;
+      color: white;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 30px 15px;
+    }
+    .panel {
+      max-width: 440px;
+      margin: 40px auto;
+      padding: 25px;
+      background: #202b40;
+      border: 2px solid #e6bd52;
+      border-radius: 16px;
+      text-align: center;
+    }
+    h1 { color: #f0c85c; }
+    button, input {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 13px;
+      margin: 7px 0;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    button {
+      border: 0;
+      background: #e6bd52;
+      color: #171717;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; }
+    input {
+      background: #111a2a;
+      color: white;
+      border: 1px solid #68748a;
+    }
+    #status { line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Admin Panel</h1>
+    <p id="status">Checking your account...</p>
+
+    <div id="controls" hidden>
+      <h2>Give Yourself Coins</h2>
+      <p>Current coins: <b id="balance">...</b></p>
+
+      <button data-amount="1000">Set 1,000 Coins</button>
+      <button data-amount="10000">Set 10,000 Coins</button>
+      <button data-amount="999999">Set 999,999 Coins</button>
+
+      <input id="custom" type="number" min="0"
+             max="999999999" step="1"
+             placeholder="Custom coin amount">
+      <button id="giveCustom">Set Custom Amount</button>
+      <button id="refresh">Refresh Balance</button>
+    </div>
+  </div>
+
+  <script src="./config.js"></script>
+  <script type="module">
+    import { initializeApp } from
+      "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+
+    import { getAuth, onAuthStateChanged } from
+      "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+    import {
+      getFirestore, doc, getDoc,
+      runTransaction, serverTimestamp
+    } from
+      "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+    const ADMIN_UID = "PASTE_YOUR_FIREBASE_UID_HERE";
+
+    const app = initializeApp(window.PS_FIREBASE);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const status = document.getElementById("status");
+    const controls = document.getElementById("controls");
+    const balance = document.getElementById("balance");
+
+    let adminUser = null;
+
+    function saveRef() {
+      return doc(db, "saves", adminUser.uid);
+    }
+
+    async function refreshBalance() {
+      const snap = await getDoc(saveRef());
+
+      if (!snap.exists()) {
+        throw new Error("No cloud save found. Save your game first.");
+      }
+
+      balance.textContent =
+        Number(snap.data().save?.coins ?? 0).toLocaleString();
+    }
+
+    onAuthStateChanged(auth, async user => {
+      controls.hidden = true;
+      adminUser = null;
+
+      if (!user) {
+        status.textContent =
+          "Not signed in. Sign in to the game first, then reopen this page.";
+        return;
+      }
+
+      if (user.uid !== ADMIN_UID) {
+        status.textContent = "Access denied: not the admin account.";
+        return;
+      }
+
+      adminUser = user;
+      status.textContent = "Admin verified.";
+      controls.hidden = false;
+
+      try {
+        await refreshBalance();
+      } catch (err) {
+        status.textContent = err.message;
+      }
+    });
+
+    async function setCoins(amount) {
+      if (!adminUser || auth.currentUser?.uid !== ADMIN_UID) {
+        return;
+      }
+
+      if (!Number.isSafeInteger(amount) ||
+          amount < 0 || amount > 999999999) {
+        status.textContent = "Invalid coin amount.";
+        return;
+      }
+
+      controls.querySelectorAll("button").forEach(b => {
+        b.disabled = true;
+      });
+
+      try {
+        await runTransaction(db, async tx => {
+          const ref = saveRef();
+          const snap = await tx.get(ref);
+
+          if (!snap.exists()) {
+            throw new Error("Save your game first.");
+          }
+
+          tx.update(ref, {
+            "save.coins": amount,
+            updatedAt: serverTimestamp()
+          });
+        });
+
+        await refreshBalance();
+        status.textContent = "Coins updated successfully!";
+      } catch (err) {
+        status.textContent = "Error: " + err.message;
+      } finally {
+        controls.querySelectorAll("button").forEach(b => {
+          b.disabled = false;
+        });
+      }
+    }
+
+    document.querySelectorAll("[data-amount]").forEach(button => {
+      button.addEventListener("click", () => {
+        setCoins(Number(button.dataset.amount));
+      });
+    });
+
+    document.getElementById("giveCustom").onclick = () => {
+      const raw = document.getElementById("custom").value;
+
+      if (!raw.trim()) {
+        status.textContent = "Enter a coin amount.";
+        return;
+      }
+
+      setCoins(Number(raw));
+    };
+
+    document.getElementById("refresh").onclick = async () => {
+      try {
+        await refreshBalance();
+        status.textContent = "Balance refreshed.";
+      } catch (err) {
+        status.textContent = err.message;
+      }
+    };
+  </script>
+</body>
+</html>
