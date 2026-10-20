@@ -29,66 +29,36 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  let activePrimal=null;
  const tracked=new WeakMap();
 
- // Signature Primal moves: available only during active Primal Reversion.
- // Deliberately implemented as native-friendly projectile bursts, not a visual-only overlay.
- const SIGNATURES={
-   '383-primal':{label:'Precipice Blades',type:'ground',color:'#f48b42',cd:7.5},
-   '382-primal':{label:'Origin Pulse',type:'water',color:'#61d5ff',cd:6.5}
+ // Native move entries: created in the real move database and learned upon Primal Reversion.
+ // They use the engine's standard cooldown, weapon slot, auto-attacks and upgrade display.
+ const SIGNATURE_MOVES={
+   '383-primal':{id:'precipice-blades',name:'Precipice Blades',type:'ground',kind:'nova',desc:'A powerful eruption of jagged ground blades around Groudon.',cd:3.7,dmg:36,speed:250,count:16,pierce:3,life:1.4,size:18},
+   '382-primal':{id:'origin-pulse',name:'Origin Pulse',type:'water',kind:'nova',desc:'Blue water pulses radiate outward in every direction.',cd:2.6,dmg:34,speed:390,count:16,pierce:3,life:1.7,size:14}
  };
- let primalMoveLast=-Infinity,primalMoveOwner=null;
- const moveBtn=document.createElement('button');
- moveBtn.id='ps-primal-signature';
- moveBtn.type='button';
- moveBtn.style.cssText='display:none;position:fixed;right:18px;bottom:100px;z-index:1400;padding:9px 11px;border:2px solid #89d7ff;border-radius:9px;background:#172b40;color:white;font:bold 12px system-ui;cursor:pointer';
- moveBtn.setAttribute('aria-label','Use Primal signature move');
- function signatureStatus(b,p){
-   if(!activePrimal||activePrimal.player!==p||!p){moveBtn.style.display='none';primalMoveOwner=null;return;}
-   const spec=SIGNATURES[p.megaForm];
-   if(!spec){moveBtn.style.display='none';return;}
-   if(primalMoveOwner!==p){primalMoveOwner=p;primalMoveLast=-Infinity;}
-   const remaining=Math.max(0,spec.cd-(performance.now()/1000-primalMoveLast));
-   moveBtn.textContent=spec.label+(remaining>0?' ('+remaining.toFixed(1)+'s)':' [E]');
-   moveBtn.disabled=remaining>0;
-   moveBtn.style.opacity=remaining>0?'.65':'1';
-   moveBtn.style.display='block';
- }
- function castSignature(){
-   const b=getBridge(),p=getPlayer();
-   if(!activePrimal||activePrimal.player!==p||!p||!b?.projectiles?.spawn)return;
-   const spec=SIGNATURES[p.megaForm];if(!spec)return;
-   const now=performance.now()/1000;
-   if(now-primalMoveLast<spec.cd)return;
-   primalMoveLast=now;
-   const power=Math.max(12,Number(p.baseAtk||p.baseSpa||22)*1.6);
-   if(spec.type==='ground'){
-     // Precipice Blades: 12 outward-traveling jagged ground strikes (wide-range ground burst).
-     for(let i=0;i<16;i++){
-       const a=(i/16)*Math.PI*2;
-       b.projectiles.spawn({x:p.x+Math.cos(a)*28,y:p.y+Math.sin(a)*28,
-         vx:Math.cos(a)*250,vy:Math.sin(a)*250,dmg:power,r:22,life:1.6,
-         pierce:3,friendly:true,owner:p,mtype:'ground',color:spec.color,knock:130});
-     }
-   }else{
-     // Origin Pulse: 9 high-speed water pulses in a forward-facing fan.
-     // Direction uses last movement, with a right-facing fallback.
-     let facing=Math.atan2(Number(p.vy)||0,Number(p.vx)||0);
-     if(!Number.isFinite(facing)||((Number(p.vx)||0)===0&&(Number(p.vy)||0)===0))facing=0;
-     for(let i=-6;i<=6;i++){
-       const a=facing+i*.105;
-       b.projectiles.spawn({x:p.x+Math.cos(a)*23,y:p.y+Math.sin(a)*23,
-         vx:Math.cos(a)*440,vy:Math.sin(a)*440,dmg:power*1.18,r:17,life:1.5,
-         pierce:2,friendly:true,owner:p,mtype:'water',color:spec.color,knock:95});
-     }
+ function registerSignatureMoves(){
+   const m=getBridge()?.moves;
+   if(!m||!m.BY_ID||!Array.isArray(m.ALL))return false;
+   for(const def of Object.values(SIGNATURE_MOVES)){
+     if(!m.BY_ID[def.id]){m.ALL.push(def);m.BY_ID[def.id]=def;}
    }
-   signatureStatus(b,p);
+   return true;
  }
- moveBtn.addEventListener('pointerdown',e=>e.stopPropagation());
- moveBtn.addEventListener('pointerup',e=>e.stopPropagation());
- moveBtn.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();castSignature();});
- document.addEventListener('keydown',e=>{
-   if(e.code==='KeyE'&&!e.repeat&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))castSignature();
- });
-
+ function grantSignature(p,form){
+   const def=SIGNATURE_MOVES[form];
+   if(!def||!registerSignatureMoves()||typeof p.addMove!=='function')return null;
+   const previousMax=p.maxMoves;
+   p.maxMoves=Math.max(Number(previousMax)||4,(p.slots?.length||0)+1);
+   const granted=p.addMove(def.id);
+   if(!granted){p.maxMoves=previousMax;return null;}
+   return ()=>{
+     // Remove the temporary signature slot without altering existing learned moves.
+     const i=p.slots?.findIndex(slot=>Array.isArray(slot)&&slot.some(move=>move.id===def.id))??-1;
+     if(i>=0){const slot=p.slots.splice(i,1)[0];for(const move of slot)p.moves=p.moves.filter(v=>v!==move);}
+     p.maxMoves=previousMax;
+     if(typeof p.arrange==='function')p.arrange();
+     if(p.slots?.length)p.active=Math.min(Number(p.active)||0,p.slots.length-1);
+   };
+ }
  function attackType(obj,b){
    const explicit=obj?.mtype||obj?.moveType||obj?.type||obj?.vis?.pal;
    if(typeof explicit==='string')return explicit.toLowerCase();
@@ -97,7 +67,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  }
  function prismMultiplier(type,cfg){return cfg.boost.includes(type)?1.5:cfg.weaken.includes(type)?0.8:1;}
  function clearPrimal(){
-   if(activePrimal){restoreProjectileDamage(getBridge());activePrimal=null;primalMoveOwner=null;moveBtn.style.display='none';}
+   if(activePrimal){restoreProjectileDamage(getBridge());activePrimal=null;}
  }
  function restoreProjectileDamage(b){
    const arr=b?.projectiles?.all?.()||[];
@@ -160,13 +130,13 @@ function start(){
  const hint=elt('div');hint.style.cssText='margin-top:8px;color:#d5c39b;font-size:12px';
  const close=elt('button','×');close.style.cssText='position:absolute;top:4px;right:6px;background:none;border:0;color:white;font-size:22px;cursor:pointer';
  const mini=elt('button','✦ Mega');mini.style.cssText='position:fixed;z-index:2147482999;width:66px;height:66px;background:#141c2c;color:#f8eab3;border:3px solid #657a96;border-radius:12px;padding:4px;cursor:pointer;image-rendering:pixelated;font:bold 28px monospace;box-shadow:inset 0 0 0 2px #2c3f59';
- panel.style.display='none';close.onclick=()=>{panel.style.display='none';};mini.onclick=e=>{e.preventDefault();e.stopPropagation();if(!getPlayer())return;panel.style.display=panel.style.display==='none'?'block':'none';};
- for(const target of [panel,mini,moveBtn]){
+ panel.style.display='none';panel.style.pointerEvents='auto';close.onclick=()=>{panel.style.display='none';};mini.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();if(!isRunScreen())return;panel.style.display=panel.style.display==='none'?'block':'none';});
+ for(const target of [panel,mini]){
   for(const type of ['pointerdown','pointerup','mousedown','mouseup','click','dblclick','touchstart','touchend']){
    target.addEventListener(type,e=>{e.stopPropagation();if(['pointerdown','mousedown','touchstart'].includes(type))e.preventDefault();});
   }
  }
- function resetIfNew(){const p=getPlayer();if(p!==current){clearPrimal();rewardPending=false;stoneOwned=false;lastLevel=Number(p?.level||1);if(restore){try{restore();}catch(e){console.warn('Mega restore:',e);}restore=null;}current=p;used=false;}return p;}
+ function resetIfNew(){const p=getPlayer();if(!p)return current;if(p!==current){clearPrimal();rewardPending=false;stoneOwned=false;lastLevel=Number(p?.level||1);if(restore){try{restore();}catch(e){console.warn('Mega restore:',e);}restore=null;}current=p;used=false;}return p;}
  function options(p){return p?(FORM_DATA[String(Number(p.dex))]||[]):[];}
  function isRunScreen(){
    const b=getBridge(),p=b?.game?.player;
@@ -174,13 +144,14 @@ function start(){
    return !!p && !!b?.game && b.game.state==='playing' && (!menu || menu.classList.contains('hidden'));
  }
  function refresh(){
+ registerSignatureMoves();
  const p=resetIfNew();const b=getBridge();const list=options(p);allowMegaByLevel(p,list);
  const primal=!!list[0]&&!!WEATHER[list[0].key];
  title.textContent=primal?'PRIMAL REVERSION':'MEGA EVOLUTION';
  btn.textContent=primal?'✦ Primal Reversion':'✦ Mega Evolve';
  const visible=isRunScreen();
  mini.style.display=visible?'block':'none';
- if(!getPlayer())panel.style.display='none';
+ if(!visible)panel.style.display='none';
  status.textContent=!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`;
 
  // Species is fixed to the current player; no clickable Pokémon/form selector.
@@ -227,9 +198,10 @@ function start(){
      if(Number.isFinite(baseline.r))p.r=Math.max(baseline.r,baseline.r*1.6);
      if(Number.isFinite(baseline.bodyH))p.bodyH=Math.max(baseline.bodyH,baseline.bodyH*1.45);
    }
+   const undoSignature=grantSignature(p,f.key);
    p.megaForm=f.key;used=true;rewardPending=false;stoneOwned=false;
    if(WEATHER[f.key])activePrimal={player:p,cfg:WEATHER[f.key]};
-   restore=()=>{clearPrimal();p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa;p.maxHp=baseline.maxHp;p.hp=Math.min(p.hp,baseline.maxHp);p.r=baseline.r;p.bodyH=baseline.bodyH;delete p.megaForm;};
+   restore=()=>{if(undoSignature)undoSignature();clearPrimal();p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa;p.maxHp=baseline.maxHp;p.hp=Math.min(p.hp,baseline.maxHp);p.r=baseline.r;p.bodyH=baseline.bodyH;delete p.megaForm;};
    hint.textContent=WEATHER[f.key]?'Primal Reversion! Local weather aura enabled.':'Mega Evolution activated!';
  }catch(err){clearPrimal();console.error('Mega Evolution:',err);p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;p.maxHp=baseline.maxHp;p.hp=baseline.hp;p.r=baseline.r;p.bodyH=baseline.bodyH;hint.textContent='Mega error: '+err.message;}
  refresh();
@@ -266,7 +238,7 @@ function start(){
    cards.appendChild(card);
  }
 
- panel.append(title,status,btn,hint,close);document.body.append(mini,panel,ring,moveBtn);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();updatePrimalDamage(getBridge(),getPlayer());displayPrimalRing();signatureStatus(getBridge(),getPlayer());},60);refresh();
+ panel.append(title,status,btn,hint,close);document.body.append(mini,panel,ring);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();updatePrimalDamage(getBridge(),getPlayer());displayPrimalRing();},60);refresh();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
