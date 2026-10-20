@@ -28,6 +28,67 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  };
  let activePrimal=null;
  const tracked=new WeakMap();
+
+ // Signature Primal moves: available only during active Primal Reversion.
+ // Deliberately implemented as native-friendly projectile bursts, not a visual-only overlay.
+ const SIGNATURES={
+   '383-primal':{label:'Precipice Blades',type:'ground',color:'#f48b42',cd:7.5},
+   '382-primal':{label:'Origin Pulse',type:'water',color:'#61d5ff',cd:6.5}
+ };
+ let primalMoveLast=-Infinity,primalMoveOwner=null;
+ const moveBtn=document.createElement('button');
+ moveBtn.id='ps-primal-signature';
+ moveBtn.type='button';
+ moveBtn.style.cssText='display:none;position:fixed;right:18px;bottom:100px;z-index:1400;padding:9px 11px;border:2px solid #89d7ff;border-radius:9px;background:#172b40;color:white;font:bold 12px system-ui;cursor:pointer';
+ moveBtn.setAttribute('aria-label','Use Primal signature move');
+ function signatureStatus(b,p){
+   if(!activePrimal||activePrimal.player!==p||!p){moveBtn.style.display='none';primalMoveOwner=null;return;}
+   const spec=SIGNATURES[p.megaForm];
+   if(!spec){moveBtn.style.display='none';return;}
+   if(primalMoveOwner!==p){primalMoveOwner=p;primalMoveLast=-Infinity;}
+   const remaining=Math.max(0,spec.cd-(performance.now()/1000-primalMoveLast));
+   moveBtn.textContent=spec.label+(remaining>0?' ('+remaining.toFixed(1)+'s)':' [E]');
+   moveBtn.disabled=remaining>0;
+   moveBtn.style.opacity=remaining>0?'.65':'1';
+   moveBtn.style.display='block';
+ }
+ function castSignature(){
+   const b=getBridge(),p=getPlayer();
+   if(!activePrimal||activePrimal.player!==p||!p||!b?.projectiles?.spawn)return;
+   const spec=SIGNATURES[p.megaForm];if(!spec)return;
+   const now=performance.now()/1000;
+   if(now-primalMoveLast<spec.cd)return;
+   primalMoveLast=now;
+   const power=Math.max(12,Number(p.baseAtk||p.baseSpa||22)*2.5);
+   if(spec.type==='ground'){
+     // Precipice Blades: 12 outward-traveling jagged ground strikes (wide-range ground burst).
+     for(let i=0;i<12;i++){
+       const a=(i/12)*Math.PI*2;
+       b.projectiles.spawn({x:p.x+Math.cos(a)*28,y:p.y+Math.sin(a)*28,
+         vx:Math.cos(a)*210,vy:Math.sin(a)*210,dmg:power,r:14,life:1.35,
+         pierce:3,friendly:true,owner:p,mtype:'ground',color:spec.color,knock:130});
+     }
+   }else{
+     // Origin Pulse: 9 high-speed water pulses in a forward-facing fan.
+     // Direction uses last movement, with a right-facing fallback.
+     let facing=Math.atan2(Number(p.vy)||0,Number(p.vx)||0);
+     if(!Number.isFinite(facing)||((Number(p.vx)||0)===0&&(Number(p.vy)||0)===0))facing=0;
+     for(let i=-4;i<=4;i++){
+       const a=facing+i*.125;
+       b.projectiles.spawn({x:p.x+Math.cos(a)*23,y:p.y+Math.sin(a)*23,
+         vx:Math.cos(a)*390,vy:Math.sin(a)*390,dmg:power*1.18,r:10,life:1.2,
+         pierce:2,friendly:true,owner:p,mtype:'water',color:spec.color,knock:95});
+     }
+   }
+   signatureStatus(b,p);
+ }
+ moveBtn.addEventListener('pointerdown',e=>e.stopPropagation());
+ moveBtn.addEventListener('pointerup',e=>e.stopPropagation());
+ moveBtn.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();castSignature();});
+ document.addEventListener('keydown',e=>{
+   if(e.code==='KeyE'&&!e.repeat&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))castSignature();
+ });
+
  function attackType(obj,b){
    const explicit=obj?.mtype||obj?.moveType||obj?.type||obj?.vis?.pal;
    if(typeof explicit==='string')return explicit.toLowerCase();
@@ -36,7 +97,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  }
  function prismMultiplier(type,cfg){return cfg.boost.includes(type)?1.5:cfg.weaken.includes(type)?0.8:1;}
  function clearPrimal(){
-   if(activePrimal){restoreProjectileDamage(getBridge());activePrimal=null;}
+   if(activePrimal){restoreProjectileDamage(getBridge());activePrimal=null;primalMoveOwner=null;moveBtn.style.display='none';}
  }
  function restoreProjectileDamage(b){
    const arr=b?.projectiles?.all?.()||[];
@@ -183,7 +244,7 @@ function start(){
    cards.appendChild(card);
  }
 
- panel.append(title,status,btn,hint,close);document.body.append(mini,panel,ring);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();updatePrimalDamage(getBridge(),getPlayer());displayPrimalRing();},60);refresh();
+ panel.append(title,status,btn,hint,close);document.body.append(mini,panel,ring,moveBtn);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();updatePrimalDamage(getBridge(),getPlayer());displayPrimalRing();signatureStatus(getBridge(),getPlayer());},60);refresh();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
