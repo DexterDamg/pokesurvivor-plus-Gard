@@ -302,6 +302,37 @@ function start(){
  }
  function resetIfNew(){const p=getPlayer();if(!p)return current;if(p!==current){clearPrimal();rewardPending=false;stoneOwned=false;lastLevel=Number(p?.level||1);if(restore){try{restore();}catch(e){console.warn('Mega restore:',e);}restore=null;}current=p;used=false;}return p;}
  function options(p){return p?(FORM_DATA[String(Number(p.dex))]||[]):[];}
+ // Pokemon with several Mega forms (Mewtwo X/Y, Charizard X/Y...): the player picks one in the panel.
+ // Default = the first form that has a sprite, so the Pokemon visibly changes.
+ const chosenForm={};
+ function formFor(p){
+   const list=options(p);if(!list.length)return null;
+   const pick=chosenForm[String(Number(p.dex))];
+   return list.find(f=>f.key===pick)||list.find(f=>f.spr)||list[0];
+ }
+ function setText(el,t){if(el.textContent!==t)el.textContent=t;}
+ // One element per line: the game's translation pass collapses newline characters in text,
+ // so plain '\n' line breaks in a single text block were shown as one long paragraph.
+ function setLines(el,lines){
+   const key=lines.join('\u0001');if(el.__lines===key)return;el.__lines=key;
+   el.textContent='';
+   for(const l of lines){const d=document.createElement('div');if(l.trim())d.textContent=l;else d.style.height='6px';el.appendChild(d);}
+ }
+ const formsBox=elt('div');formsBox.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin:6px 0';
+ function renderForms(p,list,f0){
+   const sig=(p?p.dex:'')+'|'+(f0?f0.key:'')+'|'+used+'|'+list.length;
+   if(formsBox.__sig===sig)return;formsBox.__sig=sig;
+   formsBox.innerHTML='';formsBox.style.display=list.length>1?'flex':'none';
+   if(list.length<2)return;
+   for(const f of list){
+     const b=elt('button',(f.en||f.name).replace(/^Mega /,'')+(f.spr?'':' \u00b7 no sprite'));b.type='button';
+     const on=f0&&f.key===f0.key;
+     b.style.cssText='flex:1 1 45%;padding:6px 8px;border-radius:7px;cursor:pointer;font:bold 12px system-ui;border:2px solid '+(on?'#ffd267':'#3b4d66')+';background:'+(on?'#5a4220':'#172536')+';color:#fff';
+     b.disabled=used;if(used&&!on)b.style.opacity='.4';
+     b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();if(used)return;chosenForm[String(Number(p.dex))]=f.key;refresh();});
+     formsBox.appendChild(b);
+   }
+ }
  function isRunScreen(){
    const b=getBridge(),p=b?.game?.player;
    const menu=document.getElementById('scr-menu');
@@ -310,30 +341,33 @@ function start(){
  function refresh(){
  registerSignatureMoves();
  const p=resetIfNew();const b=getBridge();const list=options(p);allowMegaByLevel(p,list);
- const primal=!!list[0]&&!!WEATHER[list[0].key];
- title.textContent=primal?'PRIMAL REVERSION':'MEGA EVOLUTION';
- btn.textContent=primal?'✦ Primal Reversion':'✦ Mega Evolve';
+ const f0=formFor(p);
+ const primal=!!f0&&!!WEATHER[f0.key];
+ setText(title,primal?'PRIMAL REVERSION':'MEGA EVOLUTION');
+ setText(btn,primal?'✦ Primal Reversion':'✦ Mega Evolve');
+ renderForms(p,list,f0);
  const visible=isRunScreen();
  mini.style.display=visible?'block':'none';
  if(!visible)panel.style.display='none';
- status.textContent=!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(list[0]&&MEGA_KITS[list[0].key]?'\n\nPassive \u2013 '+MEGA_KITS[list[0].key].passive.name+':\n'+describePassive(MEGA_KITS[list[0].key].passive)+'\nSignature move: '+MEGA_KITS[list[0].key].move.name+' (max level)\n'+(MEGA_KITS[list[0].key].move.desc||''):'');
+ setLines(status,(!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(f0?'\nForm: '+(f0.en||f0.name)+(f0.spr?'':' (no sprite yet: keeps the normal look)'):'')+(f0&&MEGA_KITS[f0.key]?'\n\nPassive \u2013 '+MEGA_KITS[f0.key].passive.name+':\n'+describePassive(MEGA_KITS[f0.key].passive)+'\nSignature move: '+MEGA_KITS[f0.key].move.name+' (max level)\n'+(MEGA_KITS[f0.key].move.desc||''):'')).split('\n'));
 
  // Species is fixed to the current player; no clickable Pokémon/form selector.
 
 
  const enabled=!!p&&list.length>0&&!used&&stoneOwned&&(p.level||1)>=10;
- mini.textContent=used?'✦':stoneOwned?'✦':'◇';
  mini.style.background=stoneOwned&&!used?'#755221':'#141c2c';
  mini.style.borderColor=stoneOwned&&!used?'#ffd267':'#657a96';
- mini.innerHTML=primal ? orbIcon(Number(p?.dex)===383,40) : megaIcon(list[0],stoneOwned);mini.setAttribute('aria-label',stoneOwned?'Activate Mega Evolution':'Mega stone not acquired');
+ // Only rebuild the icon when it changes: replacing it every tick swallowed clicks
+ // (a click needs press + release on the same element), so the button took many clicks.
+ const miniHtml=(primal ? orbIcon(Number(p?.dex)===383,40) : megaIcon(f0,stoneOwned))+(primal?'<span style="display:block;font:bold 9px monospace;color:#ffe5a4;line-height:1">PRIMAL</span>':'');
+ if(mini.__html!==miniHtml){mini.innerHTML=miniHtml;mini.__html=miniHtml;}
  mini.title=primal?(stoneOwned&&!used?'Primal Orb obtained. Activate Primal Reversion.':'Primal HUD slot'):(stoneOwned&&!used?'Mega Stone obtained. Activate Mega Evolution.':'Mega Stone HUD slot');
   mini.setAttribute('aria-label',primal?'Primal Reversion':'Mega Evolution');
-  if(primal){mini.innerHTML+='<span style="display:block;font:bold 9px monospace;color:#ffe5a4;line-height:1">PRIMAL</span>';}
  btn.disabled=!enabled;btn.style.opacity=enabled?'1':'.45';
  hint.textContent=!p?'Start a run first.':used?'Mega Evolution active until the run ends.':!list.length?'No Mega form for this Pokémon.':(p.level||1)<10?'Available from level 10.':stoneOwned?'Mega Stone obtained! Finish your reward selection, then activate your Mega form.':rewardPending?'A Mega Stone reward card is available in the level-up rewards.':'50% Mega Stone test chance on each eligible level-up.';
  }
  btn.onclick=()=>{
- const p=resetIfNew();const list=options(p);const f=list[0];const b=getBridge();
+ const p=resetIfNew();const list=options(p);const f=formFor(p);const b=getBridge();
  if(!p||!f||used||!b?.sprites||(p.level||1)<10||!stoneOwned){refresh();return;}
  if(b.game?.state!=='playing'){hint.textContent='Finish your current reward or menu first, then open Mega Stone Ready again.';return;}
  const baseline={mon:p.mon,anim:p.anim,baseAtk:p.baseAtk,baseSpd:p.baseSpd,baseSpa:p.baseSpa,maxHp:p.maxHp,hp:p.hp,r:p.r,bodyH:p.bodyH};
@@ -401,7 +435,7 @@ function start(){
    const existing=document.getElementById('ps-mega-level-card');
    if(!showing||!rewardPending||stoneOwned||used){existing?.remove();return;}
    if(existing)return;
-   const p=getPlayer(),f=options(p)[0];if(!f)return;
+   const p=getPlayer(),f=formFor(p);if(!f)return;
    const card=elt('button');card.id='ps-mega-level-card';card.type='button';card.className='card';
    card.style.cssText='border:2px solid #e8c96b;border-radius:12px;background:#182234;color:#fff4ce;min-height:142px;padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer;';
    const primalReward=!!WEATHER[f.key];
@@ -411,7 +445,7 @@ function start(){
    cards.appendChild(card);
  }
 
- panel.append(title,status,btn,hint,close);document.body.append(mini,panel,ring);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();keepPrimalWeather();megaKitTick();},60);refresh();
+ panel.append(title,status,formsBox,btn,hint,close);document.body.append(mini,panel,ring);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();keepPrimalWeather();megaKitTick();},60);refresh();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
