@@ -43,7 +43,10 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    // Both are granted already at MAX level (see grantSignature). Numbers below are level-1 base values;
    // max level adds: nova +8 projectiles, +40% dmg, +1 pierce, -25% cooldown;
    //                 chain +4 jumps, ~2x dmg, -25% cooldown.
-   '383-primal':{id:'precipice-blades',name:'Precipice Blades',type:'ground',kind:'nova',desc:'Jagged blades of stone erupt outward in every direction.',cd:2.6,dmg:40,speed:260,count:16,pierce:3,life:1.3,size:16},
+   // Precipice Blades: a Tectonic Rage-style eruption. Rings of volcanic stone spikes burst out of the
+   // ground around Groudon in waves (custom art: assets/fx/precipice-spikes.png). Each wave can hit a foe
+   // once. 'count' (+8 at max level) adds a 4th, wider wave once it reaches 24.
+   '383-primal':{id:'precipice-blades',name:'Precipice Blades',type:'ground',kind:'nova',eruption:true,desc:'Waves of volcanic stone blades erupt from the ground around Groudon.',cd:2.6,dmg:40,speed:260,count:16,pierce:3,life:1.3,size:16,knock:140},
    // chains: how many separate lightning chains fire at once (each starts on a different foe).
    '382-primal':{id:'origin-pulse',name:'Origin Pulse',type:'water',kind:'chain',desc:'Four beams of blue light lock on to different foes and arc from foe to foe.',cd:1.4,dmg:16,count:6,radius:230,chains:4}
  };
@@ -172,6 +175,74 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  function gameCanvas(){
    return [...document.querySelectorAll('canvas')].filter(c=>c!==ring&&c.width>0).map(c=>({c,r:c.getBoundingClientRect()})).filter(o=>o.r.width>400&&o.r.height>250).sort((a,b)=>b.r.width*b.r.height-a.r.width*a.r.height)[0]||null;
  }
+ // ---- Precipice Blades eruption (called by the engine through window.PS_CAST) ----
+ const spikeImg=new Image();spikeImg.src='assets/fx/precipice-spikes.png?v=1';
+ const SPIKE_W=32,SPIKE_H=56,SPIKE_UNIT=1.05; // sheet frame size (px) and world units per sheet pixel
+ const eruptions=[],spikes=[],debris=[];
+ window.PS_CAST=function(player,move,hit,ghost){
+   if(!player||!move)return;
+   const waves=(Number(move.count)||16)>=24?4:3;
+   eruptions.push({x:player.x,y:player.y,player,move,hit,ghost:!!ghost,t:0,next:0,waves});
+   try{getBridge()?.camera?.kick?.(0.06);}catch(e){}
+ };
+ const WAVE_R=[62,128,194,260],WAVE_GAP=0.13,BAND=36;
+ function updateEruptions(dt){
+   const b=getBridge(),E=b?.enemies;
+   for(let i=eruptions.length-1;i>=0;i--){
+     const er=eruptions[i];er.t+=dt;
+     while(er.next<er.waves&&er.t>=er.next*WAVE_GAP){
+       const k=er.next++,R=WAVE_R[k];
+       // spikes around the ring
+       const n=Math.max(7,Math.round(2*Math.PI*R/66));
+       const off=Math.random()*Math.PI*2;
+       for(let j=0;j<n;j++){const a=off+j*2*Math.PI/n+(Math.random()-0.5)*0.15,r=R+(Math.random()-0.5)*14;
+         const spx=er.x+Math.cos(a)*r,spy=er.y+Math.sin(a)*r*0.8;
+         if(Math.abs(spx-er.x)<50&&spy-er.y>-100&&spy-er.y<28)continue; // keep Groudon's own sprite clear (hits still count)
+         spikes.push({x:spx,y:spy,v:(Math.random()*4)|0,t:-Math.random()*0.05,life:0.62,s:0.75+Math.random()*0.35});}
+       for(let j=0;j<10;j++){const a=Math.random()*Math.PI*2,r=R*Math.random();debris.push({x:er.x+Math.cos(a)*r,y:er.y+Math.sin(a)*r*0.8,z:0,vz:120+Math.random()*160,vx:(Math.random()-0.5)*60,t:0,c:Math.random()<0.3?'#ff8a2a':'#6b4a3a'});}
+       try{b?.camera?.kick?.(0.04);}catch(e){}
+       // damage: every foe inside this wave's band, once per wave, through the game's own hit function
+       if(!er.ghost&&E&&typeof E.all==='function'&&typeof er.hit==='function'){
+         const lo=k===0?0:R-BAND,hi=R+BAND;
+         for(const en of E.all()){
+           if(!en||en.dead||typeof en.hurt!=='function')continue;
+           const dx=en.x-er.x,dy=(en.y-er.y)/0.8,d=Math.hypot(dx,dy);
+           if(d<lo||d>hi)continue;
+           const atk=Number(er.player.atk)||1;
+           try{er.hit(er.player,en,er.move.dmg*atk,'#c9783a',dx,dy,er.move.knock||120,er.move);}catch(e){console.warn('Precipice hit:',e);}
+         }
+       }
+     }
+     if(er.next>=er.waves)eruptions.splice(i,1);
+   }
+   for(let i=spikes.length-1;i>=0;i--){spikes[i].t+=dt;if(spikes[i].t>spikes[i].life)spikes.splice(i,1);}
+   for(let i=debris.length-1;i>=0;i--){const d=debris[i];d.t+=dt;d.vz-=520*dt;d.z+=d.vz*dt;d.x+=d.vx*dt;if(d.z<0&&d.t>0.1)debris.splice(i,1);}
+ }
+ function drawEruptions(ctx,box){
+   if(!spikes.length&&!debris.length)return;
+   const b=getBridge(),cam=b?.camera,g=gameCanvas();if(!cam||!g||typeof cam.left!=='function')return;
+   const css=Number(cam._cw)>0?g.r.width/cam._cw:1,k=cam.scale*css;
+   const sx=wx=>g.r.left+(wx-cam.left())*k,sy=wy=>g.r.top+(wy-cam.top())*k;
+   ctx.save();ctx.beginPath();ctx.rect(box.left,box.top,box.width,box.height);ctx.clip();
+   ctx.imageSmoothingEnabled=false;
+   const px=SPIKE_UNIT*k;
+   // scorched cracks first
+   for(const sp of spikes){if(sp.t<0||!spikeImg.complete)continue;
+     const a=Math.max(0,1-sp.t/sp.life);ctx.globalAlpha=0.85*a;
+     const w=SPIKE_W*px*sp.s,h=16*px*sp.s;
+     ctx.drawImage(spikeImg,sp.v*SPIKE_W,56,SPIKE_W,16,sx(sp.x)-w/2,sy(sp.y)-h/2,w,h);}
+   ctx.globalAlpha=1;
+   const ord=spikes.slice().sort((a,b)=>a.y-b.y);
+   for(const sp of ord){if(sp.t<0||!spikeImg.complete)continue;
+     // rise fast (0.09s), hold, sink (last 0.18s)
+     const rise=Math.min(1,sp.t/0.09),sink=Math.max(0,(sp.t-(sp.life-0.18))/0.18),f=Math.max(0,rise-sink);
+     const w=SPIKE_W*px*sp.s,h=SPIKE_H*px*sp.s,gx=sx(sp.x),gy=sy(sp.y)+3*px*sp.s;
+     ctx.save();ctx.beginPath();ctx.rect(gx-w,gy-h*1.1,w*2,h*1.1);ctx.clip();
+     ctx.drawImage(spikeImg,sp.v*SPIKE_W,0,SPIKE_W,SPIKE_H,gx-w/2,gy-h*f,w,h);
+     ctx.restore();}
+   for(const d of debris){ctx.fillStyle=d.c;ctx.globalAlpha=Math.max(0,1-d.t/0.9);const q=Math.max(2,2*px);ctx.fillRect(Math.round(sx(d.x)),Math.round(sy(d.y)-d.z*k),q,q);}
+   ctx.restore();
+ }
  function domainOnScreen(p){
    const g=gameCanvas(),cam=getBridge()?.camera;if(!g||!p)return null;
    // The camera works in CSS pixels (cam._cw = canvas CSS width), NOT device pixels, so this
@@ -240,6 +311,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    ctx.save();ctx.beginPath();ctx.rect(d.box.left,d.box.top,d.box.width,d.box.height);ctx.clip();
    ctx.strokeStyle=cfg.ring;ctx.globalAlpha=0.55+0.15*Math.sin(t*3);ctx.lineWidth=4;ctx.setLineDash([18,10]);ctx.lineDashOffset=-t*30;
    ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.stroke();ctx.restore();
+   updateEruptions(dt);drawEruptions(ctx,d.box);
  }
  requestAnimationFrame(drawPrimalDomain);
 
