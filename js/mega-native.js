@@ -154,6 +154,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    };
    w.blocks=function(what){
      if(activePrimal&&getPlayer()===activePrimal.player)return false;
+     {const P=passiveFor(getPlayer());if(P&&P.ability&&P.ability.weatherImmune)return false;} // Air Lock / Delta Stream
      return nativeBlocks(what);
    };
    if(desc&&desc.get&&desc.configurable){
@@ -445,43 +446,157 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  }
  requestAnimationFrame(drawPrimalDomain);
 
- // ---- Mega passives: damage hooks used by the engine (app.min.js calls PS_HOOKS.deal / PS_HOOKS.take) ----
- function activeKit(){
-   const p=window.PS_MEGA_BRIDGE_V5?.game?.player;
-   if(!p||!p.megaKit||p.megaForm!==p.megaKit)return null;
-   const k=MEGA_KITS[p.megaKit];return k&&k.passive?{p,P:k.passive}:null;
+ // ================= PASSIVES: abilities + damage passives + monotype bonus =================
+ // Data lives in js/abilities.js (ability library, legendary abilities, monotype rule) and
+ // js/mega-kits.js (Mega abilities + type damage). The engine calls PS_HOOKS.deal / PS_HOOKS.take
+ // on every hit, AFTER its own damage formula, so these multiply on top of Power / Vigor upgrades
+ // and never touch the game's x50 damage soft cap.
+ const ABIL=window.PS_ABILITIES||{},LEGENDS=window.PS_LEGEND_KITS||{};
+ const MONO=Object.assign({own:2,other:1.5,scope:'legend+mega'},window.PS_MONOTYPE||{});
+ const LEGEND_DUAL=Number(window.PS_LEGEND_DUAL_DEAL)||1.3;
+ const reCache={};
+ function passiveFor(p){
+   if(!p)return null;
+   const key=p.dex+'|'+(p.megaForm||'')+'|'+(p.megaKit||'')+'|'+((p.mon&&p.mon.types)||[]).join('/');
+   if(p.__pfKey===key)return p.__pf;
+   const types=((p.mon&&Array.isArray(p.mon.types))?p.mon.types:[]).filter(Boolean);
+   const single=types.length===1;
+   let src=null,abilityId=null,deal={};
+   if(p.megaForm){
+     const k=MEGA_KITS[p.megaForm];
+     if(k&&k.passive&&p.megaKit===p.megaForm){src='mega';abilityId=k.passive.ability||null;deal=Object.assign({},k.passive.deal||{});}
+     else if(WEATHER[p.megaForm])src='primal'; // Primal weather is its ability; monotype still applies
+   }else if(LEGENDS[Number(p.dex)]){
+     src='legend';abilityId=LEGENDS[Number(p.dex)];
+     if(!single)for(const t of types)deal[t]=LEGEND_DUAL;
+   }else if(MONO.scope==='all'&&single)src='mono';
+   const P=src?{src,abilityId,ability:abilityId?ABIL[abilityId]||null:null,deal,types,mono:single}:null;
+   p.__pfKey=key;p.__pf=P;return P;
+ }
+ const W=()=>getBridge()?.weather,TY=()=>getBridge()?.types;
+ function moveOf(src){
+   if(!src)return null;if(src.kind)return src;
+   if(src.mid){const m=getBridge()?.moves;return m&&m.BY_ID?m.BY_ID[src.mid]||null:null;}
+   return null;
  }
  window.PS_HOOKS={
-   deal(type,target){
-     const a=activeKit();if(!a)return 1;const {p,P}=a;
-     let m=1;if(P.deal){if(type&&Number.isFinite(P.deal[type]))m*=P.deal[type];if(Number.isFinite(P.deal.all))m*=P.deal.all;}
-     if(P.lowHp&&p.maxHp>0&&p.hp/p.maxHp<P.lowHp.below)m*=P.lowHp.deal;
+   deal(type,target,src){
+     const p=getPlayer(),P=passiveFor(p);if(!P)return 1;
+     let m=1;const D=P.deal||{};
+     // damage passive / monotype bonus
+     if(P.mono){const own=P.types[0];m*=type===own?Math.max(MONO.own,D[own]||1):MONO.other*(D[type]||1);}
+     else if(type&&D[type])m*=D[type];
+     const A=P.ability;
+     if(A){
+       if(A.deal){if(type&&Number.isFinite(A.deal[type]))m*=A.deal[type];if(Number.isFinite(A.deal.all))m*=A.deal.all;if(A.deal.stab&&P.types.includes(type))m*=A.deal.stab;}
+       const mv=moveOf(src);
+       if(mv){
+         if(A.dealKinds&&Number.isFinite(A.dealKinds[mv.kind]))m*=A.dealKinds[mv.kind];
+         if(A.dealMatch){const re=reCache[A.dealMatch.re]||(reCache[A.dealMatch.re]=new RegExp(A.dealMatch.re));if(re.test(mv.id||''))m*=A.dealMatch.m;}
+         if(A.dealLowBase&&Number((mv.def||mv).dmg)<=A.dealLowBase.max)m*=A.dealLowBase.m;
+         if(A.dealStatus&&(mv.burn||mv.poison||mv.slow))m*=A.dealStatus;
+         if(A.dealMulti&&Number(mv.count)>1)m*=A.dealMulti;
+       }
+       if(A.weatherBoost){const k=W()?.current?.kind;if(k&&A.weatherBoost.kinds.includes(k))m*=A.weatherBoost.deal;}
+       if(A.lowHp&&A.lowHp.deal&&p.maxHp>0&&p.hp/p.maxHp<A.lowHp.below)m*=A.lowHp.deal;
+       if(A.slowStart){const t=(performance.now()-(p.__bornAt||performance.now()))/1000;m*=t<A.slowStart.secs?A.slowStart.early:A.slowStart.late;}
+       if(A.ignoreResist&&target&&Array.isArray(target.types)&&TY()&&type){
+         // cancel 'not very effective' (x0.6 per resisting type) but NOT immunities (this game uses x0.3 for those)
+         for(const dt of target.types){const one=TY().mult(type,[dt]);if(one>0.35&&one<1)m/=one;}
+       }
+       if(A.weatherImmune&&type&&W()){const w=W().mult(type);if(w>0&&w<1)m/=w;}   // weather can't weaken its moves
+       if(target&&!target.dead){
+         if(A.burnChance&&Math.random()<A.burnChance&&typeof target.applyBurn==='function')target.applyBurn(1);
+         if(A.poisonChance&&Math.random()<A.poisonChance&&typeof target.applyPoison==='function')target.applyPoison(1);
+         if(A.slowChance&&Math.random()<A.slowChance&&typeof target.applySlow==='function')target.applySlow(0.35);
+       }
+     }
      return m;
    },
    take(type,pl){
-     const a=activeKit();if(!a||pl!==a.p)return 1;const {p,P}=a;
-     let m=1;if(P.take){if(type&&Number.isFinite(P.take[type]))m*=P.take[type];if(Number.isFinite(P.take.all))m*=P.take.all;}
-     if(P.highHp&&p.maxHp>0&&p.hp/p.maxHp>P.highHp.above)m*=P.highHp.take;
+     const p=getPlayer();if(!p||pl!==p)return 1;const P=passiveFor(p);if(!P||!P.ability)return 1;
+     const A=P.ability;let m=1;
+     if(A.take){if(type&&Number.isFinite(A.take[type]))m*=A.take[type];if(Number.isFinite(A.take.all))m*=A.take.all;}
+     if(A.highHp&&p.maxHp>0&&p.hp/p.maxHp>A.highHp.above)m*=A.highHp.take;
+     if(A.lowHp&&A.lowHp.take&&p.maxHp>0&&p.hp/p.maxHp<A.lowHp.below)m*=A.lowHp.take;
+     if(A.superTake&&type&&TY()){if(TY().mult(type,P.types)>1)m*=A.superTake;}
+     if(A.absorb&&type&&A.absorb.includes(type)){
+       m=0;const now=performance.now();
+       if(!p.__absorbAt||now-p.__absorbAt>250){p.__absorbAt=now;p.hp=Math.min(p.maxHp,p.hp+p.maxHp*(A.absorbHeal||0.03));}
+     }
+     if(A.weatherImmune&&type&&W()){const w=W().mult(type);if(w>1)m/=w;}        // weather can't boost hits against it
      return m;
    }
  };
+ function activeAbility(){const P=passiveFor(getPlayer());return P&&P.ability?P.ability:null;}
  let lastKitTick=0;
  function megaKitTick(){
    const now=performance.now(),dt=lastKitTick?Math.min(0.25,(now-lastKitTick)/1000):0;lastKitTick=now;
-   const a=activeKit();if(!a||!a.P.regen)return;
-   const b=window.PS_MEGA_BRIDGE_V5;if(b?.game?.state!=='playing'||a.p.dead)return;
-   if(a.p.hp<a.p.maxHp)a.p.hp=Math.min(a.p.maxHp,a.p.hp+a.p.maxHp*a.P.regen*dt);
+   const b=getBridge(),p=b?.game?.player;if(!p)return;
+   if(!p.__bornAt)p.__bornAt=now;
+   const P=passiveFor(p),A=P&&P.ability;
+   p.weatherImmune=!!(A&&A.weatherImmune);   // engine: no weather chip damage
+   if(!A||b.game.state!=='playing'||p.dead)return;
+   if(A.regen&&p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+p.maxHp*A.regen*dt);
+   if(A.aura&&b.enemies&&(!p.__auraAt||now-p.__auraAt>500)){
+     p.__auraAt=now;const r=A.aura.radius;
+     for(const en of b.enemies.all()){if(!en||en.dead||typeof en.applySlow!=='function')continue;
+       if(Math.hypot(en.x-p.x,en.y-p.y)<=r){try{en.applySlow(A.aura.slow,0.8);}catch(e){}}}
+   }
+   if(A.weatherSet&&!activePrimal){
+     const w=W();
+     if(w&&typeof w.force==='function'){
+       const cur=w.current;
+       if((!cur||cur.kind!==A.weatherSet)&&(!p.__wxAt||now-p.__wxAt>20000)){p.__wxAt=now;try{w.force(A.weatherSet,45);}catch(e){}}
+     }
+   }
  }
- const TYPE_NAME=t=>t.charAt(0).toUpperCase()+t.slice(1);
- function describePassive(P){
-   const out=[];
-   if(P.deal)for(const [t,v] of Object.entries(P.deal))out.push((t==='all'?'All':TYPE_NAME(t))+' damage ×'+v);
-   if(P.take)for(const [t,v] of Object.entries(P.take))out.push(v===0?'Immune to '+TYPE_NAME(t):(t==='all'?'All':TYPE_NAME(t))+' damage taken -'+Math.round((1-v)*100)+'%');
-   if(P.regen)out.push('Heals '+(P.regen*100).toFixed(1).replace(/\.0$/,'')+'% HP/s');
-   if(P.spd)out.push('Speed ×'+P.spd);
-   if(P.lowHp)out.push('Below '+Math.round(P.lowHp.below*100)+'% HP: damage ×'+P.lowHp.deal);
-   if(P.highHp)out.push('Above '+Math.round(P.highHp.above*100)+'% HP: damage taken -'+Math.round((1-P.highHp.take)*100)+'%');
-   return out.join(' · ');
+ // ---- descriptions (Mega panel) ----
+ const TN=t=>t.charAt(0).toUpperCase()+t.slice(1);
+ const X=v=>'×'+(+v.toFixed(2));
+ const PCT=v=>Math.round((1-v)*100)+'%';
+ function describeAbility(A){
+   if(!A)return '';const o=[];
+   if(A.deal)for(const [t,v] of Object.entries(A.deal))o.push((t==='all'?'All':t==='stab'?'Same-type':TN(t))+' moves '+X(v));
+   if(A.dealKinds)o.push(Object.keys(A.dealKinds).map(TN).join('/')+' moves '+X(Object.values(A.dealKinds)[0]));
+   if(A.dealMatch)o.push(A.dealMatch.re.split('|').slice(0,3).map(TN).join('/')+'... moves '+X(A.dealMatch.m));
+   if(A.dealLowBase)o.push('Weak moves (base dmg ≤'+A.dealLowBase.max+') '+X(A.dealLowBase.m));
+   if(A.dealStatus)o.push('Moves that burn/poison/slow '+X(A.dealStatus));
+   if(A.dealMulti)o.push('Multi-hit moves '+X(A.dealMulti));
+   if(A.take)for(const [t,v] of Object.entries(A.take))o.push(v===0?'Immune to '+TN(t):(t==='all'?'All':TN(t))+' damage taken -'+PCT(v));
+   if(A.superTake)o.push('Super-effective hits taken -'+PCT(A.superTake));
+   if(A.absorb)o.push('Immune to '+A.absorb.map(TN).join('/')+' and heals when hit by it');
+   if(A.ignoreResist)o.push('Ignores type resistances');
+   if(A.regen)o.push('Heals '+(A.regen*100).toFixed(1).replace(/\.0$/,'')+'% HP/s');
+   if(A.spd)o.push('Speed '+X(A.spd));
+   if(A.lowHp)o.push('Below '+Math.round(A.lowHp.below*100)+'% HP: '+(A.lowHp.deal?'damage '+X(A.lowHp.deal):'damage taken -'+PCT(A.lowHp.take)));
+   if(A.highHp)o.push('Above '+Math.round(A.highHp.above*100)+'% HP: damage taken -'+PCT(A.highHp.take));
+   if(A.weatherSet)o.push('Summons '+TN(A.weatherSet)+' weather');
+   if(A.weatherBoost)o.push('In '+A.weatherBoost.kinds.map(TN).join('/')+': damage '+X(A.weatherBoost.deal));
+   if(A.weatherImmune)o.push('Weather never weakens it (no downsides, keeps upsides)');
+   if(A.aura)o.push('Slows nearby foes '+Math.round(A.aura.slow*100)+'%');
+   const ch=[['burnChance','burn'],['poisonChance','poison'],['slowChance','slow']].filter(([k])=>A[k]).map(([k,n])=>Math.round(A[k]*100)+'% '+n);
+   if(ch.length)o.push('Hits can '+ch.join(' / '));
+   if(A.slowStart)o.push('First '+A.slowStart.secs+'s of a run: damage '+X(A.slowStart.early)+', then '+X(A.slowStart.late));
+   return o.join(' · ');
+ }
+ function describeDamage(types,deal,inScope){
+   const single=types.length===1;
+   if(single&&inScope)return 'Monotype: '+TN(types[0])+' moves '+X(Math.max(MONO.own,(deal||{})[types[0]]||1))+', other moves '+X(MONO.other);
+   const d=Object.entries(deal||{}).filter(([t])=>t!=='all');
+   return d.length?'Damage: '+d.map(([t,v])=>TN(t)+' '+X(v)).join(' · '):'';
+ }
+ function currentPassiveText(p){
+   if(!p||p.megaForm)return '';
+   const P=passiveFor(p);if(!P||(P.src!=='legend'&&P.src!=='mono'))return '';
+   const lines=P.src==='legend'?passiveLines('Legendary ability',P.abilityId,P.types,P.deal,true):[describeDamage(P.types,{},true)];
+   return '\n\n'+lines.filter(Boolean).join('\n');
+ }
+ function passiveLines(title,abilityId,types,deal,inScope){
+   const A=ABIL[abilityId],out=[];
+   if(A)out.push(title+' – '+A.name+':',describeAbility(A));
+   const dl=describeDamage(types,deal,inScope);if(dl)out.push(dl);
+   return out;
  }
 
 const getPlayer=()=>{const g=getBridge()?.game;return g?.player||null;};
@@ -551,7 +666,7 @@ function start(){
  const visible=isRunScreen();
  mini.style.display=visible?'block':'none';
  if(!visible)panel.style.display='none';
- setLines(status,(!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(f0?'\nForm: '+(f0.en||f0.name)+(f0.spr?'':' (no sprite yet: keeps the normal look)'):'')+(f0&&MEGA_KITS[f0.key]?'\n\nPassive \u2013 '+MEGA_KITS[f0.key].passive.name+':\n'+describePassive(MEGA_KITS[f0.key].passive)+'\nSignature move: '+MEGA_KITS[f0.key].move.name+' (max level)\n'+(MEGA_KITS[f0.key].move.desc||'')+(MEGA_KITS[f0.key].bond?'\nBond move: '+MEGA_KITS[f0.key].bond.name+' (fires together with '+MEGA_KITS[f0.key].move.name+')\n'+(MEGA_KITS[f0.key].bond.desc||''):''):'')).split('\n'));
+ setLines(status,(!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(f0?'\nForm: '+(f0.en||f0.name)+(f0.spr?'':' (no sprite yet: keeps the normal look)'):'')+(f0&&MEGA_KITS[f0.key]?'\n\n'+passiveLines('Mega ability',MEGA_KITS[f0.key].passive.ability,f0.types||[],MEGA_KITS[f0.key].passive.deal,true).join('\n')+'\nSignature move: '+MEGA_KITS[f0.key].move.name+' (max level)\n'+(MEGA_KITS[f0.key].move.desc||'')+(MEGA_KITS[f0.key].bond?'\nBond move: '+MEGA_KITS[f0.key].bond.name+' (fires together with '+MEGA_KITS[f0.key].move.name+')\n'+(MEGA_KITS[f0.key].bond.desc||''):''):'')+currentPassiveText(p)).split('\n'));
 
  // Species is fixed to the current player; no clickable Pokémon/form selector.
 
@@ -617,11 +732,13 @@ function start(){
    }
    const undoSignature=grantSignature(p,f.key);
    const kit=MEGA_KITS[f.key];
-   if(kit&&kit.passive){p.megaKit=f.key;if(Number.isFinite(kit.passive.spd)&&Number.isFinite(p.baseSpd))p.baseSpd*=kit.passive.spd;}
+   if(kit&&kit.passive){p.megaKit=f.key;const ab=ABIL[kit.passive.ability];if(ab&&Number.isFinite(ab.spd)&&Number.isFinite(p.baseSpd))p.baseSpd*=ab.spd;}
+   // never exceed the game's max HP cap (1000 outside Area Zero)
+   {const cap=Number(p.constructor&&p.constructor.HP_CAP);if(cap>0&&p.maxHp>cap){p.maxHp=cap;p.hp=Math.min(p.hp,cap);}}
    p.megaForm=f.key;used=true;rewardPending=false;stoneOwned=false;
    if(WEATHER[f.key])startPrimalWeather(p,WEATHER[f.key]);
    restore=()=>{if(undoSignature)undoSignature();delete p.megaKit;clearPrimal();p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa;p.maxHp=baseline.maxHp;p.hp=Math.min(p.hp,baseline.maxHp);p.r=baseline.r;p.bodyH=baseline.bodyH;delete p.megaForm;};
-   hint.textContent=WEATHER[f.key]?'Primal Reversion! '+WEATHER[f.key].name+' is active.'+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':''):'Mega Evolution activated!'+(kit?' Passive: '+kit.passive.name+'.':'')+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':'');
+   hint.textContent=WEATHER[f.key]?'Primal Reversion! '+WEATHER[f.key].name+' is active.'+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':''):'Mega Evolution activated!'+(kit&&ABIL[kit.passive.ability]?' Ability: '+ABIL[kit.passive.ability].name+'.':'')+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':'');
  }catch(err){clearPrimal();console.error('Mega Evolution:',err);p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;p.maxHp=baseline.maxHp;p.hp=baseline.hp;p.r=baseline.r;p.bodyH=baseline.bodyH;hint.textContent='Mega error: '+err.message;}
  refresh();
  };
