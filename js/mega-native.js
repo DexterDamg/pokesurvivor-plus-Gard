@@ -47,9 +47,26 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    // chains: how many separate lightning chains fire at once (each starts on a different foe).
    '382-primal':{id:'origin-pulse',name:'Origin Pulse',type:'water',kind:'chain',desc:'Four beams of blue light lock on to different foes and arc from foe to foe.',cd:1.4,dmg:16,count:6,radius:230,chains:4}
  };
+ // ---- Mega kits (js/mega-kits.js): each Mega's signature move is built from a game move template ----
+ const MEGA_KITS=window.PS_MEGA_KITS||{};
+ let kitMovesBuilt=false;
+ function buildKitMoves(m){
+   if(kitMovesBuilt)return;
+   for(const [form,kit] of Object.entries(MEGA_KITS)){
+     const mv=kit&&kit.move;if(!mv||SIGNATURE_MOVES[form])continue;
+     const tpl=m.BY_ID[mv.from];if(!tpl){console.warn('Mega kit: unknown template',mv.from,'for',form);continue;}
+     const def={};
+     for(const k in tpl){if(['ups','maxLvl','evoMods','evoText','id','name','desc'].includes(k))continue;def[k]=tpl[k];}
+     for(const k in mv){if(k!=='from')def[k]=mv[k];}
+     def.kind=tpl.kind; // the template decides how the move works
+     SIGNATURE_MOVES[form]=def;
+   }
+   kitMovesBuilt=true;
+ }
  function registerSignatureMoves(){
    const m=getBridge()?.moves;
    if(!m||!m.BY_ID||!Array.isArray(m.ALL))return false;
+   buildKitMoves(m);
    for(const def of Object.values(SIGNATURE_MOVES)){
      // The engine adds 'ups' (upgrade table) and 'maxLvl' to every move at boot.
      // Moves injected later must get them too, or the level-up reward screen
@@ -226,6 +243,45 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  }
  requestAnimationFrame(drawPrimalDomain);
 
+ // ---- Mega passives: damage hooks used by the engine (app.min.js calls PS_HOOKS.deal / PS_HOOKS.take) ----
+ function activeKit(){
+   const p=window.PS_MEGA_BRIDGE_V5?.game?.player;
+   if(!p||!p.megaKit||p.megaForm!==p.megaKit)return null;
+   const k=MEGA_KITS[p.megaKit];return k&&k.passive?{p,P:k.passive}:null;
+ }
+ window.PS_HOOKS={
+   deal(type,target){
+     const a=activeKit();if(!a)return 1;const {p,P}=a;
+     let m=1;if(P.deal){if(type&&Number.isFinite(P.deal[type]))m*=P.deal[type];if(Number.isFinite(P.deal.all))m*=P.deal.all;}
+     if(P.lowHp&&p.maxHp>0&&p.hp/p.maxHp<P.lowHp.below)m*=P.lowHp.deal;
+     return m;
+   },
+   take(type,pl){
+     const a=activeKit();if(!a||pl!==a.p)return 1;const {p,P}=a;
+     let m=1;if(P.take){if(type&&Number.isFinite(P.take[type]))m*=P.take[type];if(Number.isFinite(P.take.all))m*=P.take.all;}
+     if(P.highHp&&p.maxHp>0&&p.hp/p.maxHp>P.highHp.above)m*=P.highHp.take;
+     return m;
+   }
+ };
+ let lastKitTick=0;
+ function megaKitTick(){
+   const now=performance.now(),dt=lastKitTick?Math.min(0.25,(now-lastKitTick)/1000):0;lastKitTick=now;
+   const a=activeKit();if(!a||!a.P.regen)return;
+   const b=window.PS_MEGA_BRIDGE_V5;if(b?.game?.state!=='playing'||a.p.dead)return;
+   if(a.p.hp<a.p.maxHp)a.p.hp=Math.min(a.p.maxHp,a.p.hp+a.p.maxHp*a.P.regen*dt);
+ }
+ const TYPE_NAME=t=>t.charAt(0).toUpperCase()+t.slice(1);
+ function describePassive(P){
+   const out=[];
+   if(P.deal)for(const [t,v] of Object.entries(P.deal))out.push((t==='all'?'All':TYPE_NAME(t))+' damage ×'+v);
+   if(P.take)for(const [t,v] of Object.entries(P.take))out.push(v===0?'Immune to '+TYPE_NAME(t):(t==='all'?'All':TYPE_NAME(t))+' damage taken -'+Math.round((1-v)*100)+'%');
+   if(P.regen)out.push('Heals '+(P.regen*100).toFixed(1).replace(/\.0$/,'')+'% HP/s');
+   if(P.spd)out.push('Speed ×'+P.spd);
+   if(P.lowHp)out.push('Below '+Math.round(P.lowHp.below*100)+'% HP: damage ×'+P.lowHp.deal);
+   if(P.highHp)out.push('Above '+Math.round(P.highHp.above*100)+'% HP: damage taken -'+Math.round((1-P.highHp.take)*100)+'%');
+   return out.join(' · ');
+ }
+
 const getPlayer=()=>{const g=getBridge()?.game;return g?.player||null;};
 const elt=(tag,txt)=>{const e=document.createElement(tag);if(txt)e.textContent=txt;return e;};
 function start(){
@@ -260,7 +316,7 @@ function start(){
  const visible=isRunScreen();
  mini.style.display=visible?'block':'none';
  if(!visible)panel.style.display='none';
- status.textContent=!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`;
+ status.textContent=!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(list[0]&&MEGA_KITS[list[0].key]?'\n\nPassive \u2013 '+MEGA_KITS[list[0].key].passive.name+':\n'+describePassive(MEGA_KITS[list[0].key].passive)+'\nSignature move: '+MEGA_KITS[list[0].key].move.name+' (max level)\n'+(MEGA_KITS[list[0].key].move.desc||''):'');
 
  // Species is fixed to the current player; no clickable Pokémon/form selector.
 
@@ -309,10 +365,12 @@ function start(){
      if(Number.isFinite(baseline.bodyH))p.bodyH=Math.max(p.bodyH||0,baseline.bodyH*1.45);
    }
    const undoSignature=grantSignature(p,f.key);
+   const kit=MEGA_KITS[f.key];
+   if(kit&&kit.passive){p.megaKit=f.key;if(Number.isFinite(kit.passive.spd)&&Number.isFinite(p.baseSpd))p.baseSpd*=kit.passive.spd;}
    p.megaForm=f.key;used=true;rewardPending=false;stoneOwned=false;
    if(WEATHER[f.key])startPrimalWeather(p,WEATHER[f.key]);
-   restore=()=>{if(undoSignature)undoSignature();clearPrimal();p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa;p.maxHp=baseline.maxHp;p.hp=Math.min(p.hp,baseline.maxHp);p.r=baseline.r;p.bodyH=baseline.bodyH;delete p.megaForm;};
-   hint.textContent=WEATHER[f.key]?'Primal Reversion! '+WEATHER[f.key].name+' is active.'+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':''):'Mega Evolution activated!';
+   restore=()=>{if(undoSignature)undoSignature();delete p.megaKit;clearPrimal();p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa;p.maxHp=baseline.maxHp;p.hp=Math.min(p.hp,baseline.maxHp);p.r=baseline.r;p.bodyH=baseline.bodyH;delete p.megaForm;};
+   hint.textContent=WEATHER[f.key]?'Primal Reversion! '+WEATHER[f.key].name+' is active.'+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':''):'Mega Evolution activated!'+(kit?' Passive: '+kit.passive.name+'.':'')+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':'');
  }catch(err){clearPrimal();console.error('Mega Evolution:',err);p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;p.maxHp=baseline.maxHp;p.hp=baseline.hp;p.r=baseline.r;p.bodyH=baseline.bodyH;hint.textContent='Mega error: '+err.message;}
  refresh();
  };
@@ -353,7 +411,7 @@ function start(){
    cards.appendChild(card);
  }
 
- panel.append(title,status,btn,hint,close);document.body.append(mini,panel,ring);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();keepPrimalWeather();},60);refresh();
+ panel.append(title,status,btn,hint,close);document.body.append(mini,panel,ring);setInterval(()=>{refresh();placeHudSlot();drawMegaReward();keepPrimalWeather();megaKitTick();},60);refresh();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
