@@ -6,7 +6,8 @@
    2) RULES   which songs play when. Every rule is a list, so you can put several songs in it
               (one is picked at random each time).
         menu     title screen / menus: shuffled one after another.
-        mega     Mega Evolution only (never Primal Reversion). Loops while the Mega form lasts.
+        mega     Mega Evolution only (never Primal Reversion). TOP PRIORITY: cuts off any song the moment you
+                 Mega Evolve, plays once, then the battle / special music carries on.
         special  certain moments, by the game's own music name (shown in the ♫ panel as "Game music: ...").
                  rift = inside a Rift, judgment = the Arceus Judgment fight, zz = Area Zero.
         battle   normal battles: now and then one of these songs plays once.
@@ -14,8 +15,10 @@
                  first = also roll when the battle starts.
 
    HOW SONGS BEHAVE
-   - A song that is already playing is never cut off or restarted: if the new moment wants the same
-     song, it simply keeps going; otherwise it finishes first and then the new moment's song starts.
+   - Mega Evolution music always cuts in right away.
+   - Going from the menu into a battle (or back) switches music right away.
+   - Inside a battle, a playing song is never cut off or restarted: if the new moment wants the same
+     song it simply keeps going; otherwise it finishes first and then the new moment's song starts.
    - ⏭ in the ♫ panel skips to the next song (or back to the game's music if there is no other).
    - ON/OFF turns all of your songs off; the slider is their volume. */
 (() => {
@@ -74,63 +77,83 @@
     try { const a = JSON.parse(localStorage.getItem('ps.audio') || '{}'); if (!Number(a.music)) { a.music = S.gameMusicWas; localStorage.setItem('ps.audio', JSON.stringify(a)); } } catch (_) {}
   });
 
-  // ---- where are we? -> 'menu' | 'mega' | 'special:<name>' | 'battle' ----
+  // ---- where are we? -> 'menu' | 'special:<name>' | 'battle'   (Mega Evolution is an event, see below) ----
   function context() {
-    const g = B()?.game, p = g?.player, st = g?.state;
+    const g = B()?.game, st = g?.state;
     const battle = !!(st && st !== 'ui' && st !== 'over');          // 'ui' = menus, 'over' = run ended
     if (!battle) return 'menu';
-    if (p && p.megaForm && !/primal/.test(String(p.megaForm))) return 'mega';   // Mega only, never Primal
     if (gameTrack && RULES.special && RULES.special[gameTrack]) return 'special:' + gameTrack;
     return 'battle';
   }
+  const isMega = () => { const p = B()?.game?.player; return !!(p && p.megaForm && !/primal/.test(String(p.megaForm))); };   // Mega only, never Primal
   const rule = ctx => ctx === 'menu' ? RULES.menu : ctx === 'mega' ? RULES.mega : ctx === 'battle' ? RULES.battle : (RULES.special || {})[ctx.slice(8)];
-  const loops = ctx => ctx === 'mega' || ctx.startsWith('special:');  // menu shuffles, battle plays once
+  const loops = ctx => ctx.startsWith('special:');   // special moments loop; menu shuffles; battle + Mega play once
 
   // ---- player ----
   const audio = new Audio(); audio.preload = 'auto'; audio.volume = S.volume;
   let cur = null;               // { id, ctx }  the song playing now
-  let unlocked = false, nextRoll = 0, lastCtx = null, megaSkipped = false;
+  let unlocked = false, nextRoll = 0, lastCtx = null, wasMega = false, fadeT = null;
   function start(id, ctx) {
     const t = TRACKS[id]; if (!t) return false;
-    cur = { id, ctx };
+    clearInterval(fadeT); fadeT = null; cur = { id, ctx };
     audio.src = new URL(t.file, document.baseURI).href; audio.loop = loops(ctx); audio.currentTime = 0; audio.volume = S.volume;
     audio.play().then(() => { quietGame(); render(); }).catch(() => render());
     render(); return true;
   }
-  function hush() { cur = null; audio.pause(); restoreGame(); render(); }
+  function hush() { clearInterval(fadeT); fadeT = null; cur = null; audio.pause(); audio.volume = S.volume; restoreGame(); render(); }
+  function cut(then) {          // quick fade-out of the current song, then run 'then' (or go back to the game's music)
+    clearInterval(fadeT); fadeT = null; const was = cur; cur = null;
+    if (!was || audio.paused) { audio.pause(); audio.volume = S.volume; if (!(then && then())) restoreGame(); render(); return; }
+    fadeT = setInterval(() => {
+      audio.volume = Math.max(0, audio.volume - S.volume / 6);
+      if (audio.volume <= 0.001) { clearInterval(fadeT); fadeT = null; audio.pause(); audio.volume = S.volume; if (!(then && then())) restoreGame(); render(); }
+    }, 50);
+    render();
+  }
   function chooseNext(ctx, not) {   // which song (if any) should start now in this moment
     const r = rule(ctx); if (!r || !r.songs || !r.songs.length) return null;
-    if (ctx === 'mega' && megaSkipped) return null;
     if (ctx === 'battle') { if (now() < nextRoll) return null; nextRoll = now() + (r.every || 150) * 1000; return Math.random() < (r.chance ?? 0.3) ? pick(r.songs, not) : null; }
     return pick(r.songs, not);
   }
   audio.addEventListener('ended', () => {   // a song finished: the current moment picks what comes next
     const done = cur; cur = null;
     const ctx = context();
-    if (done && done.ctx === 'battle') nextRoll = now() + (RULES.battle?.every || 150) * 1000;
-    const id = S.on ? chooseNext(ctx, done && done.id) : null;
+    if (done && (done.ctx === 'battle' || done.ctx === 'mega')) nextRoll = now() + (RULES.battle?.every || 150) * 1000;
+    const id = S.on && unlocked ? chooseNext(ctx, done && done.id) : null;
     if (!(id && start(id, ctx))) hush();
   });
   audio.addEventListener('error', () => { console.warn('[Music] could not load', cur && TRACKS[cur.id]?.file); hush(); });
 
   function tick() {
     watchGame();
-    const ctx = context();
-    if (ctx !== lastCtx) {
-      if (lastCtx === 'mega') megaSkipped = false;
-      if (ctx === 'battle' && (lastCtx === 'menu' || lastCtx == null)) nextRoll = RULES.battle?.first ? now() : now() + (RULES.battle?.every || 150) * 1000;
-      lastCtx = ctx;
-    }
+    const ctx = context(), mega = isMega();
+    const megaNow = mega && !wasMega; wasMega = mega;
+    const leftOrEnteredMenu = lastCtx != null && ctx !== lastCtx && (ctx === 'menu' || lastCtx === 'menu');
+    if (ctx !== lastCtx) { if (ctx === 'battle' && (lastCtx === 'menu' || lastCtx == null)) nextRoll = RULES.battle?.first ? now() : now() + (RULES.battle?.every || 150) * 1000; }
+    lastCtx = ctx;
     if (!S.on || !unlocked) { if (cur) hush(); return; }
+
+    // 1) Mega Evolution has top priority: it cuts off whatever is playing (unless it's already that song), plays once
+    if (megaNow) {
+      const id = pick(RULES.mega && RULES.mega.songs);
+      if (id) { if (cur && cur.id === id) { cur.ctx = 'mega'; audio.loop = false; } else cut(() => start(id, 'mega')); render(); return; }
+    }
+    // 2) going between the menu and a battle switches music right away (title songs never follow you into battle)
+    if (leftOrEnteredMenu && cur && cur.ctx !== ctx) {
+      const r = rule(ctx);
+      if (!(r && r.songs && r.songs.includes(cur.id))) { cut(() => { const id = chooseNext(ctx, null); return id ? start(id, ctx) : false; }); return; }
+    }
+    // 3) inside a battle, a playing song is never interrupted; if the new moment wants the same song it just keeps going
     if (cur) {
-      if (cur.ctx !== ctx) {
+      if (cur.ctx !== ctx && cur.ctx !== 'mega') {
         const r = rule(ctx);
-        if (r && r.songs && r.songs.includes(cur.id) && !(ctx === 'mega' && megaSkipped)) { cur.ctx = ctx; audio.loop = loops(ctx); }  // same song wanted: just keep playing
-        else audio.loop = false;                                                                  // let it finish, then the new moment takes over
+        if (r && r.songs && r.songs.includes(cur.id)) { cur.ctx = ctx; audio.loop = loops(ctx); }
+        else audio.loop = false;   // finish it, then the new moment takes over
       }
       if (!audio.paused) { const A = gameAudio(); if (A && A.settings && Number(A.settings.music) > 0) quietGame(); }
       render(); return;
     }
+    if (fadeT) return;             // mid-fade: the next song is already decided
     const id = chooseNext(ctx, null);
     if (id) start(id, ctx);
     render();
@@ -139,15 +162,14 @@
   const unlock = () => { if (!unlocked) { unlocked = true; tick(); } };
   ['pointerdown', 'keydown', 'touchstart'].forEach(ev => addEventListener(ev, unlock, { capture: true, passive: true }));
 
-  function skip() {   // ⏭ next song for this moment (or back to the game's music)
+  function skip() {   // ⏭ next song for this moment (or back to the game's music if there is no other)
     unlocked = true; if (!S.on) return;
     const ctx = context(), was = cur;
-    if (ctx === 'mega' && (!was || was.ctx === 'mega') && (RULES.mega?.songs || []).filter(id => TRACKS[id]).length <= 1) megaSkipped = true;
+    if (was && (was.ctx === 'battle' || was.ctx === 'mega')) nextRoll = now() + (RULES.battle?.every || 150) * 1000;
     let id = null;
-    if (ctx === 'battle') { const r = RULES.battle; id = r && r.songs ? pick(r.songs, was && was.id) : null; if (id === (was && was.id)) id = null; nextRoll = now() + (r?.every || 150) * 1000; }
-    else id = chooseNext(ctx, was && was.id);
-    if (id && was && id === was.id && (rule(ctx)?.songs || []).length <= 1) id = null;   // no other song: go back to the game's music
-    if (id) start(id, ctx); else hush();
+    if (ctx === 'battle') { const r = RULES.battle; if (r && r.songs) { id = pick(r.songs, was && was.id); if (was && id === was.id) id = null; } }
+    else { id = pick(rule(ctx)?.songs, was && was.id); if (was && id === was.id) id = null; }
+    cut(() => id ? start(id, ctx) : false);
   }
 
   // ---- UI: ♫ button + small panel ----
