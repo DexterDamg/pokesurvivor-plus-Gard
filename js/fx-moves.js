@@ -479,7 +479,7 @@
        for(const cr of c.cracks){if(t<cr.at)continue;const g2=Math.min(1,(t-cr.at)/0.12);ctx.strokeStyle='rgba(255,255,255,0.95)';ctx.lineWidth=2.4*k;ctx.shadowColor='#ff5ab4';ctx.shadowBlur=8*k;ctx.beginPath();
          cr.pts.forEach(([x,y],i)=>{const px=X+x*r*g2*1.3,py=CY+y*r*g2*1.3;i?ctx.lineTo(px,py):ctx.moveTo(px,py);});ctx.stroke();ctx.shadowBlur=0;}}
      // 3) shatter: flash + flying shards
-     if(t>=1.1&&t<1.45&&v.box){const u=(t-1.1)/0.35;ctx.save();ctx.globalCompositeOperation='source-over';ctx.fillStyle='rgba(255,236,250,'+(0.75*(1-u)*(1-u))+')';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);ctx.restore();}   // full-screen flash
+     if(t>=1.1&&t<1.45&&v.box&&!(window.PS_SETTINGS&&window.PS_SETTINGS.reduceFx)){const u=(t-1.1)/0.35;ctx.save();ctx.globalCompositeOperation='source-over';ctx.fillStyle='rgba(255,236,250,'+(0.75*(1-u)*(1-u))+')';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);ctx.restore();}   // full-screen flash
      if(t>=1.1){const u=t-1.1;if(u<0.3){ctx.globalCompositeOperation='lighter';glow(ctx,X,CY,R*(1.2+u*6),'rgba(255,255,255,'+(1-u/0.3)+')','rgba(255,140,220,0)');}
        ctx.globalCompositeOperation='source-over';for(const q of c.shards){const a=Math.max(0,1-u/1.1);if(!a)continue;ctx.save();ctx.globalAlpha=a;ctx.translate(X+q.x*k,CY+q.y*k);ctx.rotate(q.r);const sz=q.s*k;
          ctx.fillStyle=u<0.2?'#ffffff':'hsl('+(320+q.hue%40)+',100%,'+(85-q.hue%20)+'%)';ctx.beginPath();ctx.moveTo(-sz,-sz*0.6);ctx.lineTo(sz,-sz*0.3);ctx.lineTo(-sz*0.2,sz);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.9)';ctx.lineWidth=1.5;ctx.stroke();ctx.restore();}}
@@ -570,9 +570,34 @@
            ctx.globalCompositeOperation='source-over';const gg=ctx.createRadialGradient(ox-R*0.3,oy-R*0.3,R*0.1,ox,oy,R);gg.addColorStop(0,'#ffffff');gg.addColorStop(0.35,'#ffb8ec');gg.addColorStop(0.8,'#e040b8');gg.addColorStop(1,'#8a2cff');ctx.fillStyle=gg;ctx.beginPath();ctx.arc(ox,oy,R,0,TAU);ctx.fill();
            ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=2*k;ctx.beginPath();ctx.arc(ox,oy,R*1.15,c.t*6+i,c.t*6+i+2);ctx.stroke();});}}
      else{const u=Math.min(1,(c.t-c.dur)/1.1),R=(c.fx.boomR||420)*k;ctx.globalCompositeOperation='lighter';
-       if(u<0.25&&v.box){ctx.fillStyle='rgba(255,220,245,'+(0.7*(1-u/0.25))+')';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);}
+       if(u<0.25&&v.box&&!(window.PS_SETTINGS&&window.PS_SETTINGS.reduceFx)){ctx.fillStyle='rgba(255,220,245,'+(0.7*(1-u/0.25))+')';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);}
        glow(ctx,X,Y-20*k,R*(0.3+u),'rgba(255,255,255,'+(1-u)+')','rgba(255,80,200,0)');ctx.strokeStyle='rgba(255,140,230,'+(1-u)+')';ctx.lineWidth=12*k*(1-u)+1;ctx.beginPath();ctx.ellipse(X,Y,R*(0.2+u),R*(0.2+u)*0.8,0,0,TAU);ctx.stroke();}
      ctx.restore();}};
+
+ // ---------------------------------------------------------------- DYNAMAX (ported from the Android port of PokeSurvivor, adapted)
+ //  dynaura: red Dynamax aura around the giant Pokemon (ground glow, rising red/violet mist, sparks)
+ S.dynaura={cast(c){c.life=c.fx.life||60;return c;},
+   update(c,dt){c.t+=dt;if(c.fx.done&&c.fx.done())return false;return c.t<c.life;},
+   draw(c,ctx,v){const p=c.player;if(!p)return;const k=v.k,sc=c.fx.scale?c.fx.scale():1.6,h=(Number(p.bodyH)||40)*sc,w=(Number(p.r)||14)*1.8*sc,X=v.sx(p.x),Y=v.sy(p.y),t=c.t,beat=0.5+0.5*Math.sin(t*4),fade=Math.min(1,t/0.4,(c.life-t)/0.4);
+     ctx.save();ctx.globalAlpha=fade;
+     ctx.fillStyle='rgba(230,20,64,'+(0.3+0.1*beat)+')';ctx.beginPath();ctx.ellipse(X,Y,w*(1.7+0.12*beat)*k,w*0.55*k,0,0,TAU);ctx.fill();
+     ctx.globalCompositeOperation='lighter';const cy=Y-h*0.5*k;
+     for(let i=0;i<4;i++){const q=i/3;glow(ctx,X,cy,(Math.max(w,h*0.5)*(1.55-q*0.55)+beat*4)*k,'rgba(255,'+Math.round(40+80*q)+','+Math.round(90+60*q)+','+(0.05+0.02*q)+')','rgba(255,30,80,0)');}
+     for(let i=0;i<14;i++){const ph=(t*0.55+i*0.0714)%1,a2=t*1.6+i*0.9,rr=w*(0.9+0.35*Math.sin(t*2+i)),px=X+Math.cos(a2)*rr*k,py=cy+(h*0.55-ph*h*1.25)*k+Math.sin(a2)*rr*0.3*k,al=Math.sin(ph*Math.PI)*0.22;
+       const mix=0.5+0.5*Math.sin(i);ctx.fillStyle='rgba('+Math.round(230-100*mix)+','+Math.round(20+5*mix)+','+Math.round(64+110*mix)+','+al+')';ctx.beginPath();ctx.arc(px,py,(3+4*(1-ph)+1.5*beat)*k,0,TAU);ctx.fill();}
+     for(let i=0;i<9;i++){const ph2=(t*0.9+i*0.111)%1,xx=Math.sin(i*7.3+t*1.7)*w*1.1*k,yy=cy+(h*0.5-ph2*h*1.5)*k,sz=(2+2*(1-ph2))*k;ctx.fillStyle='rgba(255,217,230,'+(Math.sin(ph2*Math.PI)*0.9)+')';ctx.fillRect(X+xx-sz/2,yy-sz/2,sz,sz);}
+     ctx.restore();}};
+ //  maxwave: a Max shockwave of your type; every 3rd one is big (bigger radius, more damage, stars)
+ S.maxwave={cast(c){const p=c.player;c.x=p.x;c.y=p.y;c.R=c.fx.radius||280;c.done=false;const st=c.fx.status||{};
+     hitCircle(c,c.x,c.y,c.R,{knock:c.fx.big?260:140,stun:st.stun,slow:st.slow,slowDur:1.6});
+     if(st.poison&&!c.ghost)for(const e of enemies())if(Math.hypot(e.x-c.x,e.y-c.y)<c.R&&e.applyPoison)e.applyPoison(1);
+     kick(c.fx.big?0.35:0.15);const col=typeColor(c);ring(c.x,c.y,10,c.R,col,0.5,c.fx.big?7:4);if(c.fx.big){ring(c.x,c.y,10,c.R*0.7,'#ffffff',0.45,5);burst(c.x,c.y-20,col,26,260);}
+     c.stars=[];if(c.fx.big)for(let i=0;i<14;i++)c.stars.push(i/14*TAU);return c;},
+   update(c,dt){c.t+=dt;return c.t<0.7;},
+   draw(c,ctx,v){const k=v.k,X=v.sx(c.x),Y=v.sy(c.y),u=c.t/0.7,R=c.R*k*Math.min(1,0.2+u*1.3),col=c.fx.colors||['#ffffff','#ff6a8a','#ff1a4a'];ctx.save();ctx.globalCompositeOperation='lighter';
+     glow(ctx,X,Y,R,rgba(col[1],0.25*(1-u)),rgba(col[2],0));ctx.strokeStyle=rgba(col[1],0.95*(1-u));ctx.lineWidth=Math.max(2,(c.fx.big?12:7)*k*(1-u));ctx.beginPath();ctx.ellipse(X,Y,R,R*0.55,0,0,TAU);ctx.stroke();
+     ctx.strokeStyle='rgba(255,40,90,'+(0.7*(1-u))+')';ctx.lineWidth=Math.max(1,4*k*(1-u));ctx.beginPath();ctx.ellipse(X,Y,R*0.85,R*0.47,0,0,TAU);ctx.stroke();
+     for(const a of c.stars)sprite(ctx,'star',c.fx.pal||c.move.type,X+Math.cos(a)*R,Y+Math.sin(a)*R*0.55-14*k*u,1.6*k,0,0,1-u);ctx.restore();}};
 
  // ---------------------------------------------------------------- SHINY FLAIR
  //  shiny Pokemon (you, and shiny wild ones) get twinkling stars above their head and leave sparkles when they move
@@ -584,7 +609,7 @@
    for(const o of list){
      const mv=Math.hypot(o.x-(o.__shx??o.x),o.y-(o.__shy??o.y));o.__shx=o.x;o.__shy=o.y;
      if(mv>0.6){o.__shT=(o.__shT||0)-dt;if(o.__shT<=0){o.__shT=0.035;const h=Number(o.bodyH)||36;shinySp.push({x:o.x+rnd(-14,14),y:o.y-rnd(2,h*0.9),vy:-rnd(20,45),t:0,life:rnd(0.5,0.9),r:rnd(3.5,6.5),c:Math.random()<0.5?'#fff6c0':'#ffffff'});}}
-     const h=Number(o.bodyH)||36,X=v.sx(o.x),Y=v.sy(o.y-h-30),k=v.k;
+     const h=Number(o.bodyH)||36,X=v.sx(o.x),Y=v.sy(o.y-h*0.92-2),k=v.k;
      for(let i=0;i<3;i++){const a=now*1.6+i*TAU/3,tw=0.55+0.45*Math.sin(now*6+i*2.1);
        star4(ctx,X+Math.cos(a)*14*k,Y+Math.sin(a)*4.5*k-(i===1?3*k:0),(4.6+2.2*tw)*k,0.65+0.35*tw,i===1?'#ffe36a':'#ffffff');}}
    for(let i=shinySp.length-1;i>=0;i--){const q=shinySp[i];q.t+=dt;q.y+=q.vy*dt;if(q.t>=q.life){shinySp.splice(i,1);continue;}

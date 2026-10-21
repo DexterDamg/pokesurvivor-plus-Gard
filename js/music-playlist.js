@@ -10,10 +10,12 @@
                  Mega Evolve, plays once, then the battle / special music carries on.
         special  certain moments, by the game's own music name (shown in the ♫ panel as "Game music: ...").
                  rift = inside a Rift, judgment = the Arceus Judgment fight, zz = Area Zero.
-        battle   battle music, shuffled back to back: 'early' songs until 'after' seconds into the run
-                 (900 = minute 15), then the 'late' songs. 'random': every now and then (any minute) one of
+        battle   battle music, shuffled back to back: 'early' songs, then 'mid' from 'midAt' seconds
+                 (480 = minute 8), then 'late' from 'after' seconds (900 = minute 15). 'random': every now and then (any minute) one of
                  these plays instead (chance per roll, every = seconds between rolls, first = roll at battle start).
-        lowhp    when your HP drops below 'below' (0.2 = 20%), this song cuts in, at any point of the run.
+        lowhp    a list of HP lines: when your HP drops below 'below' (0.4 = 40%), that song cuts in at any
+                 point of the run; dropping below a lower line cuts in again with its song.
+        events   special events (coming soon). Code can call PS_MUSIC.event('trainer') to play one.
         legends  when that legendary appears (Rift legendaries, bosses), its theme cuts in and loops while
                  it's on the field. Order of importance: Mega Evolution > legendary > low HP > special > battle.
 
@@ -36,6 +38,11 @@
     'pallet':    { title: 'Pallet Town',                         file: 'assets/music/pallet-town.mp3' },
     'littleroot':{ title: 'Littleroot Town',                     file: 'assets/music/littleroot-town.mp3' },
     'rustboro':  { title: 'Rustboro City',                       file: 'assets/music/rustboro-city.mp3' },
+    'trainer-red':      { title: 'Battle! Trainer Red',        file: 'assets/music/trainer-red.mp3' },
+    'trainer-gym-oras': { title: 'Battle! Gym Leader (ORAS)',  file: 'assets/music/trainer-gym-oras.mp3' },
+    'trainer-oras':     { title: 'Battle! Trainer (ORAS)',     file: 'assets/music/trainer-oras.mp3' },
+    'trainer-zinnia':   { title: 'Battle! Zinnia',             file: 'assets/music/trainer-zinnia.mp3' },
+    'trainer-xy':       { title: 'Battle! Trainer (X & Y)',    file: 'assets/music/trainer-xy.mp3' },
     'route-1':   { title: 'Route 1',                             file: 'assets/music/route-1.mp3' },
     'route-4':   { title: 'Route 4',                             file: 'assets/music/route-4.mp3' },
     'route-11':  { title: 'Route 11',                            file: 'assets/music/route-11.mp3' },
@@ -57,14 +64,19 @@
       rift:     { songs: ['tera'] },
       judgment: { songs: ['tera'] },
     },
-    // battle music, shuffled one after another: 'early' until 'after' seconds into a run (900 = minute 15), then 'late'
-    battle:  { after: 900,
+    // battle music, shuffled one after another: 'early' -> 'mid' from 'midAt' seconds (480 = minute 8) -> 'late' from 'after' (900 = minute 15)
+    battle:  { midAt: 480, after: 900,
                early: ['route-1', 'route-4', 'route-11', 'route-24'],
+               mid:   ['trainer-red', 'trainer-gym-oras', 'trainer-oras', 'trainer-zinnia', 'trainer-xy'],
                late:  ['vs-dialga-palkia','vs-mewtwo','vs-beasts','vs-lake','vs-giratina','vs-lugia','vs-deoxys','vs-regi'],
                // every now and then (any minute), one of these plays instead: chance per roll, seconds between rolls, roll at battle start
                random: { songs: ['tera'], chance: 0.3, every: 150, first: true } },
     // low HP: when your HP drops below 'below' (0.2 = 20%), this cuts in at any time of the run
-    lowhp:   { below: 0.2, songs: ['tera'] },
+    // low HP: when your HP drops below a line, that song cuts in (the lower line wins). 0.4 = 40%
+    lowhp:   [ { below: 0.2, songs: ['tera'] },
+               { below: 0.4, songs: ['trainer-red', 'trainer-gym-oras', 'trainer-oras', 'trainer-zinnia', 'trainer-xy'] } ],
+    // special events (coming soon): play one with PS_MUSIC.event('trainer') from code
+    events:  { trainer: { songs: ['trainer-red', 'trainer-gym-oras', 'trainer-oras', 'trainer-zinnia', 'trainer-xy'] } },
     // a legendary shows up (Rift / boss): its own theme cuts in and loops while it's around. dex number: song
     legends: { 483:'vs-dialga-palkia', 484:'vs-dialga-palkia', 150:'vs-mewtwo', 151:'vs-mewtwo',
                243:'vs-beasts', 244:'vs-beasts', 245:'vs-beasts', 480:'vs-lake', 481:'vs-lake', 482:'vs-lake',
@@ -120,15 +132,16 @@
     return null;
   }
   const isMega = () => { const p = B()?.game?.player; return !!(p && p.megaForm && !/primal/.test(String(p.megaForm))); };   // Mega only, never Primal
-  const rule = ctx => ctx === 'menu' ? RULES.menu : ctx === 'mega' ? RULES.mega : ctx === 'lowhp' ? RULES.lowhp : ctx === 'battle' ? battleRule() : ctx.startsWith('legend:') ? { songs: [ctx.slice(7)] } : (RULES.special || {})[ctx.slice(8)];
+  const rule = ctx => ctx === 'menu' ? RULES.menu : ctx === 'mega' ? RULES.mega : ctx.startsWith('lowhp:') ? lowRules()[Number(ctx.slice(6))] : ctx.startsWith('event:') ? (RULES.events || {})[ctx.slice(6)] : ctx === 'battle' ? battleRule() : ctx.startsWith('legend:') ? { songs: [ctx.slice(7)] } : (RULES.special || {})[ctx.slice(8)];
   const loops = ctx => ctx.startsWith('special:') || ctx.startsWith('legend:');
+  const lowRules = () => (Array.isArray(RULES.lowhp) ? RULES.lowhp : RULES.lowhp ? [RULES.lowhp] : []).slice().sort((a, b) => (a.below ?? 0.2) - (b.below ?? 0.2));
   let runTime = 0, runLast = 0;   // seconds of actual play this run (for RULES.late)
-  function battleRule() { const r = RULES.battle; if (!r) return null; return { songs: runTime >= (r.after ?? 900) ? (r.late || []) : (r.early || []) }; }   // special moments loop; menu shuffles; battle + Mega play once
+  function battleRule() { const r = RULES.battle; if (!r) return null; return { songs: runTime >= (r.after ?? 900) ? (r.late || []) : runTime >= (r.midAt ?? 480) && (r.mid || []).length ? r.mid : (r.early || []) }; }   // special moments loop; menu shuffles; battle + Mega play once
 
   // ---- player ----
   const audio = new Audio(); audio.preload = 'auto'; audio.volume = S.volume;
   let cur = null;               // { id, ctx }  the song playing now
-  let unlocked = false, nextRoll = 0, lastCtx = null, wasMega = false, wasLow = false, fadeT = null;
+  let unlocked = false, nextRoll = 0, lastCtx = null, wasMega = false, wasLow = 99, fadeT = null;
   function start(id, ctx) {
     const t = TRACKS[id]; if (!t) return false;
     clearInterval(fadeT); fadeT = null; cur = { id, ctx };
@@ -176,10 +189,11 @@
       if (id) { if (cur && cur.id === id) { cur.ctx = 'mega'; audio.loop = false; } else cut(() => start(id, 'mega')); render(); return; }
     }
     // 1a) low HP: the low-HP song cuts in (not over the Mega song or a legendary theme)
-    { const p = B()?.game?.player, L = RULES.lowhp, low = !!(L && ctx !== 'menu' && p && !p.dead && p.maxHp > 0 && p.hp / p.maxHp < (L.below || 0.2));
-      const lowNow = low && !wasLow; wasLow = low;
-      if (lowNow && !(cur && cur.ctx === 'mega') && !ctx.startsWith('legend:')) { const id = pick(L.songs);
-        if (id) { if (cur && cur.id === id) { cur.ctx = 'lowhp'; audio.loop = false; } else cut(() => start(id, 'lowhp')); render(); return; } } }
+    { const p = B()?.game?.player, L = lowRules(), hp = p && p.maxHp > 0 ? p.hp / p.maxHp : 1;
+      let tier = 99; if (ctx !== 'menu' && p && !p.dead) L.forEach((r, i) => { if (hp < (r.below ?? 0.2) && i < tier) tier = i; });
+      const worse = tier < wasLow; wasLow = tier;
+      if (worse && !(cur && cur.ctx === 'mega') && !ctx.startsWith('legend:')) { const id = pick(L[tier].songs);
+        if (id) { if (cur && cur.id === id) { cur.ctx = 'lowhp:' + tier; audio.loop = false; } else cut(() => start(id, 'lowhp:' + tier)); render(); return; } } }
     // 1b) a legendary appeared: its theme cuts in (but never over the Mega Evolution song)
     if (ctx.startsWith('legend:') && (!cur || (cur.ctx !== ctx && cur.ctx !== 'mega'))) {
       const id = ctx.slice(7);
@@ -258,5 +272,9 @@
   function init() { document.head.append(css); document.body.append(root); restoreGame(); render(); }
   audio.addEventListener('play', render); audio.addEventListener('pause', render);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
-  window.PS_MUSIC = { skip, stop: hush, rules: RULES, tracks: TRACKS, _audio: audio, get playing() { return cur && { ...cur }; }, get gameTrack() { return gameTrack; } };
+  function event(name) {   // special events: PS_MUSIC.event('trainer') plays one of that event's songs right away (once)
+    const r = (RULES.events || {})[name]; if (!r || !S.on) return false; const id = pick(r.songs); if (!id) return false;
+    unlocked = true; if (cur && cur.id === id) { cur.ctx = 'event:' + name; return true; } cut(() => start(id, 'event:' + name)); return true;
+  }
+  window.PS_MUSIC = { skip, event, stop: hush, rules: RULES, tracks: TRACKS, _audio: audio, get playing() { return cur && { ...cur }; }, get gameTrack() { return gameTrack; } };
 })();
