@@ -161,6 +161,7 @@
      if(typeof e.hurt==='function'){e.hurt(damage,'#ffe76b',0,0,0);q.hit.add(e);}
    }
  }
+ const deltaStream=()=>!!window.PS_DELTA_STREAM?.active?.();
  function update(dt){
    clock+=dt;
    if(scene){scene.t+=dt;
@@ -169,6 +170,7 @@
      if(scene.t>=END)scene=null;
    }
    if(scene&&!scene.revealed)return;
+   if(deltaStream()){spouts.length=strikes.length=0;return;}   // Mega Rayquaza's Delta Stream negates the Primordial Sea
    spawnIn-=dt;if(spawnIn<=0){if(spouts.length<8)spawnSpout();spawnIn=1.5;}
    for(let i=spouts.length-1;i>=0;i--){const q=spouts[i];q.age+=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;if(q.age>=q.life)spouts.splice(i,1);}
    thunderIn-=dt;if(thunderIn<=0){
@@ -259,7 +261,8 @@
    const dpr=Math.min(2,devicePixelRatio||1),w=Math.round(innerWidth*dpr),h=Math.round(innerHeight*dpr);
    if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';}
    canvas.style.display='block';ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,innerWidth,innerHeight);
-   update(dt);ctx.save();ctx.beginPath();ctx.rect(frameView.rect.left,frameView.rect.top,frameView.rect.width,frameView.rect.height);ctx.clip();field();waterGlow(dt);transformation();ctx.restore();
+   update(dt);ctx.save();ctx.beginPath();ctx.rect(frameView.rect.left,frameView.rect.top,frameView.rect.width,frameView.rect.height);ctx.clip();if(!deltaStream()){const ob=window.PS_PRIMAL_OUTBREAK,split=!!ob?.active?.();if(split){ctx.save();ob.clip(ctx,'kyogre');}field();if(split)ctx.restore();}waterGlow(dt);   // Primal Outbreak: the sea only fills Kyogre's half
+  transformation();ctx.restore();
  }
  requestAnimationFrame(frame);
 })();

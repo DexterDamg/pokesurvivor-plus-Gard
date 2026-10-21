@@ -134,12 +134,15 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  }
  // Primal evolutions: Kyogre's Origin Pulse and Groudon's Precipice Blades (js/legend-moves.js) evolve at max level,
  // but only while the Pokemon is in its Primal form (instead of needing a passive like the game's evolutions).
- const ORIGIN_K='origin-pulse-k',PRECIPICE_G='precipice-blades-g';
+ const ORIGIN_K='origin-pulse-k',PRECIPICE_G='precipice-blades-g';   // + 'dragon-ascent-r' (Rayquaza)
  const PRIMAL_EVOS={
    [ORIGIN_K]:{form:'382-primal',name:'Origin Pulse (Primal)',needName:'Primal Kyogre',
      apply(inst){inst.count=Math.max(Number(inst.count)||0,14);inst.pierce=Math.max(Number(inst.pierce)||0,20);inst.dmg=(Number(inst.dmg)||0)*1.5;inst.primalPulse=true;}},
    [PRECIPICE_G]:{form:'383-primal',name:'Precipice Blades (Primal)',needName:'Primal Groudon',
-     apply(inst){inst.count=Math.max(Number(inst.count)||0,10);inst.primalBlades=true;}}
+     apply(inst){inst.count=Math.max(Number(inst.count)||0,10);inst.primalBlades=true;}},
+   // Rayquaza's Dragon Ascent -> Ad Astra while Mega Rayquaza
+   'dragon-ascent-r':{form:'384-mega',name:'Ad Astra',needName:'Mega Rayquaza',
+     apply(inst){inst.adAstra=true;inst.execute=.5;inst.dmg=(Number(inst.dmg)||0)*1.5;inst.cd=Math.max(Number(inst.cd)||0,5.5);}}
  };
  let primalEvoHooked=false;
  function hookOriginEvo(m){
@@ -161,7 +164,16 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const def=SIGNATURE_MOVES[form];
    if(!def||!registerSignatureMoves()||typeof p.addMove!=='function')return null;
    // A Kyogre / Groudon that already knows Origin Pulse / Precipice Blades evolves it into the Primal version instead of getting a second copy.
-   if(typeof p.hasMove==='function'&&Object.entries(PRIMAL_EVOS).some(([id,pe])=>pe.form===form&&p.hasMove(id)))return null;
+   {const known=typeof p.hasMove==='function'&&Object.entries(PRIMAL_EVOS).find(([id,pe])=>pe.form===form&&p.hasMove(id));
+    if(known){
+      // ...but its bond move (e.g. Mega Rayquaza's ExtremeSpeed) still joins, in the slot of the move it already knows.
+      const bond=BOND_MOVES[form],m=getBridge()?.moves;
+      if(bond&&typeof p.learnBond==='function'&&!(typeof p.hasMove==='function'&&p.hasMove(bond.id))){
+        const idx=p.slots.findIndex(sl=>Array.isArray(sl)&&sl.some(v=>v.id===known[0]));const prev=Number(p.bonds)||0;p.bonds=prev+1;
+        if(idx>=0&&p.learnBond(bond.id,idx)){const bi=p.moves.find(v=>v.id===bond.id);if(m&&bi&&typeof m.levelUp==='function'){let guard=20;while(guard-->0&&m.levelUp(bi));}}else p.bonds=prev;
+      }
+      return null;
+    }}
    if(typeof p.hasMove==='function'&&p.hasMove(def.id))return null;
    const previousMax=Number(p.maxMoves)||4;
    // Bonus slot: the signature move never uses up one of your normal move slots,
@@ -208,22 +220,36 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  //  - natural fields (Misty/Electric) don't block the Primal player's burns, stuns, etc.
  // The HUD shows the Primal weather while it is active.
  function weatherApi(){const w=getBridge()?.weather;return w&&w.KINDS&&typeof w.mult==='function'?w:null;}
+ // ---- Delta Stream (Mega Rayquaza): very harsh winds that cancel EVERY weather, Primal Kyogre's and Groudon's
+ // domains included, for as long as a Mega Rayquaza (you or a co-op partner) is on the field.
+ // Rayquaza itself moves 2x faster and deals 2x damage. Visuals: js/delta-stream.js.
+ const DELTA={form:'384-mega',name:'Delta Stream',kind:'winds',hint:'Harsh winds cancel every weather, Primal domains too. Rayquaza: 2x speed, 2x damage',color:'#8dffc0',atk:2,spd:2};
+ function deltaHolder(){
+   const list=[];try{list.push(...(getBridge()?.game?.everyone?.()||[]));}catch(e){}
+   const p=getPlayer();if(p&&!list.includes(p))list.push(p);
+   return list.find(q=>q&&!q.dead&&(q.megaForm===DELTA.form||q.mon?.mega===DELTA.form))||null;
+ }
+ window.PS_DELTA_STREAM={active:()=>!!deltaHolder(),holder:deltaHolder,cfg:DELTA};
  let weatherHooked=false;
  function hookWeather(){
    const w=weatherApi();if(!w||weatherHooked)return;
    const nativeMult=w.mult.bind(w),nativeBlocks=typeof w.blocks==='function'?w.blocks.bind(w):()=>false;
    const desc=Object.getOwnPropertyDescriptor(w,'current');
    w.mult=function(type){
+     if(deltaHolder())return 1;   // Delta Stream: no weather boosts or penalties for anyone
      if(activePrimal&&getPlayer()===activePrimal.player){const m=activePrimal.cfg.mult[type];return Number.isFinite(m)?m:1;}
      return nativeMult(type);
    };
    w.blocks=function(what){
+     if(deltaHolder())return false;
      if(activePrimal&&getPlayer()===activePrimal.player)return false;
      {const P=passiveFor(getPlayer());if(P&&P.ability&&P.ability.weatherImmune)return false;} // Air Lock / Delta Stream
      return nativeBlocks(what);
    };
    if(desc&&desc.get&&desc.configurable){
      Object.defineProperty(w,'current',{configurable:true,enumerable:true,get(){
+       if(deltaHolder()){const k=w.KINDS[DELTA.kind]||{};
+         return {kind:'primal-delta',name:DELTA.name,hint:DELTA.hint,icon:k.icon,color:DELTA.color,tint:[0,0,0,0],mult:{},left:Infinity,t:0,dur:Infinity};}
        if(activePrimal&&getPlayer()===activePrimal.player){
          const c=activePrimal.cfg,k=w.KINDS[c.kind]||{};
          return {kind:'primal-'+c.kind,name:c.name,hint:c.hint,icon:k.icon,color:k.color||c.ring,tint:k.tint||[0,0,0,0],mult:Object.assign({},c.mult),left:Infinity,t:0,dur:Infinity};
@@ -240,6 +266,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  }
  function keepPrimalWeather(){
    hookWeather();
+   if(deltaHolder())try{weatherApi()?.clear?.();}catch(e){}   // Delta Stream blows any weather away
    if(!activePrimal)return;
    const p=getPlayer();
    if(!p||p!==activePrimal.player){clearPrimal();return;}
@@ -457,7 +484,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    requestAnimationFrame(drawPrimalDomain);
    const p=getPlayer();
    const playing=getBridge()?.game?.state==='playing';
-   const on=activePrimal&&p===activePrimal.player&&playing&&!(p.megaForm==='382-primal'&&window.PS_PRIMAL_KYOGRE)&&!(p.megaForm==='383-primal'&&window.PS_PRIMAL_GROUDON);
+   const on=activePrimal&&p===activePrimal.player&&playing&&!deltaHolder()&&!(p.megaForm==='382-primal'&&window.PS_PRIMAL_KYOGRE)&&!(p.megaForm==='383-primal'&&window.PS_PRIMAL_GROUDON);
    // Custom move effects (Precipice Blades, Blackhole...) draw on this overlay too, Primal or not.
    const fxActive=playing&&(eruptions.length||spikes.length||debris.length||holes.length||(window.PS_FX&&window.PS_FX.active()));
    if(!on){fx.drops.length=fx.ripples.length=fx.motes.length=0;}
@@ -1053,6 +1080,8 @@ function start(){
    const undoSignature=grantSignature(p,f.key);
    const kit=MEGA_KITS[f.key];
    if(kit&&kit.passive){p.megaKit=f.key;const ab=ABIL[kit.passive.ability];if(ab&&Number.isFinite(ab.spd)&&Number.isFinite(p.baseSpd))p.baseSpd*=ab.spd;}
+   if(f.key===DELTA.form){   // Delta Stream: 2x damage, 2x speed (undone with the rest of the Mega stats)
+     if(Number.isFinite(p.baseAtk))p.baseAtk*=DELTA.atk;if(Number.isFinite(p.baseSpa))p.baseSpa*=DELTA.atk;if(Number.isFinite(p.baseSpd))p.baseSpd*=DELTA.spd;}
    // never exceed the game's max HP cap (1000 outside Area Zero)
    {const cap=Number(p.constructor&&p.constructor.HP_CAP);if(cap>0&&p.maxHp>cap){p.maxHp=cap;p.hp=Math.min(p.hp,cap);}}
    p.megaForm=f.key;used=true;rewardPending=false;stoneOwned=false;

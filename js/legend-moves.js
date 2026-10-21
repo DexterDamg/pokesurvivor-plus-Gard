@@ -65,7 +65,12 @@
      {dmg:30,count:1,radius:130,cd:3.2,maxLvl:6,evoText:'10 Giant Spikes, and the spike wall stands longer and destroys enemy projectiles',
       ups:[{t:'Bigger spike wall',m:{radius:1.3}},{t:'+50% damage, +25% range',m:{dmg:1.5,radius:1.25}},{t:'+1 Giant Spike (2nd strongest foe)',m:{count:1}},{t:'Even bigger spike wall',m:{radius:1.35}},{t:'+1 Giant Spike',m:{count:1}}]},
      {giantMult:3,stun:5,wallLife:3})],
-  384:[comet('dragon-ascent-l','Dragon Ascent','flying','Rayquaza plummets from the sky like a green meteor.',['#ffffff','#9affc0','#1e8c4e'],{dmg:80,fx:{shape:'fire',pal:'grass',big:true}})],
+  // Dragon Ascent: count = drill directions (chains), radius = drill range; execute / allSE are set by upgrades 4 and 5.
+  // Evolves into Ad Astra once Rayquaza is Mega Rayquaza (see js/mega-native.js).
+  384:[M('aerial-ace','dragon-ascent-r','Dragon Ascent','flying','ascent','Rayquaza becomes a long comet of green and gold energy and drills straight through every foe in its path. Untouchable while drilling.',
+     {dmg:42,count:1,radius:260,width:70,cd:2.6,knock:90,maxLvl:6,evoText:'Ad Astra: Rayquaza leaves the screen and crashes across it three times, carving a glowing Delta symbol. Executes every non-boss foe below 50% HP',
+      ups:[{t:'Drills in 2 directions',m:{count:1}},{t:'+50% damage, +50% range',m:{dmg:1.5,radius:1.5}},{t:'+1 drill direction',m:{count:1}},{t:'Executes foes below 10% HP',m:{execute:.1}},{t:'Super effective against every type',m:{allSE:1}}]},
+     {})],
   385:[lances('doom-desire','Doom Desire','steel','Wishing stars rain down after a short delay.',C.gold,'star',{count:7,fx:{delay:0.6}})],
   386:[comet('psycho-boost','Psycho Boost','psychic','A violent psychic comet crashes down.',C.psy,{dmg:80,fx:{shape:'ball',pal:'psychic',big:true}})],
   480:[shock('mystical-power-uxie','Mystical Power','psychic','Golden waves of knowledge.',C.gold,'stars')],
@@ -160,6 +165,7 @@
   '376-mega':{psCast:'comet',dmg:60,count:2,radius:130,cd:2.0,fx:{colors:C.steel,shape:'star',pal:'steel'}},
   '380-mega':{psCast:'orbs',dmg:24,count:6,cd:1.4,fx:{colors:C.psy,shape:'ball',pal:'psychic'}},
   '381-mega':{psCast:'beam',dmg:15,radius:480,cd:1.8,fx:{colors:['#ffffff','#a8d0ff','#3c6cff']}},
+  '384-mega':{psCast:'ascent',dmg:60,count:3,radius:320,width:76,cd:1.6,execute:.1,fx:{}},   // Mega Rayquaza's own Dragon Ascent: the new comet drill
   '485-mega':{psCast:'vortex',dmg:14,count:2,radius:90,cd:3.5,fx:{colors:C.fire,burn:1,shape:'fire',pal:'fire'}},
   '491-mega':{psCast:'void',dmg:40,radius:170,cd:2.6,fx:{colors:C.dark,stun:{chance:0.7,dur:1.8}}},
   '670-mega':{psCast:'beam',dmg:15,radius:480,cd:2.2,fx:{colors:C.fairy,width:70}},

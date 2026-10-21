@@ -772,6 +772,154 @@
      for(const q of c.cuts){ctx.save();ctx.globalCompositeOperation='lighter';glow(ctx,v.sx(q.x),v.sy(q.y),16*k*(1-q.t/.3),rgba('#ffe0a0',.9),rgba('#ff7a2a',0));ctx.restore();}
    }};
 
+ // ---------------------------------------------------------------- DRAGON ASCENT / AD ASTRA (Rayquaza)
+ //  Dragon Ascent: Rayquaza becomes a long green-and-gold comet and drills straight through everything in its path
+ //  (i-frames the whole time). move.count = drill legs (each new leg turns toward the next foe), move.radius = leg
+ //  length, move.execute = finish foes below that HP share, move.allSE = super effective against every type.
+ //  Ad Astra (evolved, Mega Rayquaza, move.adAstra): Rayquaza leaves the screen, then crashes across it three times
+ //  with energy arrows beside it, carving the Delta symbol, which then blazes green; every non-boss foe on screen
+ //  below 50% HP is executed. Rayquaza then dives back down where it started.
+ const deltaImg=new Image();let deltaGlow=null;
+ deltaImg.onload=()=>{const c=document.createElement('canvas');c.width=deltaImg.width;c.height=deltaImg.height;const g=c.getContext('2d');g.drawImage(deltaImg,0,0);
+   g.globalCompositeOperation='source-in';const gr=g.createLinearGradient(0,0,0,c.height);gr.addColorStop(0,'#c8ffb0');gr.addColorStop(.5,'#39e05a');gr.addColorStop(1,'#13a83a');g.fillStyle=gr;g.fillRect(0,0,c.width,c.height);deltaGlow=c;};
+ deltaImg.src='assets/fx/delta-symbol.png?v=1';
+ const ASC_COL=['#ffffff','#fff27a','#3dff7a','#0f9a3c'];
+ function ascHide(p,on){if(!p)return;if(!p.__ascDraw){const d=p.draw;p.__ascDraw=true;p.draw=function(){if(this.__ascHidden>0)return;return d.apply(this,arguments);};}p.__ascHidden=Math.max(0,(p.__ascHidden||0)+(on?1:-1));}
+ function ascHit(c,e,mult,dx,dy){
+   if(c.ghost||e.dead)return;let m=mult||1;
+   if(c.move.allSE){try{const eff=window.PS_HOOPA_ENGINE.Types.mult(c.move.type,e.types||[]);if(eff>0)m*=2/eff;}catch(_){}}   // always 2x, whatever the types
+   applyHit(c,e,baseDmg(c,m),{knock:90},dx,dy);
+   const ex=Number(c.move.execute)||0,hp=Number(e.hp),max=Number(e.maxHp);
+   if(ex>0&&!e.dead&&hp>0&&max>0&&hp<=max*ex&&!(c.move.adAstra&&e.boss)){try{c.hit(c.player,e,hp*50+1000,'#ffffff',dx||.01,dy||0,0,c.move);}catch(_){}
+     if(!e.dead&&Number(e.hp)>0&&typeof e.hurt==='function')try{e.hurt(Number(e.hp)*50+1000,'#ffffff',0,0,0);}catch(_){}
+     c.kos.push({x:e.x,y:e.y-(Number(e.bodyH)||24)*.5,t:0});}
+ }
+ function ascLine(c,ax,ay,bx,by,w,skip,mult){
+   const nx=bx-ax,ny=by-ay,l=Math.hypot(nx,ny)||1;
+   for(const e of enemies()){if(skip.has(e))continue;if(segDist(e.x,e.y,ax,ay,bx,by)>w/2+(e.r||10))continue;skip.add(e);ascHit(c,e,mult,nx/l,ny/l);
+     burst(e.x,e.y-10,'#c8ff7a',8,200);}
+ }
+ // The comet: a white-hot drill head, a long green/gold tail, a spinning helix and sparks.
+ function drawComet(ctx,v,hx,hy,ang,len,w,t,alpha){
+   const k=v.k,X=v.sx(hx),Y=v.sy(hy),L=len*k,W=w*k;
+   ctx.save();ctx.translate(X,Y);ctx.rotate(ang);ctx.globalAlpha=alpha;ctx.globalCompositeOperation='lighter';
+   for(const [ww,col,a] of [[1.25,ASC_COL[3],.55],[.85,ASC_COL[2],.75],[.5,ASC_COL[1],.85],[.2,ASC_COL[0],1]]){
+     const g=ctx.createLinearGradient(-L,0,0,0);g.addColorStop(0,rgba(col,0));g.addColorStop(.75,rgba(col,a*.8));g.addColorStop(1,rgba(col,a));
+     ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(W*.55,0);ctx.quadraticCurveTo(0,-W*ww*.6,-L*.2,-W*ww*.45);ctx.lineTo(-L,0);ctx.lineTo(-L*.2,W*ww*.45);ctx.quadraticCurveTo(0,W*ww*.6,W*.55,0);ctx.fill();}
+   // drill helix
+   ctx.lineWidth=2.2*k;for(const ph of [0,Math.PI]){ctx.strokeStyle=rgba(ph?ASC_COL[1]:ASC_COL[2],.9);ctx.beginPath();
+     for(let i=0;i<=24;i++){const d=-i/24*L*.55,y=Math.sin(i*.9-t*38+ph)*W*.42*(1-i/30);i?ctx.lineTo(d,y):ctx.moveTo(d,y);}ctx.stroke();}
+   // spiralling tornado rings around the head
+   ctx.strokeStyle=rgba(ASC_COL[1],.7);ctx.lineWidth=1.6*k;for(let i=0;i<4;i++){const d=-((t*900+i*W*.9)%(W*3.6));ctx.beginPath();ctx.ellipse(d,0,W*.16,W*.55*(1+d/(W*7)),0,0,TAU);ctx.stroke();}
+   glow(ctx,0,0,W*.9,rgba(ASC_COL[0],.95),rgba(ASC_COL[2],0));
+   ctx.fillStyle=rgba('#fffbd0',.9);for(let i=0;i<10;i++){const d=-Math.random()*L*.7,o=(Math.random()-.5)*W*1.3;ctx.fillRect(d,o,3*k,1.6*k);}
+   ctx.restore();
+ }
+ // A green / gold energy arrow that flies alongside the Ad Astra comet.
+ function drawArrow(ctx,v,x,y,ang,s,alpha,col){const k=v.k;ctx.save();ctx.translate(v.sx(x),v.sy(y));ctx.rotate(ang);ctx.globalAlpha=alpha;ctx.globalCompositeOperation='lighter';
+   const g=ctx.createLinearGradient(-s*3*k,0,s*k,0);g.addColorStop(0,rgba(col,0));g.addColorStop(1,rgba(col,.9));ctx.fillStyle=g;ctx.fillRect(-s*3*k,-s*.12*k,s*3*k,s*.24*k);
+   ctx.fillStyle=rgba('#ffffff',.95);ctx.beginPath();ctx.moveTo(s*1.1*k,0);ctx.lineTo(-s*.2*k,-s*.42*k);ctx.lineTo(0,0);ctx.lineTo(-s*.2*k,s*.42*k);ctx.closePath();ctx.fill();
+   ctx.strokeStyle=rgba(col,1);ctx.lineWidth=1.5*k;ctx.stroke();ctx.restore();}
+ function cameraBox(){const cam=B()?.camera,game=document.getElementById('game');if(!cam||!game||typeof cam.left!=='function')return null;
+   const r=game.getBoundingClientRect(),k=cam.scale*(cam._cw>0?r.width/cam._cw:1);return {left:cam.left(),top:cam.top(),w:r.width/k,h:r.height/k};}
+ function freeSpot(x,y,fx,fy){const W=B()?.world;if(!W||typeof W.isWall!=='function')return [x,y];for(let i=0;i<=20;i++){const q=i/20,px=x+(fx-x)*q,py=y+(fy-y)*q;if(!W.isWall(px,py))return [px,py];}return [fx,fy];}
+
+ S.ascent={cast(c){const p=c.player;c.kos=[];c.trail=[];
+     if(c.move.adAstra)return S.ascent.castAstra(c);
+     c.legs=Math.max(1,Math.round(c.move.count||1));c.R=Math.max(120,Number(c.move.radius)||260);c.w=Number(c.move.width)||70;c.legT=.24;c.gap=.06;
+     c.cur=0;c.lt=0;c.hitAll=new Set();c.x=p.x;c.y=p.y;c.lock=true;
+     c.dur=c.legs*(c.legT+c.gap)+.05;p.invuln=Math.max(Number(p.invuln)||0,c.dur+.35);ascHide(p,true);c.hidden=true;
+     S.ascent.nextLeg(c,true);kick(.12);return c;},
+   nextLeg(c,first){const p=c.player;let t=null;
+     const cands=enemies().filter(e=>!c.hitAll.has(e)&&Math.hypot(e.x-c.x,e.y-c.y)<c.R+180);
+     if(first)t=densest({x:c.x,y:c.y},c.R+150)||nearest(c.x,c.y,c.R+200,cands);else t=nearest(c.x,c.y,c.R+220,cands);
+     let a=t?Math.atan2(t.y-c.y,t.x-c.x):(first?(Number(p.aim)||0):c.ang+TAU/3);
+     const ex=c.x+Math.cos(a)*c.R,ey=c.y+Math.sin(a)*c.R,[bx,by]=freeSpot(ex,ey,c.x,c.y);
+     c.ang=a;c.ax=c.x;c.ay=c.y;c.bx=bx;c.by=by;c.lt=0;c.skip=new Set();},
+   castAstra(c){const p=c.player,box=cameraBox();c.astra=true;c.x0=p.x;c.y0=p.y;
+     // the Delta symbol, centred on the screen, as three strokes in world space
+     const H=box?box.h*.92:520,Wd=H*390/512,ox=box?box.left+box.w/2-Wd/2:p.x-Wd/2,oy=box?box.top+box.h/2-H/2:p.y-H/2,P=(u,v)=>({x:ox+u*Wd,y:oy+v*H});
+     c.sym={x:ox,y:oy,w:Wd,h:H};
+     const strokes=[[P(.113,.199),P(.472,.973)],[P(.887,.199),P(.528,.973)],[P(.503,.004),P(.503,.309)]];
+     c.passes=strokes.map(([a,b],i)=>{const dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy),ux=dx/l,uy=dy/l,ext=box?Math.max(box.w,box.h)*.8:900;
+       return {a,b,ax:a.x-ux*ext,ay:a.y-uy*ext,bx:b.x+ux*ext*.9,by:b.y+uy*ext*.9,ang:Math.atan2(dy,dx),start:.65+i*.75,dur:.42,skip:new Set(),drawn:false};});
+     c.dur=.65+3*.75+2.3;c.symT=.65+3*.75+.05;c.tints=[];
+     p.invuln=Math.max(Number(p.invuln)||0,c.dur+.4);ascHide(p,true);c.hidden=true;kick(.2);return c;},
+   // Shattered-glass cracks across the whole screen (screen space, from the centre of the Delta).
+   makeCracks(c){const box=document.getElementById('game')?.getBoundingClientRect();if(!box)return;const cx=box.left+box.width/2,cy=box.top+box.height*.5,R=Math.hypot(box.width,box.height);
+     const rays=[],rings=[];const n=13;
+     for(let i=0;i<n;i++){const a=i/n*TAU+rnd(-.18,.18),pts=[{x:cx,y:cy}];let d=0,ang=a;while(d<R){d+=rnd(40,110);ang+=rnd(-.22,.22);pts.push({x:cx+Math.cos(ang)*d,y:cy+Math.sin(ang)*d});}rays.push(pts);}
+     for(const r0 of [90,190,320,470]){const ring=[];for(let i=0;i<n;i++){const p=rays[i],q=p[Math.min(p.length-1,Math.max(1,Math.round(r0/75)))];ring.push({x:q.x+rnd(-12,12),y:q.y+rnd(-12,12)});}rings.push(ring);}
+     c.cracks={rays,rings,cx,cy,R};},
+   drawCracks(c,ctx,v,grow,fade){const K=c.cracks;ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+     ctx.globalAlpha=fade*.18;ctx.fillStyle='#e8fff0';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);ctx.globalAlpha=fade;
+     const path=(pts,lim)=>{ctx.beginPath();let len=0;ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++){const d=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y);if(len+d>lim){const f=(lim-len)/d;ctx.lineTo(pts[i-1].x+(pts[i].x-pts[i-1].x)*f,pts[i-1].y+(pts[i].y-pts[i-1].y)*f);break;}len+=d;ctx.lineTo(pts[i].x,pts[i].y);}};
+     for(const [w,col] of [[5,'rgba(10,40,20,.65)'],[2,'rgba(255,255,255,.95)']]){ctx.strokeStyle=col;ctx.lineWidth=w;
+       for(const r of K.rays){path(r,K.R*grow);ctx.stroke();}
+       if(grow>=1)for(const ring of K.rings){ctx.beginPath();ring.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.closePath();ctx.stroke();}}
+     // impact point
+     const g=ctx.createRadialGradient(K.cx,K.cy,0,K.cx,K.cy,70);g.addColorStop(0,'rgba(255,255,255,.9)');g.addColorStop(1,'rgba(160,255,190,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(K.cx,K.cy,70,0,TAU);ctx.fill();
+     ctx.restore();},
+   update(c,dt){c.t+=dt;const p=c.player;
+     for(const q of c.kos)q.t+=dt;c.kos=c.kos.filter(q=>q.t<.45);
+     if(c.astra)return S.ascent.updateAstra(c,dt);
+     if(c.cur<c.legs){c.lt+=dt;const q=Math.min(1,c.lt/c.legT),hx=c.ax+(c.bx-c.ax)*q,hy=c.ay+(c.by-c.ay)*q;
+       ascLine(c,c.ax,c.ay,hx,hy,c.w,c.skip,1);for(const e of c.skip)c.hitAll.add(e);
+       p.x=hx;p.y=hy;c.x=hx;c.y=hy;c.trail.push({x:hx,y:hy,t:0});
+       if(q>=1&&c.lt>=c.legT+c.gap){c.cur++;burst(hx,hy,'#c8ff7a',14,200);kick(.06);if(c.cur<c.legs)S.ascent.nextLeg(c,false);}}
+     else if(c.hidden){c.hidden=false;ascHide(p,false);ring(c.x,c.y,8,90,'#7dff9a',.4,5);}
+     for(const q of c.trail)q.t+=dt;c.trail=c.trail.filter(q=>q.t<.35);
+     return c.t<c.dur+.45;},
+   updateAstra(c,dt){const p=c.player;
+     if(c.t<c.dur-.5){p.x=c.x0;p.y=c.y0;}                       // Rayquaza is in the sky; its spot on the ground waits for it
+     for(const ps of c.passes){const u=(c.t-ps.start)/ps.dur;if(u<0||u>1.15)continue;
+       const q=Math.min(1,u),hx=ps.ax+(ps.bx-ps.ax)*q,hy=ps.ay+(ps.by-ps.ay)*q;
+       if(!ps.k){ps.k=1;kick(.6);c.tints.push({t:0});}       // each pierce: a heavy jolt and a green flash
+       ascLine(c,ps.ax,ps.ay,hx,hy,170,ps.skip,1.6);
+       if(u<1&&Math.random()<dt*18)kick(.3);}                  // the screen keeps shaking while each pierce tears across it
+     for(const q of c.tints)q.t+=dt;c.tints=c.tints.filter(q=>q.t<.5);
+     if(!c.symHit&&c.t>=c.symT){c.symHit=true;kick(1.2);S.ascent.makeCracks(c);
+       // the finished Delta executes every non-boss foe on screen below 50% HP
+       const box=cameraBox();for(const e of enemies()){if(e.boss||e.dead)continue;if(box&&(e.x<box.left||e.x>box.left+box.w||e.y<box.top||e.y>box.top+box.h))continue;
+         if(Number(e.hp)<=Number(e.maxHp)*.5){try{c.hit(c.player,e,Number(e.hp)*50+1000,'#ffffff',.01,0,0,c.move);}catch(_){}if(!e.dead&&typeof e.hurt==='function')try{e.hurt(Number(e.hp)*50+1000,'#ffffff',0,0,0);}catch(_){}
+           c.kos.push({x:e.x,y:e.y-(Number(e.bodyH)||24)*.5,t:0});burst(e.x,e.y-10,'#9dff7a',12,220);}}}
+     if(c.t>=c.dur-.5&&!c.landed){c.landed=true;}
+     if(c.hidden&&c.t>=c.dur-.12){c.hidden=false;ascHide(p,false);kick(.18);ring(c.x0,c.y0,10,120,'#7dff9a',.5,6);burst(c.x0,c.y0,'#c8ff7a',20,240);}
+     return c.t<c.dur+.3;},
+   draw(c,ctx,v){const k=v.k;
+     if(c.astra){S.ascent.drawAstra(c,ctx,v);}
+     else{
+       for(const q of c.trail){const f=1-q.t/.35;ctx.save();ctx.globalCompositeOperation='lighter';glow(ctx,v.sx(q.x),v.sy(q.y-18),c.w*.55*k*f,rgba(ASC_COL[2],.35*f),rgba(ASC_COL[3],0));ctx.restore();}
+       if(c.cur<c.legs){const q=Math.min(1,c.lt/c.legT),hx=c.ax+(c.bx-c.ax)*q,hy=c.ay+(c.by-c.ay)*q,len=Math.max(60,Math.hypot(hx-c.ax,hy-c.ay))+80;
+         drawComet(ctx,v,hx,hy-18,c.ang,Math.min(620,Math.max(380,len+220)),c.w*1.35,c.t,1);}}
+     for(const q of c.kos){const u=q.t/.45;ctx.save();ctx.globalCompositeOperation='lighter';glow(ctx,v.sx(q.x),v.sy(q.y),(16+40*u)*k,rgba('#ffffff',1-u),rgba(ASC_COL[2],0));ctx.restore();}
+   },
+   drawAstra(c,ctx,v){const k=v.k,t=c.t,lift=18;
+     // lift-off: a comet streaks straight up off the screen
+     if(t<.65){const u=t/.65,hy=c.y0-u*u*900;drawComet(ctx,v,c.x0,hy-lift,-Math.PI/2,520,110,t,1-Math.max(0,u-.8)*5);}
+     // glowing scars of the strokes already carved
+     for(const ps of c.passes){const u=(t-ps.start)/ps.dur;if(u<.05)continue;const fade=t>c.dur-.8?Math.max(0,(c.dur-t)/.8):1,q=Math.min(1,u);
+       const hx=ps.ax+(ps.bx-ps.ax)*q,hy=ps.ay+(ps.by-ps.ay)*q;ctx.save();ctx.globalCompositeOperation='lighter';ctx.lineCap='round';
+       for(const [w,col,a] of [[58,ASC_COL[3],.35],[28,ASC_COL[2],.6],[9,ASC_COL[1],.9]]){ctx.strokeStyle=rgba(col,a*fade);ctx.lineWidth=w*k;ctx.beginPath();ctx.moveTo(v.sx(ps.ax),v.sy(ps.ay));ctx.lineTo(v.sx(hx),v.sy(hy));ctx.stroke();}
+       ctx.restore();
+       if(u<=1.1){const ang=ps.ang;drawComet(ctx,v,hx,hy,ang,820,150,t,1);
+         // energy arrows flying with it
+         for(let i=0;i<8;i++){const side=(i%2?1:-1)*(80+(i>>1)*34),back=90+i*46+Math.sin(t*20+i)*14,ax=hx-Math.cos(ang)*back-Math.sin(ang)*side,ay=hy-Math.sin(ang)*back+Math.cos(ang)*side;
+           drawArrow(ctx,v,ax,ay,ang,24+(i%3)*5,.95,i%2?ASC_COL[1]:ASC_COL[2]);}}}
+     // the Delta symbol blazes green
+     if(t>=c.symT&&deltaGlow){const u=t-c.symT,a=Math.min(1,u/.15)*(u>1.5?Math.max(0,1-(u-1.5)/.6):1),pulse=1+.04*Math.sin(u*14);
+       const X=v.sx(c.sym.x+c.sym.w/2),Y=v.sy(c.sym.y+c.sym.h/2),Wd=c.sym.w*k*pulse,Hd=c.sym.h*k*pulse;
+       ctx.save();ctx.globalAlpha=a;ctx.shadowColor='#3dff7a';ctx.shadowBlur=40*k;ctx.drawImage(deltaGlow,X-Wd/2,Y-Hd/2,Wd,Hd);
+       ctx.globalCompositeOperation='lighter';ctx.globalAlpha=a*.5;ctx.drawImage(deltaGlow,X-Wd/2,Y-Hd/2,Wd,Hd);ctx.restore();
+       if(u<.25){ctx.save();ctx.fillStyle=rgba('#e8ffe0',.55*(1-u/.25));ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);ctx.restore();}}
+     // the dive back down to the ground
+     if(t>c.dur-.5&&t<c.dur){const u=(t-(c.dur-.5))/.38;if(u<=1)drawComet(ctx,v,c.x0,c.y0-lift-(1-u)*(1-u)*900,Math.PI/2,520,110,t,1);}
+     // green flash with every pierce
+     for(const q of c.tints){ctx.save();ctx.fillStyle=rgba('#3dff7a',.32*(1-q.t/.5));ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);ctx.restore();}
+     // the screen CRACKS when the Delta is complete, then the glass clears
+     if(c.cracks&&t>=c.symT){const u=t-c.symT,grow=Math.min(1,u/.12),fade=u<1.3?1:Math.max(0,1-(u-1.3)/.5);if(fade>0)S.ascent.drawCracks(c,ctx,v,grow,fade);}
+   }};
+
  // ---------------------------------------------------------------- manager
  window.PS_FX={
    styles:S,

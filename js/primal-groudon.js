@@ -150,6 +150,7 @@
  const inside=new Map();         // enemy -> {t,x,y,cf,cfA,cfT}
  const quakes=[];                // cracked-ground marks for Bulldoze / Earthquake (overlay)
  const motes=[];
+ const deltaStream=()=>!!window.PS_DELTA_STREAM?.active?.();   // Mega Rayquaza's Delta Stream negates Desolate Land
  function landOn(){const b=bridge(),p=b?.game?.player;return !!(p&&!p.dead&&p.megaForm===FORM&&b.game.state==='playing'&&(!scene||scene.revealed));}
  function tileSize(){return Number(E()?.World?.TS)||32;}
  const key=(tx,ty)=>tx+','+ty;
@@ -209,7 +210,7 @@
  }
  // Drawn into the game's own ground pass (world coordinates), so Pokemon and props stay on top of it.
  function drawScorched(g){
-   if(!scorched.size)return;const p=bridge()?.game?.player;if(!p)return;
+   if(!scorched.size||deltaStream())return;const p=bridge()?.game?.player;if(!p)return;
    const T=tileSize(),now=landClock,reach=1500;
    g.save();g.imageSmoothingEnabled=false;
    for(const [k,s] of scorched){const i=k.indexOf(','),tx=+k.slice(0,i),ty=+k.slice(i+1),x=tx*T,y=ty*T;
@@ -230,7 +231,7 @@
    W.isLiquid=function(x,y){return isScorched(x,y)?false:isLiquid.apply(this,arguments);};
    if(typeof block==='function')W.projectileBlock=function(x,y){const r=block.apply(this,arguments);return r==='wall'&&isScorched(x,y)?null:r;};
    W.collide=function(ent){
-     if(ent&&landOn()&&ent===bridge()?.game?.player)burnThrough(ent);
+     if(ent&&landOn()&&!deltaStream()&&ent===bridge()?.game?.player)burnThrough(ent);
      if(!scorched.size||!ent||!nearScorchedWall(ent))return collide.apply(this,arguments);
      return collideSkippingScorched(ent,isWall);
    };
@@ -499,6 +500,7 @@
  }
  function updateLand(dt){
    const p=bridge().game.player;landClock+=dt;hookWorld();
+   if(deltaStream()){roar=null;updateRage(dt,p);return;}   // only Groudon's own Enraged state survives the winds
    scorchAround(p.x,p.y,LAND.trail,landClock);
    // The domain slowly turns to desert: blobs grow outward from Groudon until the whole circle has changed.
    // Each tile heats up while it is inside the domain (faster near Groudon) and changes once hot enough.
@@ -579,7 +581,8 @@
    canvas.style.display='block';ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,innerWidth,innerHeight);
    update(dt);if(landOn())updateLand(dt);
    ctx.save();ctx.beginPath();ctx.rect(frameView.rect.left,frameView.rect.top,frameView.rect.width,frameView.rect.height);ctx.clip();
-   if(landOn()){drawSky();drawRoar();drawRage();}transformation();ctx.restore();
+   if(landOn()){if(!deltaStream()){const ob=window.PS_PRIMAL_OUTBREAK,split=!!ob?.active?.();   // Primal Outbreak: Desolate Land only fills Groudon's half
+     if(split){ctx.save();ob.clip(ctx,'groudon');}drawSky();if(split)ctx.restore();drawRoar();}drawRage();}transformation();ctx.restore();
  }
  requestAnimationFrame(frame);
 })();
