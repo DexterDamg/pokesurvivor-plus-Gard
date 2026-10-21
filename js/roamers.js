@@ -22,7 +22,7 @@
 
   // roamer cries (assets/cries/<dex>.mp3), played at the game's sound-effects volume
   function cry(dex, vol) {
-    try { let v = 0.6; try { const A = E().Audio, st = A && A.settings; if (st && st.sfx != null) v = Math.max(0, Math.min(1, Number(st.sfx) > 1 ? Number(st.sfx) / 100 : Number(st.sfx))); } catch (_) {}
+    try { let v = 0.4; try { const A = E().Audio, st = A && A.settings; if (st && st.sfx != null) v = Math.max(0, Math.min(1, Number(st.sfx) > 1 ? Number(st.sfx) / 100 : Number(st.sfx))); } catch (_) {}
       const a = new Audio('assets/cries/' + dex + '.mp3'); a.volume = Math.min(1, v * (vol || 0.8)); a.play().catch(() => {}); } catch (_) {}
   }
   function template() {   // stats from the boss list entry closest to the current time
