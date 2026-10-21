@@ -13,6 +13,9 @@
         battle   normal battles: now and then one of these songs plays once.
                  chance = how likely each roll is (0.3 = 30%), every = seconds between rolls,
                  first = also roll when the battle starts.
+        late     late game (after 'after' seconds, 900 = minute 15): these songs join the random battle songs.
+        legends  when that legendary appears (Rift legendaries, bosses), its theme cuts in and loops while
+                 it's on the field. Order of importance: Mega Evolution > legendary > special > battle.
 
    HOW SONGS BEHAVE
    - Mega Evolution music always cuts in right away.
@@ -33,6 +36,15 @@
     'pallet':    { title: 'Pallet Town',                         file: 'assets/music/pallet-town.mp3' },
     'littleroot':{ title: 'Littleroot Town',                     file: 'assets/music/littleroot-town.mp3' },
     'rustboro':  { title: 'Rustboro City',                       file: 'assets/music/rustboro-city.mp3' },
+    // legendary battle themes
+    'vs-dialga-palkia': { title: 'Battle! Dialga / Palkia',     file: 'assets/music/legend-dialga-palkia.mp3' },
+    'vs-mewtwo':        { title: 'Battle! Mewtwo',              file: 'assets/music/legend-mewtwo.mp3' },
+    'vs-beasts':        { title: 'Battle! Entei / Raikou / Suicune', file: 'assets/music/legend-beasts.mp3' },
+    'vs-lake':          { title: 'Battle! Lake Guardians',      file: 'assets/music/legend-lake-guardians.mp3' },
+    'vs-giratina':      { title: 'Battle! Giratina',            file: 'assets/music/legend-giratina.mp3' },
+    'vs-lugia':         { title: 'Battle! Lugia',               file: 'assets/music/legend-lugia.mp3' },
+    'vs-deoxys':        { title: 'Battle! Deoxys',              file: 'assets/music/legend-deoxys.mp3' },
+    'vs-regi':          { title: 'Battle! Regi Trio',           file: 'assets/music/legend-regi.mp3' },
   };
   const RULES = {
     menu:    { songs: ['pallet', 'littleroot', 'rustboro'] },
@@ -42,6 +54,13 @@
       judgment: { songs: ['tera'] },
     },
     battle:  { songs: ['tera'], chance: 0.3, every: 150, first: true },
+    // late game: after 'after' seconds of a run, the legendary themes join the random battle songs
+    late:    { after: 900, songs: ['vs-dialga-palkia','vs-mewtwo','vs-beasts','vs-lake','vs-giratina','vs-lugia','vs-deoxys','vs-regi'] },
+    // a legendary shows up (Rift / boss): its own theme cuts in and loops while it's around. dex number: song
+    legends: { 483:'vs-dialga-palkia', 484:'vs-dialga-palkia', 150:'vs-mewtwo', 151:'vs-mewtwo',
+               243:'vs-beasts', 244:'vs-beasts', 245:'vs-beasts', 480:'vs-lake', 481:'vs-lake', 482:'vs-lake',
+               487:'vs-giratina', 249:'vs-lugia', 250:'vs-lugia', 386:'vs-deoxys',
+               377:'vs-regi', 378:'vs-regi', 379:'vs-regi', 486:'vs-regi', 894:'vs-regi', 895:'vs-regi' },
   };
 
   // ------------------------------------------------------------------------------------------
@@ -82,12 +101,20 @@
     const g = B()?.game, st = g?.state;
     const battle = !!(st && st !== 'ui' && st !== 'over');          // 'ui' = menus, 'over' = run ended
     if (!battle) return 'menu';
+    const lg = legendSong(); if (lg) return 'legend:' + lg;
     if (gameTrack && RULES.special && RULES.special[gameTrack]) return 'special:' + gameTrack;
     return 'battle';
   }
+  function legendSong() {   // a legendary with its own theme on the field?
+    const E = B()?.enemies, p = B()?.game?.player; if (!E || !RULES.legends || typeof E.all !== 'function') return null;
+    try { for (const e of E.all()) { if (!e || e.dead) continue; const id = RULES.legends[Number(e.dex)]; if (id && TRACKS[id] && (e.boss || e.legend || e.isLegend) && (!p || Math.hypot(e.x - p.x, e.y - p.y) < 1100)) return id; } } catch (_) {}
+    return null;
+  }
   const isMega = () => { const p = B()?.game?.player; return !!(p && p.megaForm && !/primal/.test(String(p.megaForm))); };   // Mega only, never Primal
-  const rule = ctx => ctx === 'menu' ? RULES.menu : ctx === 'mega' ? RULES.mega : ctx === 'battle' ? RULES.battle : (RULES.special || {})[ctx.slice(8)];
-  const loops = ctx => ctx.startsWith('special:');   // special moments loop; menu shuffles; battle + Mega play once
+  const rule = ctx => ctx === 'menu' ? RULES.menu : ctx === 'mega' ? RULES.mega : ctx === 'battle' ? battleRule() : ctx.startsWith('legend:') ? { songs: [ctx.slice(7)] } : (RULES.special || {})[ctx.slice(8)];
+  const loops = ctx => ctx.startsWith('special:') || ctx.startsWith('legend:');
+  let runTime = 0, runLast = 0;   // seconds of actual play this run (for RULES.late)
+  function battleRule() { const r = RULES.battle; if (!r) return null; const L = RULES.late; return (L && runTime >= (L.after || 900)) ? { ...r, songs: [...(r.songs || []), ...(L.songs || [])] } : r; }   // special moments loop; menu shuffles; battle + Mega play once
 
   // ---- player ----
   const audio = new Audio(); audio.preload = 'auto'; audio.volume = S.volume;
@@ -128,6 +155,7 @@
     watchGame();
     const ctx = context(), mega = isMega();
     const megaNow = mega && !wasMega; wasMega = mega;
+    { const st = B()?.game?.state, t = now(); if (ctx === 'menu') runTime = 0; else if (st === 'playing' && runLast) runTime += Math.min(1, (t - runLast) / 1000); runLast = t; }
     const leftOrEnteredMenu = lastCtx != null && ctx !== lastCtx && (ctx === 'menu' || lastCtx === 'menu');
     if (ctx !== lastCtx) { if (ctx === 'battle' && (lastCtx === 'menu' || lastCtx == null)) nextRoll = RULES.battle?.first ? now() : now() + (RULES.battle?.every || 150) * 1000; }
     lastCtx = ctx;
@@ -137,6 +165,12 @@
     if (megaNow) {
       const id = pick(RULES.mega && RULES.mega.songs);
       if (id) { if (cur && cur.id === id) { cur.ctx = 'mega'; audio.loop = false; } else cut(() => start(id, 'mega')); render(); return; }
+    }
+    // 1b) a legendary appeared: its theme cuts in (but never over the Mega Evolution song)
+    if (ctx.startsWith('legend:') && (!cur || (cur.ctx !== ctx && cur.ctx !== 'mega'))) {
+      const id = ctx.slice(7);
+      if (cur && cur.id === id) { cur.ctx = ctx; audio.loop = true; render(); return; }
+      if (!fadeT) { cut(() => start(id, ctx)); render(); return; }
     }
     // 2) going between the menu and a battle switches music right away (title songs never follow you into battle)
     if (leftOrEnteredMenu && cur && cur.ctx !== ctx) {

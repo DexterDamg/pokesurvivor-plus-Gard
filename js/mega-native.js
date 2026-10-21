@@ -632,6 +632,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(!p.__echoXp){p.__echoXp=true;p.xpMul=(Number(p.xpMul)||1)*ECHO.xp;}                       // EXP +60%
    if(!p.__echoLives){p.__echoLives=true;p.lives=(Number(p.lives)||0)+ECHO.lives;               // Echo's Resolve For J: +2 second chances
      try{getBridge().fx.dmgText(p.x,p.y-(p.bodyH||40)-24,"Echo's Resolve For J: +2 ♥",'#ff9ad8');}catch(e){}}
+   if(!p.__jInt){p.__jInt=true;p.rerollBonus=(Number(p.rerollBonus)||0)*2+1;}   // J's Intuition: double rerolls (6 -> 12)
    const B2=ECHO.bond;if(p.megaForm!==B2.form)return;
    const hp=p.maxHp>0?p.hp/p.maxHp:1,bd=p.__echoBond;
    if(hp<B2.below&&!p.__echoLow&&(!bd||now-bd.at>B2.cooldown*1000)){
@@ -828,6 +829,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(!echoOn(p))return '';const B2=ECHO.bond,bd=p.__echoBond,now=performance.now();
    const l=['\u{1F496} Echo (only you can see this): EXP ×1.6 · damage ×1.3 · speed ×1.15',
      "\u{1F496} Echo's Resolve For J: +2 second chances (extra hearts) each run",
+     "\u{1F496} J's Intuition: twice the rerolls (e.g. 6 \u2192 12)",
      "\u{1F496} J and Echo's Bond (Mega Gardevoir): when HP drops below 50% → heals 20 HP/s for 10s, attack ×2.2 for 10s, speed ×1.5 for 5s, 20% less damage taken for 30s (every 30s at most)"+(bd&&now<bd.take?' — ACTIVE':'')];
    return '\n\n'+l.join('\n');}
  function passiveLines(title,abilityId,types,deal,inScope){
@@ -993,16 +995,24 @@ function start(){
    "This is our moment, {n}!","Together we're unstoppable, {n}!","I believe in you, {n}!","Let's turn this around, {n}!",
    "Unleash your true power, {n}!","Our bond is our strength, {n}!","Time to shine, {n}!","No holding back now, {n}!"];
  function trainerLine(name){
-   if(!document.getElementById('ps-trainer-css')){const st=document.createElement('style');st.id='ps-trainer-css';st.textContent=
-     '#ps-trainer{position:fixed;left:50%;top:18%;transform:translateX(-50%) scale(.6);z-index:65;pointer-events:none;opacity:0;transition:opacity .25s,transform .25s cubic-bezier(.2,1.6,.4,1);'+
-     'padding:10px 22px;border-radius:14px;border:3px solid #fff;background:linear-gradient(135deg,rgba(255,110,190,.95),rgba(150,90,255,.95));color:#fff;'+
-     'font:800 22px Pixelify,Fredoka,system-ui,sans-serif;text-shadow:0 2px 0 rgba(80,0,60,.6);box-shadow:0 0 0 3px rgba(255,120,200,.4),0 8px 28px rgba(0,0,0,.45);white-space:nowrap}'+
-     '#ps-trainer.show{opacity:1;transform:translateX(-50%) scale(1)}#ps-trainer small{display:block;font-size:11px;letter-spacing:2px;opacity:.85;text-transform:uppercase}'+
-     '@media (max-width:700px){#ps-trainer{font-size:16px;padding:8px 14px}}';document.head.append(st);}
-   let el=document.getElementById('ps-trainer');if(!el){el=document.createElement('div');el.id='ps-trainer';document.body.append(el);}
-   const line=TRAINER_LINES[Math.floor(Math.random()*TRAINER_LINES.length)].replace('{n}',name);
-   el.innerHTML='<small>Trainer</small>'+line.replace(/[<>&]/g,'');el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
-   clearTimeout(el.__t);el.__t=setTimeout(()=>el.classList.remove('show'),2800);
+   // Pokemon-game style text box: white panel, double border, name tag, typewriter text, blinking arrow
+   if(!document.getElementById('ps-trainer-css')){const st=document.createElement('style');st.id='ps-trainer-css';st.textContent=`
+   #ps-trainer{position:fixed;left:50%;bottom:120px;z-index:65;pointer-events:none;width:min(560px,calc(100vw - 32px));transform:translate(-50%,24px);opacity:0;transition:opacity .22s ease,transform .3s cubic-bezier(.2,1.4,.4,1)}
+   #ps-trainer.show{opacity:1;transform:translate(-50%,0)}
+   #ps-trainer .tb-box{position:relative;display:flex;align-items:center;gap:14px;padding:16px 22px 16px 16px;background:linear-gradient(#ffffff,#f3f1fb);border:4px solid #3b3f5c;border-radius:14px;box-shadow:inset 0 0 0 3px #c9d3ff,0 6px 0 rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35)}
+   #ps-trainer .tb-tag{position:absolute;left:18px;top:-15px;padding:3px 12px;border-radius:8px;background:linear-gradient(90deg,#ff6fb5,#9a6bff);border:3px solid #3b3f5c;color:#fff;font:800 12px Pixelify,Fredoka,system-ui,sans-serif;letter-spacing:2px;text-transform:uppercase}
+   #ps-trainer img{width:42px;height:auto;flex:0 0 auto;filter:drop-shadow(0 0 6px rgba(255,140,220,.8));animation:tbSpin 2.4s ease-in-out infinite}
+   @keyframes tbSpin{50%{transform:translateY(-3px) rotate(-6deg)}}
+   #ps-trainer .tb-text{flex:1;min-height:28px;color:#33354a;font:700 21px Pixelify,Fredoka,system-ui,sans-serif;line-height:1.3;text-shadow:2px 2px 0 #d9dbe9}
+   #ps-trainer .tb-arrow{position:absolute;right:14px;bottom:8px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #ff5aa8;animation:tbBlink .7s steps(2) infinite}
+   @keyframes tbBlink{50%{opacity:0}}
+   @media (max-width:700px){#ps-trainer{bottom:96px}#ps-trainer .tb-text{font-size:16px}#ps-trainer img{width:32px}}`;document.head.append(st);}
+   let el=document.getElementById('ps-trainer');
+   if(!el){el=document.createElement('div');el.id='ps-trainer';el.innerHTML='<div class="tb-box"><span class="tb-tag">Trainer</span><img src="assets/fx/mega-symbol.png?v=1" alt=""><div class="tb-text"></div><span class="tb-arrow"></span></div>';document.body.append(el);}
+   const line=TRAINER_LINES[Math.floor(Math.random()*TRAINER_LINES.length)].replace('{n}',name),tx=el.querySelector('.tb-text');
+   clearInterval(el.__type);clearTimeout(el.__t);tx.textContent='';el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
+   let n=0;el.__type=setInterval(()=>{n+=1;tx.textContent=line.slice(0,n);if(n>=line.length)clearInterval(el.__type);},28);
+   el.__t=setTimeout(()=>el.classList.remove('show'),3200);
  }
  // Pokemon cries played when the orb breaks during Mega Evolution. Add more: dex number -> file in assets/cries/
  const MEGA_CRIES={
