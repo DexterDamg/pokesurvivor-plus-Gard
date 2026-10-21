@@ -11,7 +11,8 @@
         special  certain moments, by the game's own music name (shown in the ♫ panel as "Game music: ...").
                  rift = inside a Rift, judgment = the Arceus Judgment fight, zz = Area Zero.
         battle   battle music, shuffled back to back: 'early' songs until 'after' seconds into the run
-                 (900 = minute 15), then the 'late' songs.
+                 (900 = minute 15), then the 'late' songs. 'random': every now and then (any minute) one of
+                 these plays instead (chance per roll, every = seconds between rolls, first = roll at battle start).
         lowhp    when your HP drops below 'below' (0.2 = 20%), this song cuts in, at any point of the run.
         legends  when that legendary appears (Rift legendaries, bosses), its theme cuts in and loops while
                  it's on the field. Order of importance: Mega Evolution > legendary > low HP > special > battle.
@@ -59,7 +60,9 @@
     // battle music, shuffled one after another: 'early' until 'after' seconds into a run (900 = minute 15), then 'late'
     battle:  { after: 900,
                early: ['route-1', 'route-4', 'route-11', 'route-24'],
-               late:  ['vs-dialga-palkia','vs-mewtwo','vs-beasts','vs-lake','vs-giratina','vs-lugia','vs-deoxys','vs-regi'] },
+               late:  ['vs-dialga-palkia','vs-mewtwo','vs-beasts','vs-lake','vs-giratina','vs-lugia','vs-deoxys','vs-regi'],
+               // every now and then (any minute), one of these plays instead: chance per roll, seconds between rolls, roll at battle start
+               random: { songs: ['tera'], chance: 0.3, every: 150, first: true } },
     // low HP: when your HP drops below 'below' (0.2 = 20%), this cuts in at any time of the run
     lowhp:   { below: 0.2, songs: ['tera'] },
     // a legendary shows up (Rift / boss): its own theme cuts in and loops while it's around. dex number: song
@@ -145,12 +148,13 @@
   }
   function chooseNext(ctx, not) {   // which song (if any) should start now in this moment
     const r = rule(ctx); if (!r || !r.songs || !r.songs.length) return null;
+    if (ctx === 'battle') { const X = RULES.battle && RULES.battle.random; if (X && X.songs && X.songs.length && now() >= nextRoll) { nextRoll = now() + (X.every ?? 150) * 1000; if (Math.random() < (X.chance ?? 0.3)) { const id = pick(X.songs, not); if (id && id !== not) return id; } } }
     return pick(r.songs, not);
   }
   audio.addEventListener('ended', () => {   // a song finished: the current moment picks what comes next
     const done = cur; cur = null;
     const ctx = context();
-    if (done && (done.ctx === 'battle' || done.ctx === 'mega')) nextRoll = now() + (RULES.battle?.every || 150) * 1000;
+    if (done && (done.ctx === 'battle' || done.ctx === 'mega')) nextRoll = now() + (RULES.battle?.random?.every ?? 150) * 1000;
     const id = S.on && unlocked ? chooseNext(ctx, done && done.id) : null;
     if (!(id && start(id, ctx))) hush();
   });
@@ -162,7 +166,7 @@
     const megaNow = mega && !wasMega; wasMega = mega;
     { const st = B()?.game?.state, t = now(); if (ctx === 'menu') runTime = 0; else if (st === 'playing' && runLast) runTime += Math.min(1, (t - runLast) / 1000); runLast = t; }
     const leftOrEnteredMenu = lastCtx != null && ctx !== lastCtx && (ctx === 'menu' || lastCtx === 'menu');
-    if (ctx !== lastCtx) { if (ctx === 'battle' && (lastCtx === 'menu' || lastCtx == null)) nextRoll = RULES.battle?.first ? now() : now() + (RULES.battle?.every || 150) * 1000; }
+    if (ctx !== lastCtx) { if (ctx === 'battle' && (lastCtx === 'menu' || lastCtx == null)) nextRoll = RULES.battle?.random?.first ? now() : now() + (RULES.battle?.random?.every ?? 150) * 1000; }
     lastCtx = ctx;
     if (!S.on || !unlocked) { if (cur) hush(); return; }
 
@@ -209,7 +213,7 @@
   function skip() {   // ⏭ next song for this moment (or back to the game's music if there is no other)
     unlocked = true; if (!S.on) return;
     const ctx = context(), was = cur;
-    if (was && (was.ctx === 'battle' || was.ctx === 'mega')) nextRoll = now() + (RULES.battle?.every || 150) * 1000;
+    if (was && (was.ctx === 'battle' || was.ctx === 'mega')) nextRoll = now() + (RULES.battle?.random?.every ?? 150) * 1000;
     let id = null;
     if (ctx === 'battle') { const r = battleRule(); if (r && r.songs) { id = pick(r.songs, was && was.id); if (was && id === was.id) id = null; } }
     else { id = pick(rule(ctx)?.songs, was && was.id); if (was && id === was.id) id = null; }
