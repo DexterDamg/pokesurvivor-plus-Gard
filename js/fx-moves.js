@@ -622,6 +622,156 @@
      const f=q.t/q.life;star4(ctx,v.sx(q.x),v.sy(q.y),q.r*v.k*(1-f*0.5)*(f<0.2?f/0.2:1),1-f,q.c);}
    if(shinySp.length>220)shinySp.splice(0,shinySp.length-220);}
 
+ // ---------------------------------------------------------------- ORIGIN PULSE (Kyogre)
+ //  Glowing blue orbs spawn around Kyogre, each tracks its own nearest foe and fires bright blue
+ //  beams that chain from foe to foe. When an orb runs out it bursts into bubbles: splash damage +
+ //  a 25% slow. move.count = orbs, move.pierce = extra foes each beam chains to.
+ //  The evolved form (Origin Pulse (Primal), move.primalPulse) has bigger orbs, a bigger burst and executes foes below 5% HP.
+ const opSlowed=new Set();
+ function opSlow(e,dur){if(!e||e.dead)return;e.__opSlowT=Math.max(e.__opSlowT||0,dur);if(!opSlowed.has(e)){e.__opX=e.x;e.__opY=e.y;opSlowed.add(e);}}
+ // 25% slow: give back a quarter of each step the foe takes (skipped while the game's own 50% slow is on).
+ function opSlowTick(dt){for(const e of opSlowed){if(e.dead||!(e.__opSlowT>0)){opSlowed.delete(e);delete e.__opSlowT;continue;}
+   e.__opSlowT-=dt;if(!(Number(e.slowT)>0)){const dx=e.x-e.__opX,dy=e.y-e.__opY;if(dx*dx+dy*dy<900){e.x-=dx*0.25;e.y-=dy*0.25;}}e.__opX=e.x;e.__opY=e.y;}}
+ // Origin Pulse (Primal) annihilates any foe its beams or bursts leave below 5% HP.
+ function opExecute(c,e){if(!c.pr||!e||e.dead)return;const hp=Number(e.hp),max=Number(e.maxHp);if(!(hp>0&&max>0&&hp<=max*(c.fx.execute||0.05)))return;
+   try{c.hit(c.player,e,hp*50+1000,'#ffffff',0.01,0,0,c.move);}catch(err){}
+   if(!e.dead&&Number(e.hp)>0&&typeof e.hurt==='function')try{e.hurt(Number(e.hp)*50+1000,'#ffffff',0,0,0);}catch(err){}
+   c.kills.push({x:e.x,y:e.y-(Number(e.bodyH)||24)*0.5,t:0});burst(e.x,e.y,'#bff6ff',10,180);}
+ S.originpulse={cast(c){const p=c.player,n=Math.max(1,Math.round(c.move.count||2)),pr=!!c.move.primalPulse;
+     c.jumps=Math.max(0,Math.round(c.move.pierce||0));c.life=c.fx.life||3.6;c.fire=c.fx.fireEvery||0.55;c.reach=c.fx.reach||300;c.hop=c.fx.hop||190;
+     c.size=(pr?15:11);c.blast=(c.fx.blast||80)*(pr?1.45:1);c.pr=pr;c.list=[];c.beams=[];c.pops=[];c.kills=[];
+     const h=(Number(p.bodyH)||40)*0.55;
+     for(let i=0;i<n;i++){const a=i/n*TAU-Math.PI/2;c.list.push({a,x:p.x+Math.cos(a)*34,y:p.y+Math.sin(a)*22,h,t:0,fireT:0.35+i*0.12,tg:null,dead:false,ph:rnd(0,TAU)});}
+     return c;},
+   update(c,dt){c.t+=dt;const p=c.player,all=enemies();
+     for(const o of c.list){if(o.dead)continue;o.t+=dt;
+       if(o.t<0.35){o.a+=dt*7;o.x+=(p.x+Math.cos(o.a)*34-o.x)*Math.min(1,dt*14);o.y+=(p.y+Math.sin(o.a)*22-o.y)*Math.min(1,dt*14);continue;}
+       // each orb keeps its own target: the nearest foe no other orb is chasing (falls back to the nearest one)
+       if(!o.tg||o.tg.dead){const taken=new Set(c.list.filter(q=>q!==o&&!q.dead&&q.tg).map(q=>q.tg));
+         o.tg=nearest(o.x,o.y,700,all.filter(e=>!taken.has(e)))||nearest(o.x,o.y,700,all);}
+       let gx=p.x+Math.cos(o.a)*60,gy=p.y+Math.sin(o.a)*40;
+       if(o.tg){const dx=o.x-o.tg.x,dy=o.y-o.tg.y,d=Math.hypot(dx,dy)||1;gx=o.tg.x+dx/d*55;gy=o.tg.y+dy/d*55;}
+       const dx=gx-o.x,dy=gy-o.y,d=Math.hypot(dx,dy),step=Math.min(d,(c.fx.speed||330)*dt);if(d>0.5){o.x+=dx/d*step;o.y+=dy/d*step;}
+       o.fireT-=dt;
+       if(o.fireT<=0&&o.tg&&Math.hypot(o.tg.x-o.x,o.tg.y-o.y)<c.reach){o.fireT=c.fire;
+         // the beam strikes the target, then chains to the nearest foes not yet hit
+         const pts=[{x:o.x,y:o.y-o.h}],hit=new Set();let cur=o.tg,mult=1;
+         for(let j=0;j<=c.jumps&&cur;j++){hit.add(cur);pts.push({x:cur.x,y:cur.y-(Number(cur.bodyH)||24)*0.5});
+           if(!c.ghost){applyHit(c,cur,baseDmg(c,mult),{knock:25},cur.x-o.x,cur.y-o.y);opExecute(c,cur);}
+           mult*=0.88;cur=nearest(cur.x,cur.y,c.hop,all.filter(e=>!hit.has(e)));}
+         c.beams.push({pts,t:0,seed:rnd(0,99)});kick(0.02);}
+       if(o.t>c.life){o.dead=true;c.pops.push({x:o.x,y:o.y,h:o.h,t:0,b:Array.from({length:c.pr?18:12},()=>({a:rnd(0,TAU),v:rnd(40,140),r:rnd(3,8),up:rnd(10,50)}))});
+         if(!c.ghost){hitCircle(c,o.x,o.y,c.blast,{mult:c.pr?1.6:1.3,knock:70});for(const e of enemies())if(Math.hypot(e.x-o.x,e.y-o.y)<c.blast+(e.r||10)){opSlow(e,c.fx.slowDur||2.5);opExecute(c,e);}}
+         for(let i=0;i<(c.pr?14:9);i++)sp('bubble','water',o.x+rnd(-c.blast,c.blast)*0.6,o.y+rnd(-c.blast,c.blast)*0.4,{vy:-rnd(30,90),life:rnd(0.5,0.9)});
+         ring(o.x,o.y,8,c.blast,'#7fe4ff',0.45,4);kick(0.05);}}
+     for(const b of c.beams)b.t+=dt;c.beams=c.beams.filter(b=>b.t<0.28);
+     for(const q of c.pops)q.t+=dt;c.pops=c.pops.filter(q=>q.t<0.7);
+     for(const q of c.kills)q.t+=dt;c.kills=c.kills.filter(q=>q.t<0.45);
+     return c.list.some(o=>!o.dead)||c.beams.length>0||c.pops.length>0||c.kills.length>0;},
+   draw(c,ctx,v){const k=v.k,col=c.pr?['#ffffff','#5ff2ff','#1f6dff']:['#ffffff','#7fd8ff','#2a8cff'];
+     ctx.save();ctx.globalCompositeOperation='lighter';
+     for(const b of c.beams){const f=1-b.t/0.28;
+       for(const [w,cl,a] of [[9,col[2],0.45],[4.5,col[1],0.85],[1.8,col[0],1]]){ctx.strokeStyle=rgba(cl,a*f);ctx.lineWidth=w*k*(c.pr?1.3:1);ctx.lineCap='round';ctx.beginPath();
+         b.pts.forEach((q,i)=>{const X=v.sx(q.x),Y=v.sy(q.y);if(!i){ctx.moveTo(X,Y);return;}const pq=b.pts[i-1],mx=(v.sx(pq.x)+X)/2,my=(v.sy(pq.y)+Y)/2,j=Math.sin(b.seed+i*3+b.t*40)*8*k;ctx.quadraticCurveTo(mx+j,my-j,X,Y);});ctx.stroke();}
+       for(let i=1;i<b.pts.length;i++)glow(ctx,v.sx(b.pts[i].x),v.sy(b.pts[i].y),16*k*f,rgba(col[0],0.8*f),rgba(col[1],0));}
+     for(const o of c.list){if(o.dead)continue;const X=v.sx(o.x),Y=v.sy(o.y-o.h-Math.sin(c.t*4+o.ph)*4),pulse=1+0.12*Math.sin(c.t*9+o.ph),R=c.size*k*pulse,
+         fadeIn=Math.min(1,o.t/0.2),fadeOut=Math.min(1,(c.life-o.t)/0.25+0.4);ctx.globalAlpha=fadeIn*Math.min(1,fadeOut);
+       glow(ctx,X,Y,R*3.4,rgba(col[2],0.5),rgba(col[2],0));glow(ctx,X,Y,R*1.8,rgba(col[1],0.9),rgba(col[1],0));glow(ctx,X,Y,R*0.9,rgba(col[0],1),rgba(col[0],0.2));
+       ctx.strokeStyle=rgba(col[1],0.8);ctx.lineWidth=1.5*k;ctx.beginPath();ctx.ellipse(X,Y,R*1.5,R*0.55,c.t*3+o.ph,0,TAU);ctx.stroke();
+       if(c.pr){ctx.beginPath();ctx.ellipse(X,Y,R*1.5,R*0.55,-c.t*3-o.ph,0,TAU);ctx.stroke();}}
+     ctx.globalAlpha=1;
+     for(const q of c.kills){const u=q.t/0.45,X=v.sx(q.x),Y=v.sy(q.y);glow(ctx,X,Y,(18+46*u)*k,rgba('#ffffff',1-u),rgba(col[1],0));
+       ctx.strokeStyle=rgba(col[1],1-u);ctx.lineWidth=3*k*(1-u);ctx.beginPath();ctx.arc(X,Y,(10+40*u)*k,0,TAU);ctx.stroke();}
+     for(const q of c.pops){const u=q.t/0.7,X=v.sx(q.x),Y=v.sy(q.y-q.h*(1-u));
+       glow(ctx,X,Y,c.blast*k*(0.3+0.7*Math.min(1,u*3)),rgba(col[1],0.6*(1-u)),rgba(col[2],0));
+       for(const b of q.b){const bx=X+Math.cos(b.a)*b.v*u*k,by=Y+Math.sin(b.a)*b.v*u*0.6*k-b.up*u*k;
+         ctx.strokeStyle=rgba('#d8f6ff',0.9*(1-u));ctx.lineWidth=1.4*k;ctx.beginPath();ctx.arc(bx,by,b.r*k*(0.6+u*0.6),0,TAU);ctx.stroke();
+         ctx.fillStyle=rgba('#ffffff',0.7*(1-u));ctx.beginPath();ctx.arc(bx-b.r*0.3*k,by-b.r*0.3*k,Math.max(0.8,b.r*0.22*k),0,TAU);ctx.fill();}}
+     ctx.restore();}};
+
+ // ---------------------------------------------------------------- PRECIPICE BLADES (Groudon)
+ //  A full wall of volcanic rock spikes erupts outward from Groudon, impaling every foe it reaches; the strongest
+ //  foes on screen are each impaled by a GIANT spike that stuns them for 5 s. Everything hit burns for 10 s.
+ //  move.radius = wall size, move.count = giant spikes. The evolved form (Precipice Blades (Primal),
+ //  move.primalBlades) keeps its outer wall standing for a few seconds and that wall deletes enemy projectiles.
+ function pbBurn(e){if(typeof e.applyBurn==='function'){e.applyBurn(1);if(Number.isFinite(e.burnT))e.burnT=Math.max(e.burnT,10);}}
+ function pbStun(e,dur){if(typeof e.applyStun==='function')e.applyStun(dur);e.stunT=Math.max(Number(e.stunT)||0,dur);}   // bosses too
+ // Footprints in world units: a spike sprite stands on (x,y) and rises 56 sheet pixels; Groudon stands on (px,py).
+ const PB_PX=1.05;
+ function pbRect(x,y,s){const w=32*PB_PX*s,h=56*PB_PX*s;return {l:x-w*.38,r:x+w*.38,t:y-h*.92,b:y+6*s};}
+ function pbBody(p,m){const r=Number(p.r)||16,h=Math.max(Number(p.bodyH)||40,r*2),w=Math.max(r*1.4,h*.5);return {l:p.x-w-m,r:p.x+w+m,t:p.y-h-m,b:p.y+r*.6+m};}
+ const pbHits=(a,b)=>a.l<b.r&&a.r>b.l&&a.t<b.b&&a.b>b.t;
+ function pbBlocked(x,y){   // walls and solid props (trees, rocks...) never have spikes growing through them
+   try{const W=B()?.world;if(W&&typeof W.isWall==='function'&&W.isWall(x,y))return true;}catch(e){}
+   try{const E=window.PS_HOOPA_ENGINE;for(const q of E.World.visibleProps(E.Camera)||[])if(q&&q.solid&&Math.abs(q.x-x)<60&&Math.hypot(q.x-x,q.y-y)<(q.r||12)+16)return true;}catch(e){}
+   return false;
+ }
+ // A giant spike stands where its target is, but is pushed out until it no longer covers Groudon or another giant.
+ function pbPlaceGiant(c,g,x,y){
+   const p=c.player,body=pbBody(p,14),S=c.pr?3.6:3.2;let a=Math.atan2(y-p.y,x-p.x),d=Math.hypot(x-p.x,y-p.y);
+   for(let i=0;i<40;i++){const gx=p.x+Math.cos(a)*d,gy=p.y+Math.sin(a)*d,rect=pbRect(gx,gy,S);
+     if(!pbHits(rect,body)&&!c.giants.some(o=>o!==g&&o.placed&&Math.abs(o.x-gx)<46*S*.5&&Math.abs(o.y-gy)<30))return [gx,gy];
+     d+=10;if(i%8===7)a+=.35;}
+   return [p.x+Math.cos(a)*d,p.y+Math.sin(a)*d];
+ }
+ S.precipice={cast(c){const p=c.player,R=Math.max(90,Number(c.move.radius)||130),pr=!!c.move.primalBlades;
+     c.x=p.x;c.y=p.y;c.R=R;c.pr=pr;c.wave=.35;c.life=pr?(c.fx.wallLife||3):1.15;c.spikes=[];c.hitSet=new Set();c.giants=[];c.cuts=[];
+     // Spikes are scattered at random over a ring around Groudon (never on him or right beside him), each keeping a
+     // minimum gap from the others (no clumps, no overlaps), and never inside walls, trees or rocks.
+     const minR=Math.max(62,(Number(p.r)||16)*3),gap=46,body=pbBody(p,12),want=Math.min(pr?75:55,Math.round(Math.PI*(R*R-minR*minR)/(gap*gap*1.6)));
+     const cell=gap/Math.SQRT2,grid=new Map(),gk=(x,y)=>Math.floor(x/cell)+','+Math.floor(y/cell);
+     for(let tries=0;tries<want*30&&c.spikes.length<want;tries++){
+       const a=rnd(0,TAU),r=Math.sqrt(rnd(minR*minR,R*R)),x=c.x+Math.cos(a)*r,y=c.y+Math.sin(a)*r*.85,sc=r>R*.78?rnd(1.05,1.3):rnd(.75,1.05);
+       let ok=true;const cx=Math.floor(x/cell),cy=Math.floor(y/cell);
+       for(let j=-2;j<=2&&ok;j++)for(let i=-2;i<=2&&ok;i++){const q=grid.get((cx+i)+','+(cy+j));if(q&&Math.hypot(q.x-x,(q.y-y)*1.25)<gap)ok=false;}
+       if(!ok||pbHits(pbRect(x,y,sc),body)||pbBlocked(x,y))continue;
+       const sp={x,y,d:r/R*c.wave,v:(Math.random()*4)|0,s:sc,outer:r>R*.78};c.spikes.push(sp);grid.set(gk(x,y),sp);
+     }
+     // the strongest foes on screen (bosses first, then by max HP) each get a giant spike
+     const n=Math.max(0,Math.round(c.move.count||1)),foes=enemies().filter(e=>Math.hypot(e.x-p.x,e.y-p.y)<620)
+       .sort((a,b)=>(b.boss?1:0)-(a.boss?1:0)||(Number(b.maxHp)||0)-(Number(a.maxHp)||0)||(Number(b.hp)||0)-(Number(a.hp)||0));
+     for(let i=0;i<n;i++){const e=foes[i],a=rnd(0,TAU),r=rnd(Math.max(minR+40,R*.45),R);
+       c.giants.push({e,x:e?e.x:p.x+Math.cos(a)*r,y:e?e.y:p.y+Math.sin(a)*r*.85,t:-(.18+i*(pr?.07:.16)),v:(Math.random()*4)|0,done:false,placed:false,giant:true});}
+     kick(pr?.35:.2);return c;},
+   update(c,dt){c.t+=dt;const waveR=c.R*Math.min(1,c.t/c.wave);
+     if(!c.ghost&&c.t<c.wave+.1)for(const e of enemies()){if(c.hitSet.has(e))continue;if(Math.hypot(e.x-c.x,(e.y-c.y)/.85)>waveR+(e.r||10))continue;
+       c.hitSet.add(e);applyHit(c,e,baseDmg(c),{knock:60},e.x-c.x,e.y-c.y);pbBurn(e);}
+     if(c.t<c.wave&&Math.random()<dt*30){const a=rnd(0,TAU);burst(c.x+Math.cos(a)*waveR,c.y+Math.sin(a)*waveR*.85,'#ff8a3d',4,120);}
+     for(const g of c.giants){const was=g.t;g.t+=dt;if(g.e&&!g.e.dead&&g.t<0){g.x=g.e.x;g.y=g.e.y;}
+       if(was<0&&g.t>=0&&!g.done){g.done=true;[g.x,g.y]=pbPlaceGiant(c,g,g.x,g.y);g.placed=true;
+         {const S=c.pr?3.6:3.2,gr=pbRect(g.x,g.y,S);for(const sp of c.spikes)if(!sp.gone&&pbHits(pbRect(sp.x,sp.y,sp.s),gr))sp.gone=c.t;}kick(c.pr?.18:.28);ring(g.x,g.y,10,90,'#ff7a2a',.5,6);burst(g.x,g.y,'#ffb347',18,220);
+         for(let i=0;i<10;i++)sp('rock','ground',g.x+rnd(-20,20),g.y,{vx:rnd(-120,120),vy:-rnd(120,260),life:.7,grav:520});
+         if(!c.ghost){const hitList=g.e&&!g.e.dead?[g.e]:enemies().filter(e=>Math.hypot(e.x-g.x,e.y-g.y)<40+(e.r||10));
+           for(const e of hitList){applyHit(c,e,baseDmg(c,c.fx.giantMult||3),{knock:0},0.01,0);pbStun(e,c.fx.stun||5);pbBurn(e);}}}}
+     // Primal: the standing wall swallows enemy projectiles
+     if(c.pr&&!c.ghost&&c.t<c.life){const P=B()?.projectiles;if(P&&typeof P.all==='function')for(const q of P.all().slice()){if(!q||q.friendly)continue;
+       if(Math.hypot(q.x-c.x,(q.y-c.y)/.85)<c.R+14){try{P.remove(q);}catch(e){}burst(q.x,q.y,'#ffb347',6,110);c.cuts.push({x:q.x,y:q.y,t:0});}}}
+     for(const q of c.cuts)q.t+=dt;c.cuts=c.cuts.filter(q=>q.t<.3);
+     // Groudon may walk on after casting: any spike he would stand in sinks back into the ground
+     {const body=pbBody(c.player,6);for(const sp of c.spikes)if(!sp.gone&&pbHits(pbRect(sp.x,sp.y,sp.s),body))sp.gone=c.t;
+      for(const g of c.giants)if(g.placed&&!g.gone&&pbHits(pbRect(g.x,g.y,c.pr?3.6:3.2),body))g.gone=c.t;}
+     return c.t<c.life+.3||c.giants.some(g=>g.t<1.7);},
+   draw(c,ctx,v){const k=v.k,px=1.05*k,img=spikeImg.complete&&spikeImg.naturalWidth?spikeImg:null,waveR=c.R*Math.min(1,c.t/c.wave);ctx.imageSmoothingEnabled=false;
+     // glowing magma front of the eruption
+     if(c.t<c.wave+.25){const f=c.t<c.wave?1:1-(c.t-c.wave)/.25;ctx.save();ctx.globalCompositeOperation='lighter';ctx.strokeStyle=rgba('#ff8a3d',.7*f);ctx.lineWidth=8*k;
+       ctx.beginPath();ctx.ellipse(v.sx(c.x),v.sy(c.y),waveR*k,waveR*.85*k,0,0,TAU);ctx.stroke();ctx.restore();}
+     if(!img)return;
+     const draw=(x,y,vv,s,f,glowA)=>{const w=32*px*s,h=56*px*s,X=v.sx(x),Y=v.sy(y)+3*px*s;
+       ctx.globalAlpha=.85;ctx.drawImage(img,vv*32,56,32,16,X-w/2,Y-16*px*s/2,w,16*px*s);ctx.globalAlpha=1;
+       ctx.drawImage(img,vv*32,0,32,56*f,X-w/2,Y-h*f,w,h*f);
+       if(glowA>0){ctx.save();ctx.globalCompositeOperation='lighter';glow(ctx,X,Y-h*f*.45,w*.9,rgba('#ff9a3d',glowA),rgba('#ff5a1a',0));ctx.restore();}};
+     // spikes and giants are drawn back-to-front together so nothing pokes through what stands in front of it
+     const list=[];for(const sp of c.spikes)list.push(sp);for(const g of c.giants)if(g.placed)list.push(g);list.sort((a,b)=>a.y-b.y);
+     for(const s of list){
+       if(s.giant){const g=s;let f=g.t<.1?g.t/.1:(g.t>1.35?Math.max(0,1-(g.t-1.35)/.3):1);if(g.gone)f=Math.min(f,Math.max(0,1-(c.t-g.gone)/.15));if(f>0)draw(g.x,g.y,g.v,c.pr?3.6:3.2,f,g.t<.35?.9*(1-g.t/.35):.15);continue;}
+       const u=c.t-s.d;if(u<0)continue;const end=s.outer&&c.pr?c.life:c.life-.25;
+       let f=u<.12?u/.12:(c.t>end?Math.max(0,1-(c.t-end)/.25):1);if(s.gone)f=Math.min(f,Math.max(0,1-(c.t-s.gone)/.15));if(f<=0)continue;draw(s.x,s.y,s.v,s.s,f,u<.2?.5*(1-u/.2):0);}
+     for(const g of c.giants){const X=v.sx(g.x),Y=v.sy(g.y);
+       if(g.t<0){const q=1+g.t/.4;ctx.save();ctx.globalCompositeOperation='lighter';ctx.fillStyle=rgba('#ff6a1a',.25+.35*Math.max(0,q));ctx.beginPath();ctx.ellipse(X,Y,34*k,15*k,0,0,TAU);ctx.fill();
+         ctx.strokeStyle=rgba('#ffd27a',.8);ctx.lineWidth=2*k;ctx.beginPath();ctx.ellipse(X,Y,34*k*(1.4-.4*Math.max(0,q)),15*k*(1.4-.4*Math.max(0,q)),0,0,TAU);ctx.stroke();ctx.restore();}}
+     for(const q of c.cuts){ctx.save();ctx.globalCompositeOperation='lighter';glow(ctx,v.sx(q.x),v.sy(q.y),16*k*(1-q.t/.3),rgba('#ffe0a0',.9),rgba('#ff7a2a',0));ctx.restore();}
+   }};
+
  // ---------------------------------------------------------------- manager
  window.PS_FX={
    styles:S,
@@ -632,8 +782,8 @@
    cast(name,player,move,hit,ghost){const st=S[name];if(!st)return false;
      const c={style:st,player,move,hit:hit||window.__psHit||((pl,e,dmg,col,kx,ky,kn)=>e.hurt(dmg,col,kx,ky,kn)),ghost:!!ghost,fx:Object.assign({},move.fx||{}),t:0};
      try{const r=st.cast(c);if(r)live.push(r);}catch(e){console.warn('fx cast',name,e);}return true;},
-   active(){if(live.length||shinySp.length)return true;const p=B()?.game?.player;if(shinyOf(p))return true;for(const e of enemies())if(e.shiny===true)return true;return false;},
-   update(dt){for(let i=live.length-1;i>=0;i--){let keep=false;try{keep=live[i].style.update(live[i],dt);}catch(e){console.warn('fx update',e);}if(!keep)live.splice(i,1);}},
+   active(){if(live.length||shinySp.length||opSlowed.size)return true;const p=B()?.game?.player;if(shinyOf(p))return true;for(const e of enemies())if(e.shiny===true)return true;return false;},
+   update(dt){opSlowTick(dt);for(let i=live.length-1;i>=0;i--){let keep=false;try{keep=live[i].style.update(live[i],dt);}catch(e){console.warn('fx update',e);}if(!keep)live.splice(i,1);}},
    draw(ctx,view){try{ctx.save();drawShiny(ctx,view);ctx.restore();}catch(e){}for(const c of live){try{ctx.save();c.style.draw(c,ctx,view);ctx.restore();}catch(e){console.warn('fx draw',e);}}},
    clear(){live.length=0;}
  };

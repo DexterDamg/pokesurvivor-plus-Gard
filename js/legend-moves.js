@@ -51,8 +51,20 @@
   379:[beam('flash-cannon-l','Flash Cannon','steel','A blinding beam of steel light.',C.steel,null,{dmg:14})],
   380:[orbs('mist-ball-l','Mist Ball','psychic','Glowing mist orbs home in on foes.',C.psy,{count:6})],
   381:[beam('luster-purge-l','Luster Purge','psychic','A brilliant beam of light.',['#ffffff','#a8d0ff','#3c6cff'],null,{dmg:14})],
-  382:[geyser('water-spout','Water Spout','water','Towering water spouts burst up under foes.',C.water,{count:6,fx:{shape:'drop',pal:'water'}})],
-  383:[spikes('earth-power-l','Earth Power','ground','The ground erupts in rings of molten stone.',null,{dmg:34})],
+  382:[geyser('water-spout','Water Spout','water','Towering water spouts burst up under foes.',C.water,{count:6,fx:{shape:'drop',pal:'water'}}),
+   // Origin Pulse: count = orbs, pierce = extra foes each beam chains to (the game adds both on upgrade, multiplies dmg).
+   // Evolves into Origin Pulse (Primal) once Kyogre is in its Primal form (see js/mega-native.js).
+   M('thunderbolt','origin-pulse-k','Origin Pulse','water','originpulse','Glowing blue orbs circle Kyogre, hunt the nearest foes and fire beams that chain between them. When they fade they burst into bubbles that damage and slow foes by 25%.',
+     {dmg:11,count:2,pierce:2,radius:320,cd:4.2,maxLvl:6,evoText:'14 orbs, chain up to 20 foes, x1.5 damage, and instantly annihilates any foe below 5% HP',
+      ups:[{t:'+1 orb',m:{count:1}},{t:'Chain up to 4 foes',m:{pierce:2}},{t:'+50% damage, +1 chain',m:{dmg:1.5,pierce:1}},{t:'+1 orb, +1 chain',m:{count:1,pierce:1}},{t:'+50% damage, +2 chain',m:{dmg:1.5,pierce:2}}]},
+     {colors:['#ffffff','#7fd8ff','#2a8cff'],life:3.6,blast:80,slowDur:2.5})],
+  383:[spikes('earth-power-l','Earth Power','ground','The ground erupts in rings of molten stone.',null,{dmg:34}),
+   // Precipice Blades: radius = spike wall size, count = Giant Spikes (the game multiplies radius/dmg and adds count on upgrade).
+   // Evolves into Precipice Blades (Primal) once Groudon is in its Primal form (see js/mega-native.js).
+   M('dark-pulse','precipice-blades-g','Precipice Blades','ground','precipice','A full wall of volcanic rock spikes erupts around Groudon, impaling every foe it reaches. The strongest foe is impaled by a GIANT spike and stunned for 5 s. Everything hit burns for 10 s.',
+     {dmg:30,count:1,radius:130,cd:3.2,maxLvl:6,evoText:'10 Giant Spikes, and the spike wall stands longer and destroys enemy projectiles',
+      ups:[{t:'Bigger spike wall',m:{radius:1.3}},{t:'+50% damage, +25% range',m:{dmg:1.5,radius:1.25}},{t:'+1 Giant Spike (2nd strongest foe)',m:{count:1}},{t:'Even bigger spike wall',m:{radius:1.35}},{t:'+1 Giant Spike',m:{count:1}}]},
+     {giantMult:3,stun:5,wallLife:3})],
   384:[comet('dragon-ascent-l','Dragon Ascent','flying','Rayquaza plummets from the sky like a green meteor.',['#ffffff','#9affc0','#1e8c4e'],{dmg:80,fx:{shape:'fire',pal:'grass',big:true}})],
   385:[lances('doom-desire','Doom Desire','steel','Wishing stars rain down after a short delay.',C.gold,'star',{count:7,fx:{delay:0.6}})],
   386:[comet('psycho-boost','Psycho Boost','psychic','A violent psychic comet crashes down.',C.psy,{dmg:80,fx:{shape:'ball',pal:'psychic',big:true}})],

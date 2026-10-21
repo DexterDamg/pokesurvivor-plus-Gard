@@ -60,6 +60,8 @@
     'vs-giratina':      { title: 'Battle! Giratina',            file: 'assets/music/legend-giratina.mp3' },
     'vs-lugia':         { title: 'Battle! Lugia',               file: 'assets/music/legend-lugia.mp3' },
     'vs-deoxys':        { title: 'Battle! Deoxys',              file: 'assets/music/legend-deoxys.mp3' },
+    'primal-kyogre':    { title: 'Battle! Super-Ancient Pokémon (ORAS)', file: 'assets/music/primal-oras.mp3' },
+    'primal-groudon':   { title: 'Battle! Super-Ancient Pokémon (ORAS)', file: 'assets/music/primal-oras.mp3' },
     'vs-regi':          { title: 'Battle! Regi Trio',           file: 'assets/music/legend-regi.mp3' },
     'vs-forces':        { title: 'Battle! Tornadus / Thundurus / Landorus', file: 'assets/music/legend-forces.mp3' },
     'vs-lati':          { title: 'Battle! Latias / Latios (Z-A)', file: 'assets/music/legend-lati.mp3' },
@@ -97,6 +99,8 @@
                377:'vs-regi', 378:'vs-regi', 379:'vs-regi', 486:'vs-cresselia', 894:'vs-regi', 895:'vs-regi' },
     // any other legendary / Dynamax raid / den boss without its own theme gets one of these (picked once per Pokémon)
     legendDefault: ['boss-red-lgpe', 'boss-gym-oras'],
+    // Primal Reversion: the moment Kyogre / Groudon goes Primal, its ORAS theme cuts in and replaces the battle music for the run
+    primal:  { '382-primal':'primal-kyogre', '383-primal':'primal-groudon' },
   };
 
   // ------------------------------------------------------------------------------------------
@@ -145,7 +149,13 @@
     if (window.PS_SAFEZONE && window.PS_SAFEZONE.active) return 'safezone';   // Safe Zones play the town music (the run's timer is kept)
     const lg = legendSong(); if (lg) return 'legend:' + lg;
     if (gameTrack && RULES.special && RULES.special[gameTrack]) return 'special:' + gameTrack;
+    const pr = primalSong(); if (pr) return 'primal:' + pr;
     return 'battle';
+  }
+  const primalFailed = new Set();
+  function primalSong() {     // Primal Kyogre / Groudon with its own theme (and the file loads)?
+    const f = String(B()?.game?.player?.megaForm || ''), id = RULES.primal && RULES.primal[f];
+    return id && TRACKS[id] && !primalFailed.has(id) ? id : null;
   }
   function legendSong() {   // a legendary with its own theme on the field?
     const E = B()?.enemies, p = B()?.game?.player; if (!E || !RULES.legends || typeof E.all !== 'function') return null;
@@ -156,8 +166,8 @@
   }
   const isMega = () => { const p = B()?.game?.player; return !!(p && p.megaForm && !/primal/.test(String(p.megaForm))); };   // Mega only, never Primal
   const menuish = c => c === 'menu' || c === 'safezone';
-  const rule = ctx => ctx === 'menu' ? RULES.menu : ctx === 'safezone' ? (RULES.safezone || RULES.menu) : ctx === 'mega' ? RULES.mega : ctx.startsWith('lowhp:') ? lowRules()[Number(ctx.slice(6))] : ctx.startsWith('event:') ? (RULES.events || {})[ctx.slice(6)] : ctx === 'battle' ? battleRule() : ctx.startsWith('legend:') ? { songs: [ctx.slice(7)] } : (RULES.special || {})[ctx.slice(8)];
-  const loops = ctx => ctx.startsWith('special:') || ctx.startsWith('legend:');
+  const rule = ctx => ctx === 'menu' ? RULES.menu : ctx === 'safezone' ? (RULES.safezone || RULES.menu) : ctx === 'mega' ? RULES.mega : ctx.startsWith('lowhp:') ? lowRules()[Number(ctx.slice(6))] : ctx.startsWith('event:') ? (RULES.events || {})[ctx.slice(6)] : ctx === 'battle' ? battleRule() : ctx.startsWith('legend:') ? { songs: [ctx.slice(7)] } : ctx.startsWith('primal:') ? { songs: [ctx.slice(7)] } : (RULES.special || {})[ctx.slice(8)];
+  const loops = ctx => ctx.startsWith('special:') || ctx.startsWith('legend:') || ctx.startsWith('primal:');
   const lowRules = () => (Array.isArray(RULES.lowhp) ? RULES.lowhp : RULES.lowhp ? [RULES.lowhp] : []).slice().sort((a, b) => (a.below ?? 0.2) - (b.below ?? 0.2));
   let runTime = 0, runLast = 0;   // seconds of actual play this run (for RULES.late)
   function battleRule() { const r = RULES.battle; if (!r) return null; { const md = window.PS_MODES && window.PS_MODES.run && window.PS_MODES.run.mode; if ((md === 'bossrush' || md === 'legend') && (r.late || []).length) return { songs: r.late }; } return { songs: runTime >= (r.after ?? 900) ? (r.late || []) : runTime >= (r.midAt ?? 480) && (r.mid || []).length ? r.mid : (r.early || []) }; }   // special moments loop; menu shuffles; battle + Mega play once
@@ -167,7 +177,7 @@
   const V = () => Math.max(0, Math.min(1, S.volume * BG_MIX));
   const audio = new Audio(); audio.preload = 'auto'; audio.volume = V();
   let cur = null;               // { id, ctx }  the song playing now
-  let unlocked = false, nextRoll = 0, lastCtx = null, wasMega = false, wasLow = 99, fadeT = null;
+  let unlocked = false, nextRoll = 0, lastCtx = null, wasPrimal = null, wasMega = false, wasLow = 99, fadeT = null;
   function start(id, ctx) {
     const t = TRACKS[id]; if (!t) return false;
     clearInterval(fadeT); fadeT = null; cur = { id, ctx };
@@ -202,7 +212,7 @@
     const id = S.on && unlocked ? chooseNext(ctx, done && done.id) : null;
     if (!(id && start(id, ctx))) hush();
   });
-  audio.addEventListener('error', () => { console.warn('[Music] could not load', cur && TRACKS[cur.id]?.file); hush(); });
+  audio.addEventListener('error', () => { console.warn('[Music] could not load', cur && TRACKS[cur.id]?.file); if (cur && /^primal-/.test(cur.id)) primalFailed.add(cur.id); hush(); });
 
   function tick() {
     watchGame();
@@ -211,6 +221,7 @@
     if (S.on) quietGame();
     const ctx = context(), mega = isMega();
     const megaNow = mega && !wasMega; wasMega = mega;
+    const primalId = primalSong(), primalNow = !!primalId && primalId !== wasPrimal; wasPrimal = primalId;
     { const st = B()?.game?.state, t = now(); if (ctx === 'menu') runTime = 0; else if (st === 'playing' && runLast) runTime += Math.min(1, (t - runLast) / 1000); runLast = t; }
     const leftOrEnteredMenu = lastCtx != null && ctx !== lastCtx && (menuish(ctx) || menuish(lastCtx));
     if (ctx !== lastCtx) { if (ctx === 'battle' && (lastCtx === 'menu' || lastCtx == null)) nextRoll = RULES.battle?.random?.first ? now() : now() + (RULES.battle?.random?.every ?? 150) * 1000; }
@@ -222,6 +233,10 @@
     if (megaNow) {
       const id = pick(RULES.mega && RULES.mega.songs);
       if (id) { if (cur && cur.id === id) { cur.ctx = 'mega'; audio.loop = false; } else cut(() => start(id, 'mega')); render(); return; }
+    }
+    // 1-) Primal Reversion: its ORAS theme cuts in right away (a legendary / Rift / Judgment theme finishes first)
+    if (primalNow && ctx.startsWith('primal:')) {
+      if (cur && cur.id === primalId) { cur.ctx = ctx; audio.loop = loops(ctx); } else cut(() => start(primalId, ctx)); render(); return;
     }
     // 1a) low HP: the low-HP song cuts in (not over the Mega song or a legendary theme)
     { const p = B()?.game?.player, L = lowRules(), hp = p && p.maxHp > 0 ? p.hp / p.maxHp : 1;

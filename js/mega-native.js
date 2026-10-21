@@ -129,11 +129,39 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      }
      if(!m.BY_ID[def.id]){m.ALL.push(def);m.BY_ID[def.id]=def;}
    }
+   hookOriginEvo(m);
    return true;
+ }
+ // Primal evolutions: Kyogre's Origin Pulse and Groudon's Precipice Blades (js/legend-moves.js) evolve at max level,
+ // but only while the Pokemon is in its Primal form (instead of needing a passive like the game's evolutions).
+ const ORIGIN_K='origin-pulse-k',PRECIPICE_G='precipice-blades-g';
+ const PRIMAL_EVOS={
+   [ORIGIN_K]:{form:'382-primal',name:'Origin Pulse (Primal)',needName:'Primal Kyogre',
+     apply(inst){inst.count=Math.max(Number(inst.count)||0,14);inst.pierce=Math.max(Number(inst.pierce)||0,20);inst.dmg=(Number(inst.dmg)||0)*1.5;inst.primalPulse=true;}},
+   [PRECIPICE_G]:{form:'383-primal',name:'Precipice Blades (Primal)',needName:'Primal Groudon',
+     apply(inst){inst.count=Math.max(Number(inst.count)||0,10);inst.primalBlades=true;}}
+ };
+ let primalEvoHooked=false;
+ function hookOriginEvo(m){
+   if(primalEvoHooked||typeof m.evoInfo!=='function'||typeof m.evolve!=='function')return;primalEvoHooked=true;
+   const info=m.evoInfo,evolve=m.evolve;
+   m.evoInfo=function(inst){
+     const pe=inst&&PRIMAL_EVOS[inst.id];if(!pe)return info.apply(this,arguments);
+     if(inst.evolved||inst.lvl<(inst.def?.maxLvl||1))return null;
+     return {name:pe.name,needs:'primal',needName:pe.needName,text:inst.def?.evoText||'',ready:getPlayer()?.megaForm===pe.form};
+   };
+   m.evolve=function(inst){
+     const pe=inst&&PRIMAL_EVOS[inst.id];if(!pe)return evolve.apply(this,arguments);
+     if(inst.evolved)return false;
+     pe.apply(inst);inst.baseName=inst.name;inst.name=pe.name;inst.evolved=true;
+     return true;
+   };
  }
  function grantSignature(p,form){
    const def=SIGNATURE_MOVES[form];
    if(!def||!registerSignatureMoves()||typeof p.addMove!=='function')return null;
+   // A Kyogre / Groudon that already knows Origin Pulse / Precipice Blades evolves it into the Primal version instead of getting a second copy.
+   if(typeof p.hasMove==='function'&&Object.entries(PRIMAL_EVOS).some(([id,pe])=>pe.form===form&&p.hasMove(id)))return null;
    if(typeof p.hasMove==='function'&&p.hasMove(def.id))return null;
    const previousMax=Number(p.maxMoves)||4;
    // Bonus slot: the signature move never uses up one of your normal move slots,
@@ -429,7 +457,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    requestAnimationFrame(drawPrimalDomain);
    const p=getPlayer();
    const playing=getBridge()?.game?.state==='playing';
-   const on=activePrimal&&p===activePrimal.player&&playing;
+   const on=activePrimal&&p===activePrimal.player&&playing&&!(p.megaForm==='382-primal'&&window.PS_PRIMAL_KYOGRE)&&!(p.megaForm==='383-primal'&&window.PS_PRIMAL_GROUDON);
    // Custom move effects (Precipice Blades, Blackhole...) draw on this overlay too, Primal or not.
    const fxActive=playing&&(eruptions.length||spikes.length||debris.length||holes.length||(window.PS_FX&&window.PS_FX.active()));
    if(!on){fx.drops.length=fx.ripples.length=fx.motes.length=0;}
@@ -1028,7 +1056,11 @@ function start(){
    // never exceed the game's max HP cap (1000 outside Area Zero)
    {const cap=Number(p.constructor&&p.constructor.HP_CAP);if(cap>0&&p.maxHp>cap){p.maxHp=cap;p.hp=Math.min(p.hp,cap);}}
    p.megaForm=f.key;used=true;rewardPending=false;stoneOwned=false;
-   if(WEATHER[f.key])startPrimalWeather(p,WEATHER[f.key]);
+   if(WEATHER[f.key]){
+     startPrimalWeather(p,WEATHER[f.key]);
+     if(f.key==='382-primal'&&window.PS_PRIMAL_KYOGRE)window.PS_PRIMAL_KYOGRE.begin(p,baseline.anim,p.anim);
+     if(f.key==='383-primal'&&window.PS_PRIMAL_GROUDON)window.PS_PRIMAL_GROUDON.begin(p,baseline.anim,p.anim);
+   }
    else if(window.PS_FX&&window.PS_FX.has('megaevo')){ // Mega Evolution cutscene: orb -> shatter -> Mega symbol (the new sprite appears when the orb breaks)
      try{const newAnim=p.anim;if(newAnim!==baseline.anim){p.anim=baseline.anim;}p.invuln=Math.max(Number(p.invuln)||0,1.4);
        const cry=MEGA_CRIES[String(Number(p.dex))]||null;
