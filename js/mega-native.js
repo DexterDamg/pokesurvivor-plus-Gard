@@ -584,6 +584,21 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(tr.charge)e.push('every '+tr.charge.secs+'s the next hit deals '+X(tr.charge.mult)+(tr.charge.stun?' and stuns':''));
    return tr.name+': '+(c.length?c.join(', ')+' → ':'')+e.join(', ');
  }
+ // ---- QUEEN'S GAZE: a private passive for the LoverGare account's Pheromosa only.
+ //      Nobody else's game ever applies or shows it.
+ const QUEEN={user:'lovergare',dex:795,spd:1.25,perKill:0.0001,killCap:1000,regen:20,
+   summonEvery:12,summonCount:2,maxAllies:6,allyLife:15,
+   allies:[{dex:10,shot:'pin-missile',slow:0.35},{dex:13,shot:'poison-sting',poison:1},{dex:265,shot:'poison-sting',poison:1},
+           {dex:540,shot:'pin-missile'},{dex:664,shot:'pin-missile',slow:0.25},{dex:736,shot:'pin-missile'}]};
+ function queenOn(p){const b=getBridge();return !!(p&&b&&String(b.user||'').trim().toLowerCase()===QUEEN.user&&Number(p.dex)===QUEEN.dex&&!p.megaForm);}
+ function queenKills(p){let k=0;try{k=typeof p.myKills==='function'?Number(p.myKills())||0:0;}catch(e){}return Math.min(QUEEN.killCap,k);}
+ function queenTick(p,dt,now){
+   if(p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+QUEEN.regen*dt);
+   if(!window.PS_FX)return;if(!p.__qAt)p.__qAt=now-(QUEEN.summonEvery-3)*1000;
+   if(now-p.__qAt>=QUEEN.summonEvery*1000){p.__qAt=now;const alive=window.PS_FX.count?window.PS_FX.count('minion'):0;
+     for(let i=0;i<Math.min(QUEEN.summonCount,QUEEN.maxAllies-alive);i++){const a=QUEEN.allies[(Math.random()*QUEEN.allies.length)|0];
+       window.PS_FX.cast('minion',p,{id:'pin-missile',type:'bug',dmg:9,knock:20,fx:Object.assign({life:QUEEN.allyLife,colors:['#ffffff','#c8ff9a','#5fcb6a']},a)},null,false);}}
+ }
  // Beast Boost (Ultra Beasts): each KO stacks a boost to one stat for a few seconds
  function bbMult(p,stat){const P=passiveFor(p),A=P&&P.ability,bb=A&&A.beastBoost;if(!bb||bb.stat!==stat||!p.__bb||performance.now()>p.__bb.until||p.__bb.ab!==P.abilityId)return 1;
    const n=p.__bb.n;return stat==='take'?Math.max(0.5,1-n*bb.per):1+n*bb.per;}
@@ -592,7 +607,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(bb.stat==='heal'){p.hp=Math.min(p.maxHp,p.hp+p.maxHp*bb.per*Math.min(nk,5));return;}
    const act=p.__bb&&p.__bb.ab===abId&&now<p.__bb.until?p.__bb.n:0;p.__bb={ab:abId,n:Math.min(bb.max||15,act+nk),until:now+(bb.dur||8)*1000};}
  window.PS_HOOKS={
-   spd(pl){const p=getPlayer();if(!p||pl!==p)return 1;let m=bbMult(p,'spd');const TR=traitsFor(p);if(!TR)return m;for(const tr of TR)if(tr.spd&&condOK(tr.when,p,null))m*=tr.spd;return m;},
+   spd(pl){const p=getPlayer();if(!p||pl!==p)return 1;let m=bbMult(p,'spd')*(queenOn(p)?QUEEN.spd:1);const TR=traitsFor(p);if(!TR)return m;for(const tr of TR)if(tr.spd&&condOK(tr.when,p,null))m*=tr.spd;return m;},
    deal(type,target,src){
      const p=getPlayer(),P=passiveFor(p);if(!P)return 1;
      let m=1;const D=P.deal||{};
@@ -627,6 +642,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
        }
      }
      m*=traitDeal(p,target);
+     if(queenOn(p))m*=1+queenKills(p)*QUEEN.perKill;
      return m;
    },
    take(type,pl,dmg){
@@ -688,6 +704,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    p.weatherImmune=!!(A&&A.weatherImmune);   // engine: no weather chip damage
    if(b.game.state!=='playing'||p.dead)return;
    traitTick(p,dt,now);
+   if(queenOn(p))queenTick(p,dt,now);
    if(!A)return;
    if(A.regen&&p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+p.maxHp*A.regen*dt);
    if(A.beastBoost)bbTick(p,A,P.abilityId,now);
@@ -758,6 +775,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const UB=(window.PS_ULTRA_BEASTS||[]).includes(Number(p.dex));
    const lines=P.src==='legend'?passiveLines(UB?'Ultra Beast ability':'Legendary ability',P.abilityId,P.types,P.deal,true):[describeDamage(P.types,{},true)];
    if(P.src==='legend'&&TRAITS[Number(p.dex)])for(const t of TRAITS[Number(p.dex)])lines.push('Trait \u2013 '+describeTrait(t));
+   if(queenOn(p))lines.push('\u{1F451} Queen\'s Gaze (only you can see this): Speed \u00d71.25 \u00b7 +0.01% damage per KO (now +'+(queenKills(p)*QUEEN.perKill*100).toFixed(2)+'%, max +10% at 1000) \u00b7 heals 20 HP/s \u00b7 summons bug Pok\u00e9mon to fight for her');
    if(P.src==='legend'&&window.PS_LEGEND_MOVES&&window.PS_LEGEND_MOVES[Number(p.dex)])lines.push('Signature move (from level-up rewards): '+window.PS_LEGEND_MOVES[Number(p.dex)].map(m=>m.name).join(', '));
    return '\n\n'+lines.filter(Boolean).join('\n');
  }

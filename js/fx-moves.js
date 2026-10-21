@@ -75,6 +75,14 @@
    ctx.beginPath();ctx.moveTo(L*0.22,-W/2);ctx.quadraticCurveTo(L*0.5,0,L*0.22,W/2);ctx.fill();ctx.fillStyle='#3cb84a';ctx.fillRect(-L*0.1,-W/2,L*0.08,W);ctx.restore();}
  function drawBlock(ctx,x,y,w,h,shade){ctx.fillStyle=shade||'#8e8a84';ctx.fillRect(x-w/2,y-h,w,h);ctx.fillStyle='rgba(255,255,255,0.28)';ctx.fillRect(x-w/2,y-h,w,h*0.22);ctx.fillStyle='rgba(0,0,0,0.25)';ctx.fillRect(x+w*0.3,y-h,w*0.2,h);
    ctx.strokeStyle='#3a3632';ctx.lineWidth=2;ctx.strokeRect(x-w/2,y-h,w,h);ctx.fillStyle='#ff3c3c';ctx.beginPath();ctx.arc(x-w*0.1,y-h*0.55,Math.max(1.5,w*0.08),0,TAU);ctx.fill();}
+ // draw a real Pokemon sprite frame on the overlay (used for afterimages and summoned allies)
+ const pokeImgs={};
+ function pokeSprite(ctx,dex,anim,ang,t,X,Y,scale,alpha,comp){const M=B()?.spriteMeta?.[String(dex)],a=M&&M.a&&(M.a[anim]||M.a.Idle);if(!a)return false;
+   const key=dex+'/'+(M.a[anim]?anim:'Idle');let img=pokeImgs[key];if(!img){img=new Image();img.src='assets/pokemon/'+key+'.png';pokeImgs[key]=img;}if(!img.complete||!img.naturalWidth)return false;
+   const n=a.n||1,dur=(a.d||[]).reduce((x,y)=>x+y,0)||n*4;let tick=Math.floor(t*60)%dur,f=0;if(a.d){for(let i=0;i<n;i++){tick-=a.d[i];if(tick<0){f=i;break;}}}else f=Math.floor(t*8)%n;
+   const dir=B()?.sprites?.dirFromAngle?B().sprites.dirFromAngle(ang):0,row=Math.min((a.r||1)-1,dir),k=scale;
+   ctx.save();ctx.imageSmoothingEnabled=false;ctx.globalAlpha=alpha==null?1:alpha;if(comp)ctx.globalCompositeOperation=comp;
+   ctx.drawImage(img,f*a.w,row*a.h,a.w,a.h,X-a.ax*k,Y-a.ay*k,a.w*k,a.h*k);ctx.restore();return true;}
  const spikeImg=new Image();spikeImg.src='assets/fx/precipice-spikes.png?v=1';
  const S={};
 
@@ -328,9 +336,79 @@
        if(c.fx.vshape){ctx.strokeStyle=rgba(col[1],0.95);ctx.lineWidth=8*(1-u)+2;const bx=v.sx(c.bx),by=v.sy(c.by);ctx.beginPath();ctx.moveTo(bx-R,by-R);ctx.lineTo(bx,by+R*0.3);ctx.lineTo(bx+R,by-R);ctx.stroke();}}
      ctx.restore();}};
 
+ // ---------------------------------------------------------------- HIGH JUMP KICK (Pheromosa leaps at a foe, kicks down, shockwave + aftershock)
+ S.hjk={cast(c){const p=c.player,R=(c.move.radius||340);const t=densest(p,R+60)||nearest(p.x,p.y,R+80);if(!t)return null;
+     const a=Math.atan2(t.y-p.y,t.x-p.x),D=Math.min(Math.hypot(t.x-p.x,t.y-p.y),R),L=wallClip(p.x,p.y,a,D);
+     c.ax=p.x;c.ay=p.y;c.bx=p.x+Math.cos(a)*L;c.by=p.y+Math.sin(a)*L;c.ang=a;c.dur=c.fx.leap||0.26;c.skip=new Set();c.R=c.fx.burst||135;c.ghosts=[];c.cracks=[];
+     c.dex=Number(p.dex)||795;c.sc=(Number(p.anim?.scale)||1)*2;try{p.invuln=Math.max(Number(p.invuln)||0,c.dur+0.15);}catch(e){}
+     for(let i=0;i<9;i++){const ca=i/9*TAU+rnd(-0.2,0.2),pts=[[0,0]];let r=0;for(let j=0;j<4;j++){r+=rnd(0.18,0.32);pts.push([Math.cos(ca+rnd(-0.25,0.25))*r,Math.sin(ca+rnd(-0.25,0.25))*r]);}c.cracks.push(pts);}
+     return c;},
+   update(c,dt){c.t+=dt;const p=c.player,q=Math.min(1,c.t/c.dur),e=q<1?1-Math.pow(1-q,2):1;
+     if(q<1||!c.land){const x=c.ax+(c.bx-c.ax)*e,y=c.ay+(c.by-c.ay)*e;if(!c.land){p.x=x;p.y=y;}
+       if(c.ghosts.length<8&&c.t>c.ghosts.length*c.dur/7)c.ghosts.push({x,y,q,t:c.t});
+       hitLine(c,c.ax,c.ay,x,y,46,{skip:c.skip,knock:60,mult:0.45});}
+     if(q>=1&&!c.land){c.land=c.t;p.x=c.bx;p.y=c.by;
+       hitCircle(c,c.bx,c.by,c.R,{mult:c.fx.burstMult||1.6,knock:230});kick(0.22);
+       ring(c.bx,c.by,10,c.R*1.15,'#ffffff',0.45,7);ring(c.bx,c.by,6,c.R*0.8,typeColor(c),0.35,4);burst(c.bx,c.by-8,typeColor(c),24,260);
+       try{FX().slash(c.bx,c.by-30,c.ang+Math.PI/2,c.R*0.75,2.2,'#ffffff',{pal:'fighting'});}catch(err){}
+       for(let j=0;j<10;j++)sp(j%3?'rock':'impact',j%3?'ground':'fighting',c.bx,c.by,{vx:rnd(-200,200),vy:-rnd(80,260),life:0.7,grav:520});}
+     if(c.land&&!c.after&&c.t-c.land>0.28){c.after=1;hitCircle(c,c.bx,c.by,c.R*1.5,{mult:0.7,knock:140,slow:0.5,slowDur:1.6,stun:c.fx.stun});ring(c.bx,c.by,c.R*0.6,c.R*1.6,typeColor(c),0.5,5);kick(0.1);}
+     return !c.land||c.t-c.land<0.95;},
+   draw(c,ctx,v){const col=c.fx.colors||['#ffffff','#fff1c8','#ff9ad8'],k=v.k;
+     // leap: a glowing arc + Pheromosa afterimages up in the air
+     const fadeL=c.land?Math.max(0,1-(c.t-c.land)/0.35):1;
+     if(fadeL>0){ctx.save();ctx.globalAlpha=fadeL;ctx.globalCompositeOperation='lighter';ctx.lineCap='round';
+       const AX=v.sx(c.ax),AY=v.sy(c.ay)-30*k,BX=v.sx(c.bx),BY=v.sy(c.by)-30*k,CX=(AX+BX)/2,CY=Math.min(AY,BY)-110*k;
+       const q=Math.min(1,c.t/c.dur);ctx.strokeStyle=rgba(col[2],0.45);ctx.lineWidth=22*k;ctx.beginPath();ctx.moveTo(AX,AY);
+       for(let i=1;i<=20;i++){const u=i/20*q,x=(1-u)*(1-u)*AX+2*u*(1-u)*CX+u*u*BX,y=(1-u)*(1-u)*AY+2*u*(1-u)*CY+u*u*BY;ctx.lineTo(x,y);}ctx.stroke();
+       ctx.strokeStyle=rgba(col[1],0.9);ctx.lineWidth=8*k;ctx.stroke();ctx.strokeStyle='rgba(255,255,255,0.95)';ctx.lineWidth=2.5*k;ctx.stroke();ctx.restore();
+       c.ghosts.forEach((g,i)=>{const u=g.q,gx=(1-u)*(1-u)*AX+2*u*(1-u)*CX+u*u*BX,gy=(1-u)*(1-u)*AY+2*u*(1-u)*CY+u*u*BY+30*k;
+         const al=fadeL*0.55*Math.max(0.2,1-(c.t-g.t)/0.6);
+         if(!pokeSprite(ctx,c.dex,'Attack',c.ang,c.t,gx,gy,c.sc*k,al,'lighter'))glow(ctx,gx,gy-20*k,18*k,rgba(col[1],al),rgba(col[2],0));});}
+     if(!c.land)return;
+     const w=c.t-c.land,X=v.sx(c.bx),Y=v.sy(c.by),R=c.R*k,fade=Math.max(0,1-w/0.95);
+     ctx.save();
+     // crater + cracks in the ground
+     ctx.globalAlpha=fade;ctx.fillStyle='rgba(40,28,20,0.45)';ctx.beginPath();ctx.ellipse(X,Y,R*0.55,R*0.24,0,0,TAU);ctx.fill();
+     ctx.strokeStyle='rgba(30,20,14,0.85)';ctx.lineWidth=Math.max(2,3*k);ctx.lineJoin='round';
+     for(const cr of c.cracks){ctx.beginPath();cr.forEach(([x,y],i)=>{const px=X+x*R*Math.min(1,w*8),py=Y+y*R*0.45*Math.min(1,w*8);i?ctx.lineTo(px,py):ctx.moveTo(px,py);});ctx.stroke();}
+     ctx.globalCompositeOperation='lighter';
+     // impact star flash
+     if(w<0.22){const s2=R*(0.5+w*3),a2=1-w/0.22;ctx.fillStyle='rgba(255,255,255,'+a2+')';ctx.beginPath();for(let i=0;i<16;i++){const r=i%2?s2*0.35:s2,an=i/16*TAU+0.2;ctx.lineTo(X+Math.cos(an)*r,Y-26*k+Math.sin(an)*r*0.7);}ctx.closePath();ctx.fill();
+       ctx.fillStyle=rgba(col[1],a2*0.9);ctx.beginPath();for(let i=0;i<16;i++){const r=i%2?s2*0.2:s2*0.6,an=i/16*TAU;ctx.lineTo(X+Math.cos(an)*r,Y-26*k+Math.sin(an)*r*0.7);}ctx.closePath();ctx.fill();}
+     // shockwave + aftershock
+     const r1=R*Math.min(1.2,0.3+w*4);ctx.strokeStyle=rgba(col[0],0.95*fade);ctx.lineWidth=Math.max(2,10*k*(1-w));ctx.beginPath();ctx.ellipse(X,Y,r1,r1*0.45,0,0,TAU);ctx.stroke();
+     if(w>0.28){const u=(w-0.28)/0.67,r2=R*(0.6+u*1.1);ctx.strokeStyle=rgba(col[2],0.9*(1-u));ctx.lineWidth=Math.max(2,8*k*(1-u));ctx.beginPath();ctx.ellipse(X,Y,r2,r2*0.45,0,0,TAU);ctx.stroke();
+       glow(ctx,X,Y,r2*0.7,rgba(col[1],0.35*(1-u)),rgba(col[2],0));}
+     // dust puffs
+     for(let i=0;i<10;i++){const an=i/10*TAU,dd=R*(0.5+w*1.3);ctx.globalCompositeOperation='source-over';ctx.fillStyle='rgba(220,205,180,'+(0.5*fade)+')';ctx.beginPath();ctx.arc(X+Math.cos(an)*dd,Y+Math.sin(an)*dd*0.42-6*k,(10+w*20)*k,0,TAU);ctx.fill();}
+     ctx.restore();}};
+
+ // ---------------------------------------------------------------- SUMMONED ALLIES (little Pokemon that follow you and shoot)
+ //  move.fx = {dex, life, shot:'poison-sting', rate, poison, slow}
+ S.minion={cast(c){const p=c.player,a=rnd(0,TAU);c.off=a;c.x=p.x+Math.cos(a)*60;c.y=p.y+Math.sin(a)*45;c.life=c.fx.life||15;c.cd=rnd(0.3,0.9);c.face=0;c.walk=0;
+     ring(c.x,c.y,4,40,'#9cff7a',0.35,3);burst(c.x,c.y-10,'#c8ff9a',10,110);return c;},
+   update(c,dt){c.t+=dt;const p=c.player;if(!p||p.dead)return false;const P=B()?.projectiles;
+     const t=nearest(c.x,c.y,420);let gx,gy;
+     if(t&&Math.hypot(t.x-p.x,t.y-p.y)<650){const d=Math.hypot(t.x-c.x,t.y-c.y)||1;c.face=Math.atan2(t.y-c.y,t.x-c.x);const sx2=t.x+Math.cos(c.off)*120,sy2=t.y+Math.sin(c.off)*85;if(Math.hypot(sx2-c.x,sy2-c.y)>14){gx=sx2;gy=sy2;}
+       c.cd-=dt;if(c.cd<=0&&P&&typeof P.spawn==='function'&&!c.ghost){c.cd=c.fx.rate||0.9;const sp2=330,ang=Math.atan2(t.y-(c.y-8),t.x-c.x);
+         try{const mid=c.fx.shot||'poison-sting',md=B()?.moves?.BY_ID?.[mid],vis=VFX()&&md?VFX().forMove(md):null;P.spawn({owner:p,mid,x:c.x,y:c.y-10,vx:Math.cos(ang)*sp2,vy:Math.sin(ang)*sp2,dmg:baseDmg(c),r:6,life:1.3,friendly:true,pierce:0,color:md?(B()?.types?.color?.(md.type)||typeColor(c)):typeColor(c),poison:c.fx.poison||0,slow:c.fx.slow||0,knock:20,hits:new Set(),vis,homing:0});}catch(e){}}}
+     else{gx=p.x+Math.cos(c.off+c.t*0.6)*70;gy=p.y+Math.sin(c.off+c.t*0.6)*50;}
+     c.walk=0;if(gx!=null){const dx=gx-c.x,dy=gy-c.y,d=Math.hypot(dx,dy);if(d>8){const spd=Math.min(d,(c.fx.speed||165))*dt;c.x+=dx/d*spd;c.y+=dy/d*spd;c.walk=1;if(!t)c.face=Math.atan2(dy,dx);}}
+     for(const o of live)if(o!==c&&o.style===S.minion){const dx=c.x-o.x,dy=c.y-o.y,d=Math.hypot(dx,dy);if(d>0.1&&d<34){c.x+=dx/d*(34-d)*0.5;c.y+=dy/d*(34-d)*0.5;}}
+     if(Math.hypot(p.x-c.x,p.y-c.y)>700){c.x=p.x;c.y=p.y;}
+     if(c.t>=c.life&&!c.gone){c.gone=1;burst(c.x,c.y-10,'#e8ffd0',10,110);}
+     return c.t<c.life;},
+   draw(c,ctx,v){const X=v.sx(c.x),Y=v.sy(c.y),k=v.k,al=Math.min(1,c.t/0.3,(c.life-c.t)/0.4);
+     ctx.save();ctx.globalAlpha=0.3*al;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(X,Y,11*k,4.5*k,0,0,TAU);ctx.fill();ctx.restore();
+     if(!pokeSprite(ctx,c.fx.dex||10,c.walk?'Walk':'Idle',c.face,c.t,X,Y,2*(c.fx.scale||1)*k,al))glow(ctx,X,Y-10*k,10*k,'rgba(160,255,120,0.9)','rgba(0,0,0,0)');
+     ctx.save();ctx.globalAlpha=al*(0.6+0.4*Math.sin(c.t*5));ctx.fillStyle='#ff7ad0';const hx=X,hy=Y-34*k,hs=3.2*k;ctx.beginPath();ctx.moveTo(hx,hy+hs);ctx.bezierCurveTo(hx-hs*2,hy-hs*0.5,hx-hs*0.6,hy-hs*2,hx,hy-hs*0.6);ctx.bezierCurveTo(hx+hs*0.6,hy-hs*2,hx+hs*2,hy-hs*0.5,hx,hy+hs);ctx.fill();ctx.restore();}};
+
  // ---------------------------------------------------------------- manager
  window.PS_FX={
    styles:S,
+   sprite:pokeSprite,
+   count(name){return live.filter(c=>c.style===S[name]).length;},
    has(name){return !!S[name];},
    cast(name,player,move,hit,ghost){const st=S[name];if(!st)return false;
      const c={style:st,player,move,hit,ghost:!!ghost,fx:Object.assign({},move.fx||{}),t:0};
