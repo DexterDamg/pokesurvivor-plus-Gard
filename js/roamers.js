@@ -21,9 +21,10 @@
   let runP = null, nextRoll = CFG.every, nextRush = CFG.rushEvery;
 
   // roamer cries (assets/cries/<dex>.mp3), played at the game's sound-effects volume
+  const CRY_VOL = 0.35;   // cries are mastered loud: this scales them down (raise toward 1 for louder)
   function cry(dex, vol) {
-    try { let v = 0.4; try { const A = E().Audio, st = A && A.settings; if (st && st.sfx != null) v = Math.max(0, Math.min(1, Number(st.sfx) > 1 ? Number(st.sfx) / 100 : Number(st.sfx))); } catch (_) {}
-      const a = new Audio('assets/cries/' + dex + '.mp3'); a.volume = Math.min(1, v * (vol || 0.8)); a.play().catch(() => {}); } catch (_) {}
+    try { let v = 0.6; try { const A = E().Audio, st = A && A.settings; if (st && st.sfx != null) v = Math.max(0, Math.min(1, Number(st.sfx) > 1 ? Number(st.sfx) / 100 : Number(st.sfx))); } catch (_) {}
+      const a = new Audio('assets/cries/' + dex + '.mp3'); a.volume = Math.min(1, v * (vol || 0.8) * CRY_VOL); a.play().catch(() => {}); } catch (_) {}
   }
   function template() {   // stats from the boss list entry closest to the current time
     const L = E()?.Enemies?.BOSSES || [], t = clock(); let best = L[0] || {}; for (const b of L) if (Math.abs(b.at - t) < Math.abs((best.at || 0) - t)) best = b; return best;
