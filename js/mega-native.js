@@ -584,8 +584,15 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(tr.charge)e.push('every '+tr.charge.secs+'s the next hit deals '+X(tr.charge.mult)+(tr.charge.stun?' and stuns':''));
    return tr.name+': '+(c.length?c.join(', ')+' → ':'')+e.join(', ');
  }
+ // Beast Boost (Ultra Beasts): each KO stacks a boost to one stat for a few seconds
+ function bbMult(p,stat){const P=passiveFor(p),A=P&&P.ability,bb=A&&A.beastBoost;if(!bb||bb.stat!==stat||!p.__bb||performance.now()>p.__bb.until||p.__bb.ab!==P.abilityId)return 1;
+   const n=p.__bb.n;return stat==='take'?Math.max(0.5,1-n*bb.per):1+n*bb.per;}
+ function bbTick(p,A,abId,now){const bb=A.beastBoost;let k=null;try{k=typeof p.myKills==='function'?p.myKills():null;}catch(e){}
+   if(k==null)return;const nk=p.__bbK!=null&&k>p.__bbK?k-p.__bbK:0;p.__bbK=k;if(!nk)return;
+   if(bb.stat==='heal'){p.hp=Math.min(p.maxHp,p.hp+p.maxHp*bb.per*Math.min(nk,5));return;}
+   const act=p.__bb&&p.__bb.ab===abId&&now<p.__bb.until?p.__bb.n:0;p.__bb={ab:abId,n:Math.min(bb.max||15,act+nk),until:now+(bb.dur||8)*1000};}
  window.PS_HOOKS={
-   spd(pl){const p=getPlayer();if(!p||pl!==p)return 1;const TR=traitsFor(p);if(!TR)return 1;let m=1;for(const tr of TR)if(tr.spd&&condOK(tr.when,p,null))m*=tr.spd;return m;},
+   spd(pl){const p=getPlayer();if(!p||pl!==p)return 1;let m=bbMult(p,'spd');const TR=traitsFor(p);if(!TR)return m;for(const tr of TR)if(tr.spd&&condOK(tr.when,p,null))m*=tr.spd;return m;},
    deal(type,target,src){
      const p=getPlayer(),P=passiveFor(p);if(!P)return 1;
      let m=1;const D=P.deal||{};
@@ -606,6 +613,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
        if(p.__buff&&p.__buff.ab===P.abilityId&&performance.now()<p.__buff.until&&(!p.__buff.type||p.__buff.type==='all'||p.__buff.type===type))m*=p.__buff.deal||1;
        if(A.weatherBoost){const k=W()?.current?.kind;if(k&&A.weatherBoost.kinds.includes(k))m*=A.weatherBoost.deal;}
        if(A.lowHp&&A.lowHp.deal&&p.maxHp>0&&p.hp/p.maxHp<A.lowHp.below)m*=A.lowHp.deal;
+       if(A.beastBoost)m*=bbMult(p,'deal');
        if(A.slowStart){const t=(performance.now()-(p.__bornAt||performance.now()))/1000;m*=t<A.slowStart.secs?A.slowStart.early:A.slowStart.late;}
        if(A.ignoreResist&&target&&Array.isArray(target.types)&&TY()&&type){
          // cancel 'not very effective' (x0.6 per resisting type) but NOT immunities (this game uses x0.3 for those)
@@ -631,6 +639,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      if(A.highHp&&p.maxHp>0&&p.hp/p.maxHp>A.highHp.above)m*=A.highHp.take;
      if(A.lowHp&&A.lowHp.take&&p.maxHp>0&&p.hp/p.maxHp<A.lowHp.below)m*=A.lowHp.take;
      if(A.superTake&&type&&TY()){if(TY().mult(type,P.types)>1)m*=A.superTake;}
+     if(A.beastBoost)m*=bbMult(p,'take');
      if(p.__buff&&p.__buff.ab===P.abilityId&&now<p.__buff.until&&p.__buff.take)m*=p.__buff.take;
      if(A.absorb&&type&&A.absorb.includes(type)){
        m=0;
@@ -681,6 +690,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    traitTick(p,dt,now);
    if(!A)return;
    if(A.regen&&p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+p.maxHp*A.regen*dt);
+   if(A.beastBoost)bbTick(p,A,P.abilityId,now);
    if(A.aura&&b.enemies&&(!p.__auraAt||now-p.__auraAt>500)){
      p.__auraAt=now;const r=A.aura.radius;
      for(const en of b.enemies.all()){if(!en||en.dead||typeof en.applySlow!=='function')continue;
@@ -690,7 +700,8 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      const w=W();
      if(w&&typeof w.force==='function'){
        const cur=w.current;
-       if((!cur||cur.kind!==A.weatherSet)&&(!p.__wxAt||now-p.__wxAt>20000)){p.__wxAt=now;try{w.force(A.weatherSet,45);}catch(e){}}
+       // summon at most once a minute (lasts 30s) so the weather/terrain banner isn't spammed; Primals are skipped above
+       if((!cur||cur.kind!==A.weatherSet)&&(!p.__wxAt||now-p.__wxAt>60000)){p.__wxAt=now;try{w.force(A.weatherSet,30);}catch(e){}}
      }
    }
  }
@@ -714,7 +725,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(A.spd)o.push('Speed '+X(A.spd));
    if(A.lowHp)o.push('Below '+Math.round(A.lowHp.below*100)+'% HP: '+(A.lowHp.deal?'damage '+X(A.lowHp.deal):'damage taken -'+PCT(A.lowHp.take)));
    if(A.highHp)o.push('Above '+Math.round(A.highHp.above*100)+'% HP: damage taken -'+PCT(A.highHp.take));
-   if(A.weatherSet)o.push('Summons '+TN(A.weatherSet)+' weather');
+   if(A.weatherSet)o.push('Summons '+TN(A.weatherSet)+' for 30s, once a minute');
    if(A.weatherBoost)o.push('In '+A.weatherBoost.kinds.map(TN).join('/')+': damage '+X(A.weatherBoost.deal));
    if(A.weatherImmune)o.push('Weather never weakens it (no downsides, keeps upsides)');
    if(A.aura)o.push('Slows nearby foes '+Math.round(A.aura.slow*100)+'%');
@@ -731,6 +742,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(A.absorbBuff)o.push('After absorbing: '+(A.absorbBuff.type==='all'?'all':TN(A.absorbBuff.type||A.absorb[0]))+' moves '+X(A.absorbBuff.deal)+' for '+A.absorbBuff.dur+'s');
    if(A.takeRanged)o.push('Ranged damage taken -'+PCT(A.takeRanged));
    if(A.endure)o.push('Survives a lethal hit with 1 HP (every '+A.endure.cd+'s)');
+   if(A.beastBoost){const bb=A.beastBoost;o.push(bb.stat==='heal'?'Each KO heals '+Math.round(bb.per*100)+'% HP':'Each KO: '+(bb.stat==='take'?'-'+Math.round(bb.per*100)+'% damage taken':'+'+Math.round(bb.per*100)+'% '+(bb.stat==='spd'?'speed':'damage'))+' (stacks to '+bb.max+', '+bb.dur+'s)');}
    if(A.slowStart)o.push('First '+A.slowStart.secs+'s of a run: damage '+X(A.slowStart.early)+', then '+X(A.slowStart.late));
    return o.join(' · ');
  }
@@ -743,7 +755,8 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  function currentPassiveText(p){
    if(!p||p.megaForm)return '';
    const P=passiveFor(p);if(!P||(P.src!=='legend'&&P.src!=='mono'))return '';
-   const lines=P.src==='legend'?passiveLines('Legendary ability',P.abilityId,P.types,P.deal,true):[describeDamage(P.types,{},true)];
+   const UB=(window.PS_ULTRA_BEASTS||[]).includes(Number(p.dex));
+   const lines=P.src==='legend'?passiveLines(UB?'Ultra Beast ability':'Legendary ability',P.abilityId,P.types,P.deal,true):[describeDamage(P.types,{},true)];
    if(P.src==='legend'&&TRAITS[Number(p.dex)])for(const t of TRAITS[Number(p.dex)])lines.push('Trait \u2013 '+describeTrait(t));
    if(P.src==='legend'&&window.PS_LEGEND_MOVES&&window.PS_LEGEND_MOVES[Number(p.dex)])lines.push('Signature move (from level-up rewards): '+window.PS_LEGEND_MOVES[Number(p.dex)].map(m=>m.name).join(', '));
    return '\n\n'+lines.filter(Boolean).join('\n');

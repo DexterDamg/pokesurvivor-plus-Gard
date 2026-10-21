@@ -48,6 +48,8 @@ window.PS_LEGEND_DUAL_DEAL = 1.3;
 //   absorbBuff:{type:'fire'|'all', deal:1.5, dur:6}                  boost after absorbing a hit
 //   takeRanged:0.6                       damage from enemy projectiles
 //   endure:{cd:30}                       survive a lethal hit with 1 HP (cooldown in seconds)
+//   beastBoost:{stat:'deal'|'take'|'spd'|'heal', per:0.03, max:15, dur:8}   each KO: +3% damage / -3% damage taken /
+//                                        +3% speed (stacks up to max, lasts dur s, refreshed by KOs) or heals per% HP
 // ---------------------------------------------------------------------
 window.PS_ABILITIES = {
  'intimidate':      {name:'Intimidate',      take:{all:0.8}, onHit:{slow:{chance:0.35,amount:0.35}}},
@@ -161,6 +163,19 @@ window.PS_ABILITIES = {
  'toxic-chain':     {name:'Toxic Chain',     poisonChance:0.3},
  'serene-grace':    {name:'Serene Grace',    burnChance:0.15, poisonChance:0.15, slowChance:0.15},
  'magnet-pull':     {name:'Magnet Pull',     aura:{radius:150,slow:0.2}, deal:{steel:1.2}},
+ // ---- Ultra Beasts: every one has BEAST BOOST (each KO stacks a boost to its best stat, for a few seconds)
+ //      plus one lore twist of its own.
+ 'beast-boost-nihilego':   {name:'Beast Boost (Sp. Def)', beastBoost:{stat:'take',per:0.025,max:12,dur:8}, poisonChance:0.25},
+ 'beast-boost-buzzwole':   {name:'Beast Boost (Attack)',  beastBoost:{stat:'deal',per:0.03,max:15,dur:8}, dealKinds:{melee:1.2,dash:1.2}},
+ 'beast-boost-pheromosa':  {name:'Beast Boost (Speed)',   beastBoost:{stat:'spd',per:0.03,max:15,dur:8}, deal:{all:1.15}},
+ 'beast-boost-xurkitree':  {name:'Beast Boost (Sp. Atk)', beastBoost:{stat:'deal',per:0.03,max:15,dur:8}, onHit:{stun:{chance:0.25,dur:0.8},stunName:'paralyze'}},
+ 'beast-boost-celesteela': {name:'Beast Boost (Attack)',  beastBoost:{stat:'deal',per:0.025,max:15,dur:8}, takeRanged:0.8},
+ 'beast-boost-kartana':    {name:'Beast Boost (Attack)',  beastBoost:{stat:'deal',per:0.035,max:12,dur:8}, dealMatch:{re:'cut|slash|blade|sword|leaf|claw|edge|origami',m:1.3}},
+ 'beast-boost-guzzlord':   {name:'Beast Boost (HP)',      beastBoost:{stat:'heal',per:0.03}, regen:0.005},
+ 'beast-boost-poipole':    {name:'Beast Boost (Sp. Atk)', beastBoost:{stat:'deal',per:0.02,max:20,dur:8}, poisonChance:0.2},
+ 'beast-boost-naganadel':  {name:'Beast Boost (Sp. Atk)', beastBoost:{stat:'deal',per:0.03,max:15,dur:8}, poisonChance:0.25, dealKinds:{beam:1.2}},
+ 'beast-boost-stakataka':  {name:'Beast Boost (Defense)', beastBoost:{stat:'take',per:0.03,max:12,dur:8}, highHp:{above:0.8,take:0.75}},
+ 'beast-boost-blacephalon':{name:'Beast Boost (Sp. Atk)', beastBoost:{stat:'deal',per:0.035,max:15,dur:8}, burnChance:0.2},
  // Mega Gardevoir (your spec): 25% less damage from Ghost, Dark and Steel.
  'pixie-ward':      {name:'Pixilate',        take:{ghost:0.75,dark:0.75,steel:0.75}}
 };
@@ -183,5 +198,10 @@ window.PS_LEGEND_KITS = {
  802:'technician',807:'volt-absorb',808:'magnet-pull',809:'iron-fist',
  888:'intrepid-sword',889:'dauntless-shield',890:'pressure',891:'inner-focus',892:'unseen-fist',
  894:'transistor',895:'dragons-maw',896:'chilling-neigh',897:'grim-neigh',898:'as-one',905:'contrary',
+ 793:'beast-boost-nihilego',794:'beast-boost-buzzwole',795:'beast-boost-pheromosa',796:'beast-boost-xurkitree',797:'beast-boost-celesteela',
+ 798:'beast-boost-kartana',799:'beast-boost-guzzlord',803:'beast-boost-poipole',804:'beast-boost-naganadel',805:'beast-boost-stakataka',806:'beast-boost-blacephalon',
  1004:'beads-of-ruin',1007:'orichalcum-pulse',1015:'toxic-chain',1016:'toxic-chain',1017:'embody-aspect',1024:'tera-shell'
 };
+
+// Ultra Beasts: treated like legendaries (ability + traits + signature move), labelled 'Ultra Beast'.
+window.PS_ULTRA_BEASTS = [793,794,795,796,797,798,799,803,804,805,806];

@@ -193,5 +193,17 @@ window.PS_TRAITS = {
  '952-mega':[{name:'Chlorophyll',when:{weather:['sun','harsh']},spd:1.3}],
  '970-mega':[{name:'Toxic Debris',when:{vsPoison:true},deal:1.3}],
  '978-mega':[{name:'Storm Drain',regen:0.01}],
- '998-mega':[{name:'Ice Scales',take:0.85}]
+ '998-mega':[{name:'Ice Scales',take:0.85}],
+ // ---- Ultra Beasts
+ 793:[{name:'Neurotoxin',when:{vsPoison:true},deal:1.35},{name:'Unknown Being',when:{hpBelow:0.5},take:0.75}],
+ 794:[{name:'Muscle Pump',when:{crowd:5},deal:1.25},{name:'Blood Feast',onKill:{heal:0.015}}],
+ 795:[{name:'Swift Grace',when:{moving:true},spd:1.2},{name:'Untouchable',when:{moving:true},take:0.85}],
+ 796:[{name:'Overcharge',charge:{secs:7,mult:2.2,stun:1.0}},{name:'Live Wire',when:{still:true},deal:1.2}],
+ 797:[{name:'Launch Thrusters',when:{far:220},deal:1.25},{name:'Iron Fortress',when:{still:true},take:0.8}],
+ 798:[{name:'Paper-Thin Blade',when:{near:140},deal:1.3},{name:'Featherweight',when:{hpAbove:0.7},spd:1.1}],
+ 799:[{name:'Bottomless Gluttony',onKill:{deal:0.02,max:15,dur:8,heal:0.01}},{name:'Endless Appetite',when:{hpBelow:0.5},regen:0.015}],
+ 803:[{name:'Growing Venom',onKill:{deal:0.03,max:10,dur:6}},{name:'Little Beast',when:{moving:true},spd:1.15}],
+ 804:[{name:'Venom Dragon',when:{vsPoison:true},deal:1.3},{name:'Stinger Flight',when:{moving:true},spd:1.15}],
+ 805:[{name:'Living Wall',when:{still:true},take:0.7},{name:'Collapse',when:{hurt:3},deal:1.3}],
+ 806:[{name:'Fireworks',when:{crowd:5},deal:1.3},{name:'Mind Blown',when:{hpBelow:0.5},deal:1.25}]
 };
