@@ -144,7 +144,7 @@
   const loops = ctx => ctx.startsWith('special:') || ctx.startsWith('legend:');
   const lowRules = () => (Array.isArray(RULES.lowhp) ? RULES.lowhp : RULES.lowhp ? [RULES.lowhp] : []).slice().sort((a, b) => (a.below ?? 0.2) - (b.below ?? 0.2));
   let runTime = 0, runLast = 0;   // seconds of actual play this run (for RULES.late)
-  function battleRule() { const r = RULES.battle; if (!r) return null; return { songs: runTime >= (r.after ?? 900) ? (r.late || []) : runTime >= (r.midAt ?? 480) && (r.mid || []).length ? r.mid : (r.early || []) }; }   // special moments loop; menu shuffles; battle + Mega play once
+  function battleRule() { const r = RULES.battle; if (!r) return null; { const md = window.PS_MODES && window.PS_MODES.run && window.PS_MODES.run.mode; if ((md === 'bossrush' || md === 'legend') && (r.late || []).length) return { songs: r.late }; } return { songs: runTime >= (r.after ?? 900) ? (r.late || []) : runTime >= (r.midAt ?? 480) && (r.mid || []).length ? r.mid : (r.early || []) }; }   // special moments loop; menu shuffles; battle + Mega play once
 
   // ---- player ----
   const BG_MIX = 0.5;   // songs play as background music: the slider's value x this, so moves and effects are easy to hear

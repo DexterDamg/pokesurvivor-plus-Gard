@@ -70,12 +70,84 @@
     try { const N = E(), p = B().game.player; let need = Number(p.xpNext) || 0; if (!need) { const lx = N.Game.levelXp; need = Number(typeof lx === 'function' ? lx(p.level) : lx) || 60; }
       const total = Math.max(40, need * CFG.xpLevels), n = 8; for (let i = 0; i < n; i++) { const a = i / n * TAU; N.Pickups.dropXp(x + Math.cos(a) * 30, y + Math.sin(a) * 20, total / n); } } catch (e) { console.warn('[dens] xp', e); }
   }
+
+  // ================= LEGENDARY DENS =================
+  // Battle version: rarely (2.5% each 3-minute check) a golden den appears; walk in to face 4 Dynamax bosses (common..epic)
+  // and then a Dynamax Legendary. Shiny chance 1/25 each (Shiny Charm triples it). Beat the Legendary and it joins your collection.
+  // Game-mode version (PS_MODES 'legend'): you start right inside the den. Shiny 1/150 (bosses) and 1/500 (Legendary).
+  // Boss 1 is easy and lifts you to level 20, the next ones +10 levels each (level 40 at the Legendary). Bosses always drop the Dynamax Band.
+  const GACHA_ONLY = { 801: 3, 648: 3, 490: 1, 489: 1 };   // Magearna, Meloetta (x3 weight), Manaphy, Phione (rarer)
+  const LCFG = { chance: 0.025, stages: 5, battleShiny: 1 / 25, modeBossShiny: 1 / 150, modeLegendShiny: 1 / 500, levels: [20, 30, 40, 40] };
+  function legendSet() { return Object.keys(window.PS_LEGEND_MOVES || {}).map(Number); }
+  function legendPool() { const N = E(), L = new Set(legendSet()); return (N?.DEX || []).filter(d => L.has(d.dex) && !GACHA_ONLY[d.dex] && N.SPRITE_META[d.dex] && d.dex !== 493); }
+  function bossPool() { const N = E(), L = new Set(legendSet()); return (N?.DEX || []).filter(d => d.rarity >= 1 && d.rarity <= 4 && !L.has(d.dex) && N.SPRITE_META[d.dex]); }
+  // gacha: Legendaries are earned in dens now, except the gacha-only ones (Magearna & Meloetta common, Manaphy & Phione rarer)
+  window.PS_GACHA_POOL = function (list, rarity) {
+    if (rarity !== 5) return list; const L = new Set(legendSet()), out = [];
+    for (const d of list) { if (!L.has(d.dex)) out.push(d); else if (GACHA_ONLY[d.dex]) for (let i = 0; i < GACHA_ONLY[d.dex]; i++) out.push(d); }
+    return out.length ? out : list;
+  };
+  let lden = null;   // {kind, stage, list, e, wait, legend}
+  const ldens = [];  // golden dens on the map
+  const shinyMul = p => (p && p.item === 'shinycharm') ? 3 : 1;
+  function makeBoss(p, dex, x, y, stage, legend) {
+    const N = E(), T = N.Enemies.BOSSES[Math.floor(Math.random() * Math.min(8, N.Enemies.BOSSES.length))] || {}, d = N.DEX_BY[dex] || {};
+    const lv = Number(p.level) || 1, mode = lden.kind === 'mode', easy = mode && stage === 0;
+    const hp = easy ? 450 : Math.round((320 + 110 * lv + 0.6 * (Number(p.maxHp) || 100)) * (legend ? 2.6 : 1 + stage * 0.15));
+    const dmg = easy ? 5 : Math.round((7 + 1.0 * lv) * (legend ? 1.3 : 1));
+    const def = { dex, name: d.name || 'Pokémon', hp, spd: Math.min(110, Number(T.spd) || 80), dmg, xp: Math.round(40 + lv * 6), behavior: T.behavior || 'charger', shotDmg: Math.round(dmg * 0.55), shotCd: T.shotCd || 1.2, range: T.range || 240 };
+    const e = new N.Enemy(def, x, y, { hp: 1, dmg: 1, spd: 1 }, true);
+    e.__maxRaid = true; e.__legendDen = true; if (legend) e.legend = true;
+    try { e.anim.scale = (Number(e.anim.scale) || 1) * 1.4; e.scale = (Number(e.scale) || 1) * 1.4; e.r = (Number(e.r) || 14) * 1.3; e.bodyH = (Number(e.bodyH) || 40) * 1.4; } catch (_) {}
+    const rate = mode ? (legend ? LCFG.modeLegendShiny : LCFG.modeBossShiny) : LCFG.battleShiny;
+    try { if (N.Sprites.hasShiny(dex) && Math.random() < rate * shinyMul(p)) { e.shiny = true; e.anim = new N.Sprites.Animator(dex, e.scale, true); } } catch (_) {}
+    N.EnemyMgr.add(e); return e;
+  }
+  function startLegendDen(kind) {
+    const p = B()?.game?.player, N = E(); if (!p || !N || lden) return false;
+    const bp = bossPool(), lp = legendPool(); if (!bp.length || !lp.length) return false;
+    const list = []; for (let i = 0; i < 4; i++) list.push(bp[Math.floor(Math.random() * bp.length)].dex); list.push(lp[Math.floor(Math.random() * lp.length)].dex);
+    lden = { kind, stage: 0, list, e: null, wait: 1.5 };
+    say('LEGENDARY DEN! Defeat 4 Dynamax Pokémon to reach the Legendary!', 3.5);
+    try { window.PS_MUSIC && window.PS_MUSIC.event && window.PS_MUSIC.event('trainer'); } catch (_) {}
+    return true;
+  }
+  function grantLevels(p, target) { let n = 0; while ((Number(p.level) || 1) < target && n++ < 80) { const need = Math.max(1, (Number(p.xpNext) || 60) - (Number(p.xp) || 0)); p.gainXp(need / (Number(p.xpK) || 1) + 0.01); } }
+  function legendTick(dt) {
+    const p = B()?.game?.player; if (!lden || !p) return;
+    if (!lden.e) { lden.wait -= dt; if (lden.wait > 0) return; const legend = lden.stage === 4, a = Math.random() * TAU;
+      lden.e = makeBoss(p, lden.list[lden.stage], p.x + Math.cos(a) * 220, p.y + Math.sin(a) * 160, lden.stage, legend);
+      say((legend ? 'The LEGENDARY ' : 'Dynamax ') + lden.e.name + (lden.e.shiny ? ' (shiny!)' : '') + ' appeared! · ' + (lden.stage + 1) + '/5', 3); return; }
+    if (!(lden.e.dead || lden.e.hp <= 0)) return;
+    const e = lden.e, st = lden.stage; lden.e = null; lden.wait = 2.5; lden.stage++;
+    if (!p.__dynBand) { p.__dynBand = true; banner.show('Dynamax Band obtained!', 'Press G (or the red button) to Dynamax', true); }
+    if (lden.kind === 'mode' && st < 4) { grantLevels(p, LCFG.levels[st]); }
+    else if (st < 4) dropXp(e.x, e.y);
+    p.coins = (Number(p.coins) || 0) + (st === 4 ? 600 : 120);
+    if (st === 4) {   // the Legendary joins you
+      const dex = e.dex, sh = !!e.shiny, N = E();
+      try { if (typeof N.DB.grant === 'function') N.DB.grant(dex); else { N.DB.save.owned[dex] = { at: Date.now(), from: 'den' }; } } catch (_) { try { N.DB.save.owned[dex] = { at: Date.now(), from: 'den' }; } catch (__) {} }
+      if (sh) { try { if (typeof N.DB.grantShiny === 'function') N.DB.grantShiny(dex); else N.DB.save.shiny[dex] = { at: Date.now(), from: 'den' }; } catch (_) {} }
+      try { N.DB.commit(); } catch (_) {}
+      banner.show((sh ? 'Shiny ' : '') + e.name + ' joined you!', 'Legendary Den cleared · +600 PokéCoins', true);
+      try { B().audio?.sfx?.('legend'); } catch (_) {}
+      const kind = lden.kind; lden = null;
+      if (kind === 'mode') setTimeout(() => { try { if (B()?.game?.player === p && B()?.game?.state !== 'over') E().Game.winRun(0); } catch (_) {} }, 3500);
+    }
+  }
+  function spawnLegendDen() { const d = spawnDen(true); if (!d) return null; dens.splice(dens.indexOf(d), 1); d.legend = true; d.life = 90; ldens.push(d); say('A golden LEGENDARY DEN appeared!', 3.5); return d; }
+  // Dynamax vs Dynamax: while you're Dynamaxed you deal 1.5x damage to Dynamax Pokémon
+  let dmgWrapped = false;
+  function wrapDyn() { const H = window.PS_HOOKS; if (!H || dmgWrapped) return; dmgWrapped = true; const deal = H.deal;
+    H.deal = function (...a) { const m = deal ? deal.apply(this, a) : 1; try { if (window.PS_QUALITY?.dyn?.active && a.some(x => x && typeof x === 'object' && x.__maxRaid)) return m * 1.5; } catch (_) {} return m; }; }
   function tick(dt) {
     const g = B()?.game, p = g?.player;
-    if (!p || g.state === 'ui' || g.state === 'over') { dens.length = 0; if (raid) raid = null; runP = null; return; }
-    if (p !== runP) { runP = p; nextAt = CFG.first; dens.length = 0; raid = null; }
+    if (!p || g.state === 'ui' || g.state === 'over') { dens.length = 0; ldens.length = 0; lden = null; if (raid) raid = null; runP = null; return; }
+    if (p !== runP) { runP = p; nextAt = CFG.first; dens.length = 0; ldens.length = 0; raid = null; lden = null; }
+    wrapDyn(); legendTick(dt);
+    for (let i = ldens.length - 1; i >= 0; i--) { const d = ldens[i]; d.t += dt; if (d.t >= d.life) { ldens.splice(i, 1); continue; } if (!lden && d.t > 0.8 && Math.hypot(p.x - d.x, p.y - d.y) < 34) { ldens.splice(i, 1); startLegendDen('battle'); } }
     if (!playing() || coop() || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) return;
-    if (!raid && clock() >= nextAt) { nextAt += CFG.every; if (!dens.length && Math.random() < CFG.chance) spawnDen(false); }   // a quarter as often as the game's rifts (they come every 3 min)
+    if (!raid && clock() >= nextAt) { nextAt += CFG.every; if (!dens.length && !ldens.length && !lden) { if (Math.random() < LCFG.chance) spawnLegendDen(); else if (Math.random() < CFG.chance) spawnDen(false); } }   // a quarter as often as the game's rifts (they come every 3 min)
     for (let i = dens.length - 1; i >= 0; i--) { const d = dens[i]; d.t += dt; if (d.t >= d.life) { dens.splice(i, 1); continue; }
       if (!raid && d.t > 0.8 && Math.hypot(p.x - d.x, p.y - d.y) < 34) { dens.splice(i, 1); startRaid(d); } }
     if (raid) { raid.t -= dt; if (raid.e.dead || raid.e.hp <= 0) endRaid(true); else if (raid.t <= 0 || p.dead) endRaid(false); }
@@ -98,11 +170,12 @@
     const ctx = ov.getContext('2d'), dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight;
     if (ov.width !== Math.round(W * dpr) || ov.height !== Math.round(H * dpr)) { ov.width = Math.round(W * dpr); ov.height = Math.round(H * dpr); }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); if (ov.__dirty) { ctx.clearRect(0, 0, W, H); ov.__dirty = false; }
-    const st = B()?.game?.state; if ((!dens.length && !raid) || st === 'ui' || st === 'over' || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) { if (ov.style.display !== 'none') ov.style.display = 'none'; return; } ov.__dirty = true; if (ov.style.display === 'none') ov.style.display = 'block';
+    const st = B()?.game?.state; if ((!dens.length && !ldens.length && !raid && !lden) || st === 'ui' || st === 'over' || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) { if (ov.style.display !== 'none') ov.style.display = 'none'; return; } ov.__dirty = true; if (ov.style.display === 'none') ov.style.display = 'block';
     const cam = B()?.camera, g = gameCanvas(); if (!cam || !g || typeof cam.left !== 'function') return;
     const css = Number(cam._cw) > 0 ? g.r.width / cam._cw : 1, k = cam.scale * css, now = performance.now() / 1000;
     const sx = x => g.r.left + (x - cam.left()) * k, sy = y => g.r.top + (y - cam.top()) * k;
-    for (const d of dens) {
+    for (const d of [...dens, ...ldens]) {
+      ctx.filter = d.legend ? 'hue-rotate(55deg) saturate(1.4) brightness(1.15)' : 'none';
       const X = sx(d.x), Y = sy(d.y), open = Math.min(1, d.t / 0.8), fade = Math.min(1, (d.life - d.t) / 1.5);
       ctx.save(); ctx.globalAlpha = fade;
       // rocky den ring
@@ -118,10 +191,12 @@
       const gl = ctx.createRadialGradient(X, Y, 0, X, Y, 70 * k); gl.addColorStop(0, 'rgba(255,60,100,.5)'); gl.addColorStop(1, 'rgba(255,60,100,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.ellipse(X, Y, 70 * k, 28 * k, 0, 0, TAU); ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
       ctx.font = '700 ' + Math.round(13 * Math.max(1, k * 0.8)) + 'px Pixelify, "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.fillStyle = '#ff8aa6';
-      const lb = 'MAX RAID DEN · ' + Math.ceil(d.life - d.t) + 's'; ctx.strokeText(lb, X, Y - hgt - 8); ctx.fillText(lb, X, Y - hgt - 8);
+      const lb = (d.legend ? 'LEGENDARY DEN · ' : 'MAX RAID DEN · ') + Math.ceil(d.life - d.t) + 's'; ctx.strokeText(lb, X, Y - hgt - 8); ctx.fillText(lb, X, Y - hgt - 8);
       ctx.restore();
-      const p = B()?.game?.player; if (p) edgeArrow(ctx, X, Y - 20 * k, W, H, '#ff4d7a', 'MAX RAID DEN · ' + Math.round(Math.hypot(d.x - p.x, d.y - p.y) / 32) + ' m');
+      const p = B()?.game?.player; if (p) edgeArrow(ctx, X, Y - 20 * k, W, H, d.legend ? '#ffd23f' : '#ff4d7a', (d.legend ? 'LEGENDARY DEN · ' : 'MAX RAID DEN · ') + Math.round(Math.hypot(d.x - p.x, d.y - p.y) / 32) + ' m');
     }
+    ctx.filter = 'none';
+    if (lden && lden.e && !lden.e.dead) { const p = B()?.game?.player; if (p) edgeArrow(ctx, sx(lden.e.x), sy(lden.e.y) - 30 * k, W, H, '#ffd23f', String(lden.e.name).toUpperCase() + ' · ' + Math.round(Math.hypot(lden.e.x - p.x, lden.e.y - p.y) / 32) + ' m'); }
     if (raid && !raid.e.dead) { const p = B()?.game?.player; if (p) edgeArrow(ctx, sx(raid.e.x), sy(raid.e.y) - 30 * k, W, H, '#ff4d7a', 'DYNAMAX ' + String(raid.name).toUpperCase() + ' · ' + Math.round(Math.hypot(raid.e.x - p.x, raid.e.y - p.y) / 32) + ' m'); }
     if (raid && !raid.e.dead) {   // red Dynamax aura + cloud crown around the raid boss
       const e = raid.e, X = sx(e.x), Y = sy(e.y), h = (Number(e.bodyH) || 60) * k;
@@ -145,6 +220,8 @@
   const bannerEl = document.createElement('div'); bannerEl.id = 'ps-dyn-get';
   const banner = { show(t, s, ok) { bannerEl.innerHTML = '<div class="box"><h2>' + t + '</h2><p class="sub">' + s + '</p></div>'; bannerEl.classList.toggle('ok', !!ok); bannerEl.style.display = 'flex'; clearTimeout(banner.h); banner.h = setTimeout(() => { bannerEl.style.display = 'none'; }, 3600); } };
   function renderHud() {
+    if (lden && lden.e && !lden.e.dead && playing()) { const e = lden.e, f = Math.max(0, Math.min(1, e.hp / (e.maxHp || 1)));
+      hud.innerHTML = '<span class="tm">LEGENDARY DEN ' + (lden.stage + 1) + '/5</span> · ' + (lden.stage === 4 ? 'Legendary ' : 'Dynamax ') + e.name + (e.shiny ? ' ✦' : '') + '<div class="bar"><i style="width:' + (f * 100).toFixed(1) + '%"></i></div>'; hud.style.display = 'block'; return; }
     if (!raid || raid.e.dead || !playing()) { hud.style.display = 'none'; return; }
     const e = raid.e, f = Math.max(0, Math.min(1, e.hp / (e.maxHp || 1)));
     hud.innerHTML = '<span class="rb">MAX RAID</span> · Dynamax ' + raid.name + (raid.e.shiny ? ' ✦' : '') + ' <span class="tm">· ' + Math.max(0, Math.ceil(raid.t)) + 's</span><div class="bar"><i style="width:' + (f * 100).toFixed(1) + '%"></i></div>';
@@ -153,6 +230,7 @@
   // test button for LoverGare (inside the Safe Zone test panel)
   function testBtn() {
     const t = document.getElementById('ps-sz-test'); if (!t || t.querySelector('[data-den]')) return;
+    const b2 = document.createElement('button'); b2.dataset.lden = '1'; b2.textContent = 'Legendary Den'; b2.addEventListener('click', e => { e.stopPropagation(); spawnLegendDen(); }); t.appendChild(b2);
     const b = document.createElement('button'); b.dataset.den = '1'; b.textContent = 'Dynamax Den'; b.addEventListener('click', e => { e.stopPropagation(); spawnDen(true); }); t.appendChild(b);
   }
 
@@ -163,5 +241,5 @@
   }
   function init() { document.head.append(css); document.body.append(ov, hud, bannerEl); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
-  window.PS_DENS = { spawn: spawnDen, get dens() { return dens.slice(); }, get raid() { return raid && { name: raid.name, t: raid.t, hp: raid.e.hp, maxHp: raid.e.maxHp, dead: raid.e.dead }; }, cfg: CFG };
+  window.PS_DENS = { spawn: spawnDen, spawnLegend: spawnLegendDen, startLegend: startLegendDen, get legend() { return lden && { kind: lden.kind, stage: lden.stage, list: lden.list.slice(), boss: lden.e && { name: lden.e.name, hp: lden.e.hp, shiny: !!lden.e.shiny } }; }, lcfg: LCFG, get dens() { return dens.slice(); }, get raid() { return raid && { name: raid.name, t: raid.t, hp: raid.e.hp, maxHp: raid.e.maxHp, dead: raid.e.dead }; }, cfg: CFG };
 })();
