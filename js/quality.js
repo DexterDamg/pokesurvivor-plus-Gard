@@ -174,10 +174,21 @@
 
   // ---------------- loop ----------------
   let last = performance.now(), frames = 0, fpsT = 0, mmT = 0, uiT = 0;
+  // ---------------- TM loot: only general moves ----------------
+  // The TM list (gold rifts / boss loot) is built from every move in the game, which now includes signature moves
+  // that belong to one Pokemon (Judgment, Roar of Time, Echo's moves...). Only moves from the normal type pools are offered.
+  const TM_EXTRA = ['calm-mind'];
+  let tmWrapped = false;
+  function wrapTMs() {
+    const N = window.PS_HOOPA_ENGINE, L = N && N.Loot, M = N && N.Moves; if (tmWrapped || !L || !M || typeof L.tmDown !== 'function') return; tmWrapped = true;
+    const general = () => { const ok = new Set(TM_EXTRA); for (const list of Object.values(M.POOL || {})) for (const id of (list || [])) ok.add(id); return M.ALL.filter(m => m && ok.has(m.id) && !m.psCast && !m.sig); };
+    const orig = L.tmDown;
+    L.tmDown = function (...a) { const all = M.ALL; let swapped = false; try { M.ALL = general(); swapped = true; } catch (_) {} try { return orig.apply(this, a); } finally { if (swapped) M.ALL = all; } };
+  }
   function loop(now) {
     requestAnimationFrame(loop);
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
-    wrapCamera(); wrapHooks(); buffMelee();
+    wrapCamera(); wrapHooks(); buffMelee(); wrapTMs();
     try { tickDynamax(dt); } catch (e) { console.warn('[dynamax]', e); }
     frames++; fpsT += dt; if (fpsT >= 0.5) { fpsEl.textContent = Math.round(frames / fpsT) + ' FPS'; frames = 0; fpsT = 0; }
     mmT += dt; if (mmT >= 0.05) { mmT = 0; try { drawMinimap(); } catch (_) {} }

@@ -10,7 +10,7 @@
   if (window.PS_DENS_INSTALLED) return; window.PS_DENS_INSTALLED = true;
   const B = () => window.PS_MEGA_BRIDGE_V5, E = () => window.PS_HOOPA_ENGINE;
   const TAU = Math.PI * 2;
-  const CFG = { first: 150, every: 180, chance: 0.6, life: 70, raidTime: 120, hpMul: 4, dmgMul: 1.3, grow: 1.4, coins: 300, coinsAgain: 450 };
+  const CFG = { first: 135, every: 180, chance: 0.25, shinyMul: 2, bandChance: 0.30, xpLevels: 2, life: 70, raidTime: 120, hpMul: 4, dmgMul: 1.3, grow: 1.4, coins: 300, coinsAgain: 450 };
   const dens = [];        // {x,y,t,life}
   let raid = null;        // {e,t,player}
   let runP = null, nextAt = CFG.first;
@@ -24,7 +24,7 @@
     for (let i = 0; i < 40; i++) { const a = Math.random() * TAU, d = near ? 170 : 300 + Math.random() * 160, nx = p.x + Math.cos(a) * d, ny = p.y + Math.sin(a) * d * 0.8;
       try { const W = B().world; if (W && (W.isWall(nx, ny) || (W.isLiquid && W.isLiquid(nx, ny)))) continue; } catch (_) {} x = nx; y = ny; break; }
     const d = { x, y, t: 0, life: CFG.life }; dens.push(d);
-    say('🔴 A Pokémon Den is overflowing with Dynamax energy!', 3);
+    say('A Pokémon Den is overflowing with Dynamax energy!', 3);
     try { B().fx.ring(x, y, 10, 120, '#ff2a55', 0.7, 6); B().audio?.sfx?.('legend'); } catch (_) {}
     return d;
   }
@@ -42,33 +42,40 @@
     let e = null;
     try { e = new N.Enemy(def, den.x, den.y, mul, true); } catch (err) { console.warn('[dens] could not create raid boss', err); return; }
     e.__maxRaid = true; e.legend = true;
+    try { const rate = Number(N.Spawner.SHINY_RATE) || 1 / 4096; if (N.Sprites.hasShiny(e.dex) && Math.random() < rate * CFG.shinyMul) { e.shiny = true; e.anim = new N.Sprites.Animator(e.dex, e.scale, true); } } catch (_) {}
     try { e.anim.scale = (Number(e.anim.scale) || e.scale || 1) * CFG.grow; e.scale = (Number(e.scale) || 1) * CFG.grow; e.r = (Number(e.r) || 14) * 1.5; e.bodyH = (Number(e.bodyH) || 40) * CFG.grow; } catch (_) {}
     N.EnemyMgr.add(e);
     raid = { e, t: CFG.raidTime, player: p, name: e.name || def.name || 'Pokémon' };
-    say('⚠ MAX RAID! A Dynamax ' + raid.name + ' appeared!', 3.2);
+    say('MAX RAID! A Dynamax ' + raid.name + ' appeared!', 3.2);
     try { B().fx.ring(den.x, den.y, 10, 300, '#ff2a55', 0.8, 8); B().fx.burst(den.x, den.y - 30, '#ff6b8a', 40, 320); B().camera?.kick?.(0.6); } catch (_) {}
     try { window.PS_MUSIC && window.PS_MUSIC.event && window.PS_MUSIC.event('trainer'); } catch (_) {}
   }
   function endRaid(won) {
     const r = raid; raid = null; if (!r) return; const p = B()?.game?.player;
     if (won && p && p === r.player) {
-      const had = !!p.__dynBand; p.__dynBand = true;
+      const had = !!p.__dynBand, got = !had && Math.random() < CFG.bandChance; if (got) p.__dynBand = true;   // the Dynamax Band is a 30% drop
       const coins = had ? CFG.coinsAgain : CFG.coins; p.coins = (Number(p.coins) || 0) + coins;
-      try { window.PS_QUALITY && window.PS_QUALITY.dynRecharge && window.PS_QUALITY.dynRecharge(); } catch (_) {}
-      say(had ? '🔴 Raid cleared! Dynamax recharged · +' + coins + ' PokéCoins' : '🔴 Raid cleared! You got the DYNAMAX BAND — press G! · +' + coins + ' PokéCoins', 4);
-      banner.show(had ? 'Dynamax recharged!' : 'Dynamax Band obtained!', had ? '+' + coins + ' PokéCoins' : 'Press G (or the red button) to Dynamax · +' + coins + ' PokéCoins');
+      dropXp(r.e.x, r.e.y);
+      if (had) { try { window.PS_QUALITY && window.PS_QUALITY.dynRecharge && window.PS_QUALITY.dynRecharge(); } catch (_) {} }
+      const sh = r.e.shiny ? ' (shiny!)' : '';
+      say(had ? 'Raid cleared' + sh + '! Dynamax recharged · +' + coins + ' PokéCoins' : got ? 'Raid cleared' + sh + '! The Dynamax Band dropped — press G!' : 'Raid cleared' + sh + '! +' + coins + ' PokéCoins · no Dynamax Band this time', 4);
+      banner.show(had ? 'Dynamax recharged!' : got ? 'Dynamax Band obtained!' : 'Max Raid cleared!', had ? '+' + coins + ' PokéCoins · bonus EXP' : got ? 'Press G (or the red button) to Dynamax · +' + coins + ' PokéCoins' : '+' + coins + ' PokéCoins · bonus EXP · the Band drops 30% of the time', got || had);
       try { B().fx.ring(p.x, p.y, 10, 260, '#ff2a55', 0.8, 8); B().fx.burst(p.x, p.y - 20, '#ffd0dc', 40, 300); B().audio?.sfx?.('levelup'); } catch (_) {}
     } else if (!won) {
       try { if (!r.e.dead) { r.e.dead = true; r.e.fade = 1; const L = E().EnemyMgr.all(), i = L.indexOf(r.e); if (i >= 0) L.splice(i, 1); } } catch (_) {}
       say('The Dynamax ' + r.name + ' escaped back into the den…', 3);
     }
   }
+  function dropXp(x, y) {   // a good pile of EXP orbs (about CFG.xpLevels levels' worth)
+    try { const N = E(), p = B().game.player; let need = Number(p.xpNext) || 0; if (!need) { const lx = N.Game.levelXp; need = Number(typeof lx === 'function' ? lx(p.level) : lx) || 60; }
+      const total = Math.max(40, need * CFG.xpLevels), n = 8; for (let i = 0; i < n; i++) { const a = i / n * TAU; N.Pickups.dropXp(x + Math.cos(a) * 30, y + Math.sin(a) * 20, total / n); } } catch (e) { console.warn('[dens] xp', e); }
+  }
   function tick(dt) {
     const g = B()?.game, p = g?.player;
     if (!p || g.state === 'ui' || g.state === 'over') { dens.length = 0; if (raid) raid = null; runP = null; return; }
     if (p !== runP) { runP = p; nextAt = CFG.first; dens.length = 0; raid = null; }
     if (!playing() || coop() || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) return;
-    if (!raid && !dens.length && clock() >= nextAt) { nextAt = clock() + CFG.every; if (!p.__dynBand || Math.random() < CFG.chance) spawnDen(false); }
+    if (!raid && clock() >= nextAt) { nextAt += CFG.every; if (!dens.length && Math.random() < CFG.chance) spawnDen(false); }   // a quarter as often as the game's rifts (they come every 3 min)
     for (let i = dens.length - 1; i >= 0; i--) { const d = dens[i]; d.t += dt; if (d.t >= d.life) { dens.splice(i, 1); continue; }
       if (!raid && d.t > 0.8 && Math.hypot(p.x - d.x, p.y - d.y) < 34) { dens.splice(i, 1); startRaid(d); } }
     if (raid) { raid.t -= dt; if (raid.e.dead || raid.e.hp <= 0) endRaid(true); else if (raid.t <= 0 || p.dead) endRaid(false); }
@@ -77,11 +84,21 @@
   // ---------------- drawing (overlay canvas, world -> screen with the game camera) ----------------
   const ov = document.createElement('canvas'); ov.id = 'ps-dens'; ov.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:18';
   function gameCanvas() { let best = null, area = 0; for (const c of document.querySelectorAll('canvas')) { if (c.id && c.id.startsWith('ps-')) continue; const r = c.getBoundingClientRect(), a = r.width * r.height; if (a > area) { area = a; best = { c, r }; } } return best; }
+  // off-screen arrow in the same style as the game's Arceus / Meowth / Gholdengo pointers
+  function edgeArrow(ctx, X, Y, W, H, col, text) {
+    const m = 46, top = 116, bot = H - 126; if (X > m && X < W - m && Y > top && Y < bot) return;
+    const cx = W / 2, cy = (top + bot) / 2, dx = X - cx, dy = Y - cy; const t = Math.min(Math.abs(dx) > 1e-3 ? (W / 2 - m) / Math.abs(dx) : 1e9, Math.abs(dy) > 1e-3 ? ((bot - top) / 2) / Math.abs(dy) : 1e9);
+    const ax = cx + dx * t, ay = cy + dy * t, a = Math.atan2(dy, dx), pu = 0.5 + 0.5 * Math.sin(performance.now() / 120);
+    ctx.save(); ctx.translate(ax, ay); ctx.globalAlpha = 0.2 + 0.25 * pu; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, 0, 26 + 6 * pu, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1; ctx.fillStyle = pu > 0.5 ? '#fff3c8' : col; ctx.beginPath(); ctx.moveTo(34 * Math.cos(a), 34 * Math.sin(a)); ctx.lineTo(17 * Math.cos(a + 2.45), 17 * Math.sin(a + 2.45)); ctx.lineTo(17 * Math.cos(a - 2.45), 17 * Math.sin(a - 2.45)); ctx.closePath(); ctx.fill();
+    ctx.font = '700 15px Pixelify, "Segoe UI", system-ui, sans-serif'; ctx.textAlign = Math.cos(a) > 0.3 ? 'right' : Math.cos(a) < -0.3 ? 'left' : 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.lineJoin = 'round'; const tx = 30 * -Math.cos(a), ty = 26 * -Math.sin(a) + 4; ctx.strokeText(text, tx, ty); ctx.fillStyle = col; ctx.fillText(text, tx, ty); ctx.restore();
+  }
   function draw() {
     const ctx = ov.getContext('2d'), dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight;
     if (ov.width !== Math.round(W * dpr) || ov.height !== Math.round(H * dpr)) { ov.width = Math.round(W * dpr); ov.height = Math.round(H * dpr); }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    const st = B()?.game?.state; if ((!dens.length && !raid) || st === 'ui' || st === 'over' || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); if (ov.__dirty) { ctx.clearRect(0, 0, W, H); ov.__dirty = false; }
+    const st = B()?.game?.state; if ((!dens.length && !raid) || st === 'ui' || st === 'over' || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) { if (ov.style.display !== 'none') ov.style.display = 'none'; return; } ov.__dirty = true; if (ov.style.display === 'none') ov.style.display = 'block';
     const cam = B()?.camera, g = gameCanvas(); if (!cam || !g || typeof cam.left !== 'function') return;
     const css = Number(cam._cw) > 0 ? g.r.width / cam._cw : 1, k = cam.scale * css, now = performance.now() / 1000;
     const sx = x => g.r.left + (x - cam.left()) * k, sy = y => g.r.top + (y - cam.top()) * k;
@@ -100,10 +117,12 @@
       for (let i = 0; i < 8; i++) { const ph = (now * 0.6 + i / 8) % 1, ax = X + Math.sin(i * 2.3 + now) * w * 1.3; ctx.fillStyle = 'rgba(255,120,160,' + (1 - ph) + ')'; ctx.beginPath(); ctx.arc(ax, Y - ph * hgt, 3 * k, 0, TAU); ctx.fill(); }
       const gl = ctx.createRadialGradient(X, Y, 0, X, Y, 70 * k); gl.addColorStop(0, 'rgba(255,60,100,.5)'); gl.addColorStop(1, 'rgba(255,60,100,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.ellipse(X, Y, 70 * k, 28 * k, 0, 0, TAU); ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
-      ctx.font = '800 ' + Math.round(11 * Math.max(1, k * 0.8)) + 'px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#4a0718'; ctx.fillStyle = '#fff';
+      ctx.font = '700 ' + Math.round(13 * Math.max(1, k * 0.8)) + 'px Pixelify, "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.fillStyle = '#ff8aa6';
       const lb = 'MAX RAID DEN · ' + Math.ceil(d.life - d.t) + 's'; ctx.strokeText(lb, X, Y - hgt - 8); ctx.fillText(lb, X, Y - hgt - 8);
       ctx.restore();
+      const p = B()?.game?.player; if (p) edgeArrow(ctx, X, Y - 20 * k, W, H, '#ff4d7a', 'MAX RAID DEN · ' + Math.round(Math.hypot(d.x - p.x, d.y - p.y) / 32) + ' m');
     }
+    if (raid && !raid.e.dead) { const p = B()?.game?.player; if (p) edgeArrow(ctx, sx(raid.e.x), sy(raid.e.y) - 30 * k, W, H, '#ff4d7a', 'DYNAMAX ' + String(raid.name).toUpperCase() + ' · ' + Math.round(Math.hypot(raid.e.x - p.x, raid.e.y - p.y) / 32) + ' m'); }
     if (raid && !raid.e.dead) {   // red Dynamax aura + cloud crown around the raid boss
       const e = raid.e, X = sx(e.x), Y = sy(e.y), h = (Number(e.bodyH) || 60) * k;
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -117,20 +136,18 @@
   // ---------------- raid HUD + reward banner ----------------
   const css = document.createElement('style');
   css.textContent = `
-  #ps-raid{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:24;display:none;min-width:280px;padding:8px 14px 10px;border-radius:14px;background:linear-gradient(180deg,rgba(90,8,30,.92),rgba(40,4,16,.92));border:2px solid #ff4d7a;color:#fff;font:800 13px Fredoka,system-ui,sans-serif;text-align:center;pointer-events:none;box-shadow:0 0 18px rgba(255,40,90,.45)}
-  #ps-raid .bar{height:10px;margin-top:6px;border-radius:6px;background:rgba(255,255,255,.15);overflow:hidden}#ps-raid .bar i{display:block;height:100%;background:linear-gradient(90deg,#ff4d7a,#ffb0c4)}
-  #ps-raid .tm{color:#ffd0dc}
+  #ps-raid{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:24;display:none;min-width:300px;padding:8px 16px 10px !important;text-align:center;pointer-events:none;font-size:17px;animation:none !important}
+  #ps-raid .rb{color:#ff8aa6}#ps-raid .tm{color:var(--gold)}
+  #ps-raid .bar{height:12px;margin-top:6px;border-radius:4px;background:#0b1838;box-shadow:0 0 0 2px var(--edge-in);overflow:hidden}#ps-raid .bar i{display:block;height:100%;background:linear-gradient(180deg,#ff8aa6,#e0335a)}
   #ps-dyn-get{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;pointer-events:none}
-  #ps-dyn-get .b{padding:20px 36px;border-radius:22px;background:linear-gradient(135deg,#ff2a55,#a0103c);color:#fff;text-align:center;font:800 34px Fredoka,system-ui;box-shadow:0 0 0 5px #fff,0 0 60px rgba(255,40,90,.8);animation:psDynGet .6s cubic-bezier(.2,1.6,.4,1)}
-  #ps-dyn-get .b small{display:block;font:800 15px Fredoka,system-ui;margin-top:4px;opacity:.95}
-  @keyframes psDynGet{from{transform:scale(.3);opacity:0}}`;
-  const hud = document.createElement('div'); hud.id = 'ps-raid';
+  #ps-dyn-get .box{text-align:center;min-width:min(460px,90vw)}#ps-dyn-get h2{color:#ff8aa6}#ps-dyn-get.ok h2{color:var(--gold)}#ps-dyn-get .sub{margin:0}`;
+  const hud = document.createElement('div'); hud.id = 'ps-raid'; hud.className = 'box';
   const bannerEl = document.createElement('div'); bannerEl.id = 'ps-dyn-get';
-  const banner = { show(t, s) { bannerEl.innerHTML = '<div class="b">🔴 ' + t + '<small>' + s + '</small></div>'; bannerEl.style.display = 'flex'; clearTimeout(banner.h); banner.h = setTimeout(() => { bannerEl.style.display = 'none'; }, 3600); } };
+  const banner = { show(t, s, ok) { bannerEl.innerHTML = '<div class="box"><h2>' + t + '</h2><p class="sub">' + s + '</p></div>'; bannerEl.classList.toggle('ok', !!ok); bannerEl.style.display = 'flex'; clearTimeout(banner.h); banner.h = setTimeout(() => { bannerEl.style.display = 'none'; }, 3600); } };
   function renderHud() {
     if (!raid || raid.e.dead || !playing()) { hud.style.display = 'none'; return; }
     const e = raid.e, f = Math.max(0, Math.min(1, e.hp / (e.maxHp || 1)));
-    hud.innerHTML = '🔴 MAX RAID · Dynamax ' + raid.name + ' <span class="tm">· ' + Math.max(0, Math.ceil(raid.t)) + 's</span><div class="bar"><i style="width:' + (f * 100).toFixed(1) + '%"></i></div>';
+    hud.innerHTML = '<span class="rb">MAX RAID</span> · Dynamax ' + raid.name + (raid.e.shiny ? ' ✦' : '') + ' <span class="tm">· ' + Math.max(0, Math.ceil(raid.t)) + 's</span><div class="bar"><i style="width:' + (f * 100).toFixed(1) + '%"></i></div>';
     hud.style.display = 'block';
   }
   // test button for LoverGare (inside the Safe Zone test panel)

@@ -643,9 +643,17 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    // Mega Gardevoir only: "J and Echo's Bond" - when HP drops below 50%:
    bond:{form:'282-mega',below:0.5,cooldown:30,regen:20,regenDur:10,deal:10,dealDur:10,spd:1.5,spdDur:5,take:0.8,takeDur:30}};
  function echoOn(p){const b=getBridge();return !!(p&&b&&String(b.user||'').trim().toLowerCase()===ECHO.user&&Number(p.dex)===ECHO.dex);}
+ // Friends For Life (LoverGare's Gardevoir only): every KO adds +0.5% damage, EXP, defense and critical chance.
+ // Damage and defense stop at 1000 KOs (+500%), EXP at +600%, critical chance at +30%.
+ const FFL={per:0.005,dealCap:5,defCap:5,xpCap:6,critCap:0.30};
+ function fflKills(p){let k=0;try{k=typeof p.myKills==='function'?Number(p.myKills())||0:0;}catch(e){}return Math.max(0,k);}
+ function fflBonus(p,stat){const v=fflKills(p)*FFL.per;return stat==='deal'?Math.min(FFL.dealCap,v):stat==='take'?Math.min(FFL.defCap,v):stat==='xp'?Math.min(FFL.xpCap,v):stat==='crit'?Math.min(FFL.critCap,v):0;}
  function echoMul(p,stat){if(!echoOn(p))return 1;const now=performance.now(),bd=p.__echoBond;let m=stat==='deal'?ECHO.deal:stat==='spd'?ECHO.spd:stat==='take'?ECHO.take:1;
-   if(bd){if(stat==='deal'&&now<bd.deal)m*=ECHO.bond.deal;if(stat==='spd'&&now<bd.spd)m*=ECHO.bond.spd;if(stat==='take'&&now<bd.take)m*=ECHO.bond.take;}return m;}
+   if(bd){if(stat==='deal'&&now<bd.deal)m*=ECHO.bond.deal;if(stat==='spd'&&now<bd.spd)m*=ECHO.bond.spd;if(stat==='take'&&now<bd.take)m*=ECHO.bond.take;}
+   if(stat==='deal')m*=1+fflBonus(p,'deal');if(stat==='take')m/=1+fflBonus(p,'take');return m;}
  function echoTick(p,dt,now){
+   {const fx=1+fflBonus(p,'xp'),old=Number(p.__fflXp)||1;if(fx!==old){p.xpMul=(Number(p.xpMul)||1)/old*fx;p.__fflXp=fx;}   // Friends For Life: EXP
+    const fc=fflBonus(p,'crit'),oc=Number(p.__fflCrit)||0;if(fc!==oc){p.critChance=(Number(p.critChance)||0)-oc+fc;p.__fflCrit=fc;}}   // Friends For Life: critical chance
    if(!p.__echoXp){p.__echoXp=true;p.xpMul=(Number(p.xpMul)||1)*ECHO.xp;}                       // EXP +60%
    if(!p.__echoLives){p.__echoLives=true;p.lives=(Number(p.lives)||0)+ECHO.lives;               // Echo's Resolve For J: +2 second chances
      try{getBridge().fx.dmgText(p.x,p.y-(p.bodyH||40)-24,"Echo's Resolve For J: +2 ♥",'#ff9ad8');}catch(e){}}
@@ -873,6 +881,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      "\u{1F496} J's Intuition: twice the rerolls (e.g. 6 \u2192 12)",
      "\u{1F496} Echo's Love: +25% critical-hit chance \u00b7 15% less damage taken",
      "\u{1F496} J and Echo's Bond (Mega Gardevoir): when HP drops below 50% → heals 20 HP/s for 10s, attack ×10 for 10s, speed ×1.5 for 5s, 20% less damage taken for 30s (every 30s at most)"+(bd&&now<bd.take?' — ACTIVE':''),
+     "\u{1F496} Friends For Life: every KO gives +0.5% damage, EXP, defense and critical chance (now: damage +"+(fflBonus(p,'deal')*100).toFixed(1)+"% \u00b7 EXP +"+(fflBonus(p,'xp')*100).toFixed(1)+"% \u00b7 defense +"+(fflBonus(p,'take')*100).toFixed(1)+"% \u00b7 crit +"+(fflBonus(p,'crit')*100).toFixed(1)+"%; caps: damage/defense +500%, EXP +600%, crit +30%)",
      "\u{1F496} J's Will: at level 50+, if you're not Mega yet and you run out of hearts, you revive with 2 hearts and instantly Mega Evolve (once per run)"+(p.__jWillUsed?' — USED':'')];
    return '\n\n'+l.join('\n');}
  function passiveLines(title,abilityId,types,deal,inScope){

@@ -10,10 +10,10 @@
   if (window.PS_MODES_INSTALLED) return; window.PS_MODES_INSTALLED = true;
   const B = () => window.PS_MEGA_BRIDGE_V5, E = () => window.PS_HOOPA_ENGINE;
   const MODES = {
-    classic:  { name: 'Classic', icon: '🎮', color: '#5fa8ff', desc: 'The normal PokéSurvivor run.' },
-    timed:    { name: 'Timed Survival', icon: '⏱️', color: '#ffb13d', desc: 'Survive until the clock hits 0:00. Enemies spawn 50% faster and bosses show up early. Win the run and earn bonus PokéCoins.' },
-    bossrush: { name: 'Boss Rush', icon: '👑', color: '#ff5f6d', desc: 'Bosses arrive 4× sooner and there are fewer small enemies. Every boss you defeat pays +150 PokéCoins.' },
-    hardcore: { name: 'Hardcore', icon: '💀', color: '#c86bdc', desc: 'No extra hearts and enemies hit 50% harder — but PokéCoins and EXP are doubled.' },
+    classic:  { name: 'Classic', ico: 'oranberry', icon: '🎮', color: '#5fa8ff', desc: 'The normal PokéSurvivor run.' },
+    timed:    { name: 'Timed Survival', ico: 'quickclaw', icon: '⏱️', color: '#ffb13d', desc: 'Survive until the clock hits 0:00. Enemies spawn 50% faster and bosses show up early. Win the run and earn bonus PokéCoins.' },
+    bossrush: { name: 'Boss Rush', ico: 'kingsrock', icon: '👑', color: '#ff5f6d', desc: 'Bosses arrive 4× sooner and there are fewer small enemies. Every boss you defeat pays +150 PokéCoins.' },
+    hardcore: { name: 'Hardcore', ico: 'lifeorb', icon: '💀', color: '#c86bdc', desc: 'No extra hearts and enemies hit 50% harder — but PokéCoins and EXP are doubled.' },
   };
   const LENGTHS = [300, 600, 900];
   const TIMED_BONUS = { 300: 400, 600: 1000, 900: 1800 };
@@ -77,65 +77,58 @@
   // ---------------- in-run HUD ----------------
   const css = document.createElement('style');
   css.textContent = `
-  #ps-mode-hud{position:fixed;left:50%;top:46px;transform:translateX(-50%);z-index:24;display:none;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;background:rgba(18,16,40,.82);border:2px solid var(--mc,#ffb13d);color:#fff;font:800 14px Fredoka,system-ui,sans-serif;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)}
-  #ps-mode-hud .tm{font:800 22px Fredoka,system-ui;letter-spacing:1px;min-width:62px;text-align:center}#ps-mode-hud.low .tm{color:#ff6b6b;animation:psModePulse .6s infinite alternate}
-  @keyframes psModePulse{to{transform:scale(1.12)}}
+  #ps-mode-hud{position:fixed;left:50%;top:46px;transform:translateX(-50%);z-index:24;display:none;align-items:center;gap:10px;padding:5px 16px !important;font-size:17px;pointer-events:none;animation:none !important;overflow:visible !important;white-space:nowrap}
+  #ps-mode-hud img{width:22px;height:22px;image-rendering:pixelated}#ps-mode-hud .tm{font-size:24px;color:var(--gold);min-width:64px;text-align:center}#ps-mode-hud .mu{color:var(--muted);font-size:14px}
+  #ps-mode-hud.low .tm{color:var(--red);animation:psModePulse .6s infinite alternate}@keyframes psModePulse{to{transform:scale(1.12)}}
   #ps-mode-win{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;pointer-events:none}
-  #ps-mode-win .b{padding:22px 40px;border-radius:22px;background:linear-gradient(180deg,#ffd86b,#ff9d3d);color:#3a1d00;text-align:center;font:800 40px Fredoka,system-ui;box-shadow:0 0 0 5px #fff,0 20px 60px rgba(0,0,0,.5);animation:psWin .6s cubic-bezier(.2,1.6,.4,1)}
-  #ps-mode-win .b small{display:block;font:800 18px Fredoka,system-ui;margin-top:4px}
-  @keyframes psWin{from{transform:scale(.3) rotate(-8deg);opacity:0}}
-  #ps-mode-btn{position:absolute;right:12px;top:12px;z-index:3;display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:12px;border:2px solid rgba(255,255,255,.35);background:rgba(16,14,40,.78);color:#fff;font:800 14px Fredoka,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.3);backdrop-filter:blur(2px)}
-  #ps-mode-btn:hover{background:rgba(40,34,90,.88)}#ps-mode-btn .sw{width:10px;height:10px;border-radius:50%;background:var(--mc)}
-  #ps-mode-pick{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;background:rgba(8,6,20,.6);backdrop-filter:blur(3px);font:700 14px Fredoka,system-ui,sans-serif;color:#eef0ff}
-  #ps-mode-pick .box{width:min(720px,calc(100vw - 20px));max-height:calc(100vh - 24px);overflow:auto;border-radius:20px;background:#1b1f3f;border:3px solid #0d1030;box-shadow:0 0 0 3px #5a7cff inset,0 24px 60px rgba(0,0,0,.6);animation:psMIn .25s cubic-bezier(.2,1.4,.4,1)}
-  @keyframes psMIn{from{transform:scale(.92);opacity:0}}
-  #ps-mode-pick .hd{display:flex;align-items:center;gap:10px;padding:14px 18px;background:linear-gradient(180deg,#2b5fc8,#1f45a0);font:800 22px Fredoka,system-ui}
-  #ps-mode-pick .hd button{margin-left:auto;border:0;border-radius:10px;padding:6px 12px;background:rgba(0,0,0,.25);color:#fff;font:800 14px system-ui;cursor:pointer}
-  #ps-mode-pick .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;padding:16px}
-  #ps-mode-pick .psm-card{display:block;position:relative;text-align:left;padding:14px 14px 14px 72px;border-radius:16px;background:#2a3068;border:3px solid transparent;cursor:pointer;min-height:92px;transition:transform .12s,background .12s}
-  #ps-mode-pick .psm-card:hover{transform:translateY(-2px);background:#323a7c}#ps-mode-pick .psm-card.on{border-color:var(--mc);box-shadow:0 0 0 3px color-mix(in srgb,var(--mc) 35%,transparent)}
-  #ps-mode-pick .psm-card .ic{position:absolute;left:14px;top:14px;width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;background:var(--mc)}
-  #ps-mode-pick .psm-card h4{margin:0 0 4px;font:800 18px Fredoka,system-ui}#ps-mode-pick .psm-card p{margin:0;color:#c5c9ef;font:600 12.5px system-ui;line-height:1.35}
-  #ps-mode-pick .psm-card .tag{text-shadow:none;position:absolute;right:12px;top:12px;font:800 11px system-ui;padding:3px 8px;border-radius:999px;background:var(--mc);color:#14102a}
-  #ps-mode-pick .lens{display:flex !important;flex-direction:row;gap:6px;margin-top:10px}#ps-mode-pick .lens button small{display:block;font:700 10px system-ui;opacity:.85}#ps-mode-pick .lens button{flex:1;min-width:0;line-height:1.2;border:0;border-radius:10px;padding:7px 0;font:800 13px system-ui;background:#1d2250;color:#cfd3ff;cursor:pointer}
-  #ps-mode-pick .lens button.on{background:var(--mc);color:#2a1600}
-  #ps-mode-pick .ft{padding:0 16px 16px;color:#9aa0d8;font:700 12px system-ui}`;
-  const hud = document.createElement('div'); hud.id = 'ps-mode-hud';
+  #ps-mode-win .box{text-align:center;min-width:min(460px,90vw)}#ps-mode-win h2{color:var(--gold)}#ps-mode-win .sub{margin:0}
+  #ps-mode-btn{position:absolute;right:12px;top:12px;z-index:3;display:flex;align-items:center;gap:8px}
+  #ps-mode-btn img{width:20px;height:20px;image-rendering:pixelated}
+  #ps-mode-pick{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;padding:16px;background:radial-gradient(circle at 50% 40%,rgba(10,20,50,.55),rgba(3,6,16,.88))}
+  #ps-mode-pick .box{width:min(600px,100%);max-height:calc(100vh - 32px)}
+  #ps-mode-pick .menu-list{margin:6px 0 10px}
+  #ps-mode-pick .menu-item{width:100%;color:#fff;font-size:21px}#ps-mode-pick .menu-item small{font-size:14px;line-height:1.3}
+  #ps-mode-pick .menu-item.on{background:rgba(255,255,255,.1)}#ps-mode-pick .menu-item.on::before{opacity:1;transform:none}
+  #ps-mode-pick .menu-item .tg{color:var(--gold);font-size:14px;margin-left:8px}
+  #ps-mode-pick .mi-ico img{width:30px;height:30px;image-rendering:pixelated}
+  #ps-mode-pick .lens{display:flex;gap:8px;grid-column:2;margin-top:8px}#ps-mode-pick .lens .btn{flex:1}
+  #ps-mode-pick .row.end{margin-top:6px}`;
+  const ico = (k, n) => { try { const I = E()?.Icons; if (I && E().ITEM_ICONS && E().ITEM_ICONS[k]) return I.html(k, n || 22); } catch (_) {} return ''; };
+  const hud = document.createElement('div'); hud.id = 'ps-mode-hud'; hud.className = 'box';
   const winEl = document.createElement('div'); winEl.id = 'ps-mode-win';
-  const win = { show(b) { winEl.innerHTML = '<div class="b">🏆 You survived!<small>+' + b + ' PokéCoins · ' + fmt(run.len) + ' cleared</small></div>'; winEl.style.display = 'flex'; }, hide() { winEl.style.display = 'none'; } };
+  const win = { show(b) { winEl.innerHTML = '<div class="box"><h2>You survived!</h2><p class="sub">' + fmt(run.len) + ' cleared · +' + b + ' PokéCoins</p></div>'; winEl.style.display = 'flex'; }, hide() { winEl.style.display = 'none'; } };
   let lastHud = '';
   function renderHud() {
     const st = B()?.game?.state;
     if (!run.player || run.mode === 'classic' || st === 'ui' || st === 'over' || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) { hud.style.display = 'none'; lastHud = ''; return; }
-    const M = MODES[run.mode]; let h = '<span>' + M.icon + '</span><span>' + M.name + '</span>', low = false;
+    const M = MODES[run.mode]; let h = ico(M.ico) + '<span>' + M.name + '</span>', low = false;
     if (run.mode === 'timed') { const left = run.len - clock(); low = left <= 30 && !run.done; h += '<span class="tm">' + (run.done ? '0:00' : fmt(left)) + '</span>'; }
-    if (run.mode === 'bossrush') h += '<span>· 👑 ' + run.bosses + '</span>';
-    if (run.mode === 'hardcore') h += '<span>· ×2 coins & EXP</span>';
+    if (run.mode === 'bossrush') h += '<span class="mu">bosses defeated</span><span class="tm">' + run.bosses + '</span>';
+    if (run.mode === 'hardcore') h += '<span class="mu">×2 PokéCoins & EXP</span>';
     if (h !== lastHud) { hud.innerHTML = h; lastHud = h; }
-    hud.style.setProperty('--mc', M.color); hud.classList.toggle('low', low); hud.style.display = 'flex';
+    hud.classList.toggle('low', low); hud.style.display = 'flex';
   }
 
   // ---------------- menu: Mode button + picker ----------------
   const pick = document.createElement('div'); pick.id = 'ps-mode-pick';
-  function modeLabel() { const M = MODES[sel]; return M.icon + ' ' + M.name + (sel === 'timed' ? ' · ' + (len / 60) + ' min' : ''); }
+  function modeLabel() { const M = MODES[sel]; return M.name + (sel === 'timed' ? ' · ' + (len / 60) + ' min' : ''); }
   function injectBtn() {
     const banner = document.getElementById('pp-banner'); if (!banner) return;
     let b = document.getElementById('ps-mode-btn');
-    if (!b) { b = document.createElement('button'); b.id = 'ps-mode-btn'; b.type = 'button'; b.addEventListener('click', e => { e.stopPropagation(); openPick(); }); }
+    if (!b) { b = document.createElement('button'); b.id = 'ps-mode-btn'; b.type = 'button'; b.className = 'btn small'; b.addEventListener('click', e => { e.stopPropagation(); openPick(); }); }
     if (b.parentElement !== banner) { if (getComputedStyle(banner).position === 'static') banner.style.position = 'relative'; banner.appendChild(b); }
-    const html = '<span class="sw"></span><span>Mode: ' + modeLabel() + '</span>'; if (b.__h !== html) { b.innerHTML = html; b.__h = html; }
-    b.style.setProperty('--mc', MODES[sel].color);
+    const html = ico(MODES[sel].ico, 20) + '<span>Mode: ' + modeLabel() + '</span>'; if (b.__h !== html) { b.innerHTML = html; b.__h = html; }
   }
   function openPick() { renderPick(); pick.style.display = 'flex'; }
   function closePick() { pick.style.display = 'none'; injectBtn(); }
   function renderPick() {
-    let h = '<div class="box"><div class="hd">🎮 Game Mode<button data-close="1">Done</button></div><div class="grid">';
+    let h = '<div class="box"><h2>Game Mode</h2><p class="sub">Choose how your next run plays. Your choice is remembered; co-op always plays Classic.</p><div class="menu-list">';
     for (const [id, M] of Object.entries(MODES)) {
-      h += '<div class="psm-card' + (id === sel ? ' on' : '') + '" data-m="' + id + '" style="--mc:' + M.color + '"><div class="ic">' + M.icon + '</div>' + (id === sel ? '<span class="tag">Selected</span>' : '') + '<h4>' + M.name + '</h4><p>' + M.desc + '</p>';
-      if (id === 'timed') { h += '<div class="lens">'; for (const L of LENGTHS) h += '<button data-len="' + L + '" class="' + (L === len ? 'on' : '') + '">' + (L / 60) + ' min<small>+' + TIMED_BONUS[L] + ' coins</small></button>'; h += '</div>'; }
-      h += '</div>';
+      h += '<button class="menu-item' + (id === sel ? ' on' : '') + '" data-m="' + id + '"><span class="mi-ico">' + ico(M.ico, 30) + '</span><span>' + M.name + (id === sel ? '<span class="tg">· selected</span>' : '') + '</span><small>' + M.desc + '</small>';
+      if (id === 'timed') { h += '<span class="lens">'; for (const L of LENGTHS) h += '<span class="btn small' + (L === len && sel === 'timed' ? ' gold' : '') + '" data-len="' + L + '">' + (L / 60) + ' min · +' + TIMED_BONUS[L] + '</span>'; h += '</span>'; }
+      h += '</button>';
     }
-    h += '</div><div class="ft">Your choice is remembered for your next runs. Co-op runs always use Classic.</div></div>';
+    h += '</div><div class="row end"><button class="btn gold" data-close="1">Done</button></div></div>';
     pick.innerHTML = h;
   }
   pick.addEventListener('click', e => {
