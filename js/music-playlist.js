@@ -121,7 +121,7 @@
   function context() {
     const g = B()?.game, st = g?.state;
     const battle = !!(st && st !== 'ui' && st !== 'over');          // 'ui' = menus, 'over' = run ended
-    if (!battle) return 'menu';
+    if (!battle || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) return 'menu';   // Safe Zones play the title music
     const lg = legendSong(); if (lg) return 'legend:' + lg;
     if (gameTrack && RULES.special && RULES.special[gameTrack]) return 'special:' + gameTrack;
     return 'battle';
@@ -201,9 +201,9 @@
       if (!fadeT) { cut(() => start(id, ctx)); render(); return; }
     }
     // 2) going between the menu and a battle switches music right away (title songs never follow you into battle)
-    if (leftOrEnteredMenu && cur && cur.ctx !== ctx) {
+    if (leftOrEnteredMenu && ((cur && cur.ctx !== ctx) || fadeT)) {   // also catches a song that was mid-fade-in
       const r = rule(ctx);
-      if (!(r && r.songs && r.songs.includes(cur.id))) { cut(() => { const id = chooseNext(ctx, null); return id ? start(id, ctx) : false; }); return; }
+      if (!(cur && r && r.songs && r.songs.includes(cur.id))) { cut(() => { const id = chooseNext(ctx, null); return id ? start(id, ctx) : false; }); return; }
     }
     // 3) inside a battle, a playing song is never interrupted; if the new moment wants the same song it just keeps going
     if (cur) {
@@ -274,6 +274,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
   function event(name) {   // special events: PS_MUSIC.event('trainer') plays one of that event's songs right away (once)
     const r = (RULES.events || {})[name]; if (!r || !S.on) return false; const id = pick(r.songs); if (!id) return false;
+    if (cur && cur.ctx === 'mega') return false;   // the Mega Evolution song always wins over events (e.g. Dynamax)
     unlocked = true; if (cur && cur.id === id) { cur.ctx = 'event:' + name; return true; } cut(() => start(id, 'event:' + name)); return true;
   }
   window.PS_MUSIC = { skip, event, stop: hush, rules: RULES, tracks: TRACKS, _audio: audio, get playing() { return cur && { ...cur }; }, get gameTrack() { return gameTrack; } };

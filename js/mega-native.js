@@ -651,7 +651,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(!p.__echoCrit){p.__echoCrit=true;p.critChance=(Number(p.critChance)||0)+ECHO.crit;}   // Echo's Love: +25% crit chance
    if(!p.__jInt){p.__jInt=true;p.rerollBonus=(Number(p.rerollBonus)||0)*2+1;}   // J's Intuition: double rerolls (6 -> 12)
    if(p.megaForm==='282-mega'){const d=getBridge()?.moves?.BY_ID?.['true-moon-blast'];   // Echo's True Potential replaces True Moon Blast (her game only)
-     const patch=o=>{if(!o||o.__echo)return;o.__echo=true;o.psCast='echoblast';o.name="Echo's True Potential";o.desc='A giant moon orb rolls forward leaving damaging glitter, then a moon meteor crashes down where it stops.';o.fx=Object.assign({},o.fx||{},{size:54,speed:380,range:290,boom:165,boomMult:2.6,colors:['#ffffff','#ffc8f0','#b8a0ff']});};
+     const patch=o=>{if(!o||o.__echo)return;o.__echo=true;o.psCast='echoblast';o.name="Echo's True Potential";o.desc='A giant moon orb rolls forward leaving damaging glitter, then three moon meteors crash down where it stops.';o.fx=Object.assign({},o.fx||{},{size:54,speed:380,range:290,boom:165,boomMult:2.6,meteors:3,colors:['#ffffff','#ffc8f0','#b8a0ff']});};
      patch(d);for(const inst of p.moves||[])if(inst&&inst.id==='true-moon-blast'){patch(inst);if(inst.def&&inst.def!==d)patch(inst.def);}}
    const B2=ECHO.bond;if(p.megaForm!==B2.form)return;
    const hp=p.maxHp>0?p.hp/p.maxHp:1,bd=p.__echoBond;
