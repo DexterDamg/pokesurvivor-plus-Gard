@@ -416,6 +416,49 @@
      if(!pokeSprite(ctx,c.fx.dex||10,c.walk?'Walk':'Idle',c.face,c.t,X,Y,2*(c.fx.scale||1)*k,al))glow(ctx,X,Y-10*k,10*k,'rgba(160,255,120,0.9)','rgba(0,0,0,0)');
      const top=(()=>{const M=B()?.spriteMeta?.[String(c.fx.dex)]?.a?.Idle;return M?M.ay*2*(c.fx.scale||1)*k:30*k;})();ctx.save();ctx.globalAlpha=al*(0.6+0.4*Math.sin(c.t*5));ctx.fillStyle=c.fx.heart||'#ff7ad0';const hx=X,hy=Y-top-6*k,hs=3.2*k;ctx.beginPath();ctx.moveTo(hx,hy+hs);ctx.bezierCurveTo(hx-hs*2,hy-hs*0.5,hx-hs*0.6,hy-hs*2,hx,hy-hs*0.6);ctx.bezierCurveTo(hx+hs*0.6,hy-hs*2,hx+hs*2,hy-hs*0.5,hx,hy+hs);ctx.fill();ctx.restore();}};
 
+ // ---------------------------------------------------------------- MEGA EVOLUTION cutscene
+ //  rainbow energy gathers -> a white/pink orb wraps the Pokemon -> it cracks and shatters ->
+ //  the Mega symbol pops above its head. The new Mega sprite is revealed when the orb breaks.
+ const megaSym=new Image();megaSym.src='assets/fx/mega-symbol.png?v=1';
+ S.megaevo={cast(c){const p=c.player;c.R=Math.max(40,(Number(p.bodyH)||40)*0.8);c.H=Number(p.bodyH)||40;c.streaks=[];c.shards=[];c.cracks=[];c.sparks=[];
+     for(let i=0;i<14;i++)c.streaks.push({a:i/14*TAU+rnd(-0.1,0.1),d:rnd(180,280),h:i*25});
+     for(let i=0;i<7;i++){const a0=rnd(0,TAU),pts=[[0,0]];let r=0,a=a0;for(let j=0;j<5;j++){r+=rnd(0.15,0.26);a+=rnd(-0.5,0.5);pts.push([Math.cos(a)*r,Math.sin(a)*r]);}c.cracks.push({pts,at:0.72+i*0.05});}
+     try{B()?.audio?.sfx?.('shinyGet');}catch(e){}return c;},
+   update(c,dt){c.t+=dt;const p=c.player;if(!p)return false;c.x=p.x;c.y=p.y;
+     if(c.t>=1.1&&!c.broke){c.broke=1;if(c.fx.newAnim&&p.megaForm===c.fx.form)p.anim=c.fx.newAnim;kick(0.25);
+       const cy=c.y-c.H*0.5;ring(c.x,cy,c.R*0.6,c.R*3,'#ffffff',0.55,7);ring(c.x,cy,c.R*0.4,c.R*2.2,'#ff8ad8',0.5,5);burst(c.x,cy,'#ffb8e8',30,260);burst(c.x,cy,'#ffffff',20,200);
+       for(let i=0;i<22;i++){const a=i/22*TAU+rnd(-0.15,0.15),sp2=rnd(160,330);c.shards.push({x:Math.cos(a)*c.R*0.8,y:Math.sin(a)*c.R*0.8,vx:Math.cos(a)*sp2,vy:Math.sin(a)*sp2-60,r:rnd(0,TAU),vr:rnd(-10,10),s:rnd(7,15),hue:(i*37)%360});}
+       try{B()?.audio?.sfx?.('chest');}catch(e){}}
+     for(const q of c.shards){q.vy+=380*dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.r+=q.vr*dt;}
+     if(c.t>1.1&&c.t<3&&Math.random()<0.5)c.sparks.push({a:rnd(0,TAU),r:rnd(20,46),t:c.t});
+     return c.t<3.4;},
+   draw(c,ctx,v){const k=v.k,X=v.sx(c.x),CY=v.sy(c.y-c.H*0.5),R=c.R*k,t=c.t;ctx.save();
+     // 1) rainbow DNA ribbons converge into the Pokemon
+     if(t<0.55){ctx.globalCompositeOperation='lighter';ctx.lineCap='round';for(const s2 of c.streaks){const q=Math.min(1,t/0.5),d=s2.d*(1-q)*k,a=s2.a+q*1.4;
+         const x1=X+Math.cos(a)*d,y1=CY+Math.sin(a)*d*0.7,x0=X+Math.cos(a-0.35)*(d+60*k),y0=CY+Math.sin(a-0.35)*(d+60*k)*0.7;
+         ctx.strokeStyle='hsla('+((s2.h+t*400)%360)+',100%,75%,'+(0.9*(1-Math.max(0,q-0.8)/0.2))+')';ctx.lineWidth=4*k;ctx.beginPath();ctx.moveTo(x0,y0);ctx.quadraticCurveTo((x0+x1)/2+20*k,(y0+y1)/2-20*k,x1,y1);ctx.stroke();}}
+     // 2) the orb
+     if(t>0.15&&t<1.1){const q=Math.min(1,(t-0.15)/0.2),pulse=1+0.05*Math.sin(t*22)+(t>0.8?0.06*(t-0.8)/0.3:0),r=R*q*pulse;
+       ctx.globalCompositeOperation='source-over';
+       const g=ctx.createRadialGradient(X-r*0.3,CY-r*0.35,r*0.05,X,CY,r);g.addColorStop(0,'rgba(255,255,255,0.98)');g.addColorStop(0.55,'rgba(255,232,248,0.96)');g.addColorStop(0.85,'rgba(255,170,226,0.95)');g.addColorStop(1,'rgba(255,105,200,0.95)');
+       ctx.fillStyle=g;ctx.beginPath();ctx.arc(X,CY,r,0,TAU);ctx.fill();
+       ctx.globalCompositeOperation='lighter';for(let i=0;i<12;i++){const a0=i/12*TAU+t*3;ctx.strokeStyle='hsla('+((i*30+t*300)%360)+',100%,72%,0.75)';ctx.lineWidth=3*k;ctx.beginPath();ctx.arc(X,CY,r*1.02,a0,a0+TAU/12+0.02);ctx.stroke();}
+       ctx.globalCompositeOperation='source-over';ctx.fillStyle='rgba(255,255,255,0.85)';ctx.beginPath();ctx.ellipse(X-r*0.38,CY-r*0.42,r*0.22,r*0.12,-0.6,0,TAU);ctx.fill();
+       for(let i=0;i<6;i++){const a=t*4+i*1.05,rr=r*(0.3+0.5*((i*0.37+t)%1));sprite(ctx,'star','fairy',X+Math.cos(a)*rr,CY+Math.sin(a)*rr*0.8,0.5*k,0,0,0.8);}
+       for(const cr of c.cracks){if(t<cr.at)continue;const g2=Math.min(1,(t-cr.at)/0.12);ctx.strokeStyle='rgba(255,255,255,0.95)';ctx.lineWidth=2.4*k;ctx.shadowColor='#ff5ab4';ctx.shadowBlur=8*k;ctx.beginPath();
+         cr.pts.forEach(([x,y],i)=>{const px=X+x*r*g2*1.3,py=CY+y*r*g2*1.3;i?ctx.lineTo(px,py):ctx.moveTo(px,py);});ctx.stroke();ctx.shadowBlur=0;}}
+     // 3) shatter: flash + flying shards
+     if(t>=1.1){const u=t-1.1;if(u<0.3){ctx.globalCompositeOperation='lighter';glow(ctx,X,CY,R*(1.2+u*6),'rgba(255,255,255,'+(1-u/0.3)+')','rgba(255,140,220,0)');}
+       ctx.globalCompositeOperation='source-over';for(const q of c.shards){const a=Math.max(0,1-u/1.1);if(!a)continue;ctx.save();ctx.globalAlpha=a;ctx.translate(X+q.x*k,CY+q.y*k);ctx.rotate(q.r);const sz=q.s*k;
+         ctx.fillStyle=u<0.2?'#ffffff':'hsl('+(320+q.hue%40)+',100%,'+(85-q.hue%20)+'%)';ctx.beginPath();ctx.moveTo(-sz,-sz*0.6);ctx.lineTo(sz,-sz*0.3);ctx.lineTo(-sz*0.2,sz);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.9)';ctx.lineWidth=1.5;ctx.stroke();ctx.restore();}}
+     // 4) the Mega symbol above its head
+     if(t>=1.15&&megaSym.complete&&megaSym.naturalWidth){const u=t-1.15,pop=u<0.18?u/0.18*1.3:u<0.32?1.3-(u-0.18)/0.14*0.3:1,fade=Math.min(1,Math.max(0,(3.4-t)/0.5)),
+         hy=v.sy(c.y-c.H-24)-6*k*Math.sin(u*3),sh=58*k*pop,sw=sh*megaSym.naturalWidth/megaSym.naturalHeight;
+       ctx.globalAlpha=fade;ctx.globalCompositeOperation='lighter';glow(ctx,X,hy,sh*0.9,'rgba(255,255,255,0.85)','rgba(255,150,230,0)');
+       for(const s2 of c.sparks){const w=t-s2.t;if(w>0.7)continue;const a=s2.a+w*3;sprite(ctx,'star','fairy',X+Math.cos(a)*s2.r*k,hy+Math.sin(a)*s2.r*0.6*k,0.45*k,0,0,1-w/0.7);}
+       ctx.globalCompositeOperation='source-over';ctx.drawImage(megaSym,X-sw/2,hy-sh/2,sw,sh);}
+     ctx.restore();}};
+
  // ---------------------------------------------------------------- manager
  window.PS_FX={
    styles:S,

@@ -9,7 +9,8 @@
         battle: during a run, now and then one of these songs plays once, then the game's music returns.
                 chance = how likely each roll is (0.3 = 30%), every = seconds between rolls,
                 first = a roll right when the battle starts.
-        menu:   song for the main menu (null = the game's own menu music).
+        menu:   songs for the title screen / menus, shuffled one after another (null = the game's own menu music).
+                Mega music is only for Mega Evolution; Primal Reversion keeps the normal music.
    A ♫ button (bottom-left in menus, top-left in battle) opens: on/off, skip, volume. */
 (() => {
   'use strict';
@@ -19,11 +20,14 @@
   const TRACKS = {
     'tera':      { title: 'Tera Raid Battle — Orchestral Remix', file: 'assets/music/tera-raid-orchestral-remix.mp3' },
     'zone-zero': { title: 'Zone Zero',                           file: 'assets/music/zone-zero.mp3' },
+    'pallet':    { title: 'Pallet Town',                         file: 'assets/music/pallet-town.mp3' },
+    'littleroot':{ title: 'Littleroot Town',                     file: 'assets/music/littleroot-town.mp3' },
+    'rustboro':  { title: 'Rustboro City',                       file: 'assets/music/rustboro-city.mp3' },
   };
   const RULES = {
     mega:   { songs: ['tera'] },
     battle: { songs: ['tera'], chance: 0.3, every: 150, first: true },
-    menu:   null,
+    menu:   { songs: ['pallet', 'littleroot', 'rustboro'] },
   };
 
   // ------------------------------------------------------------------------------------------
@@ -73,7 +77,10 @@
     } else { audio.pause(); restoreGame(); }
     render();
   }
-  audio.addEventListener('ended', () => { if (cur && cur.why === 'battle') { stop(false); nextRoll = now() + RULES.battle.every * 1000; } });
+  audio.addEventListener('ended', () => {
+    if (cur && cur.why === 'battle') { stop(false); nextRoll = now() + RULES.battle.every * 1000; }
+    else if (cur && cur.why === 'menu') { const list = RULES.menu.songs.filter(id => id !== cur.id); start(pick(list.length ? list : RULES.menu.songs), 'menu', false); }   // next menu song
+  });
   audio.addEventListener('error', () => { console.warn('[Music] could not load', cur && TRACKS[cur.id]?.file); stop(false); });
   const now = () => performance.now();
 
@@ -81,7 +88,7 @@
   let wasBattle = false, wasMega = false, nextRoll = 0;
   function tick() {
     const g = B()?.game, p = g?.player, st = g?.state, battle = !!(st && st !== 'ui' && st !== 'over');   // 'ui' = menus, 'over' = run ended
-    const mega = !!(battle && p && p.megaForm);
+    const mega = !!(battle && p && p.megaForm && !/primal/.test(String(p.megaForm)));   // Mega only, never Primal
     if (!S.on || !unlocked) { if (cur) stop(false); wasBattle = battle; wasMega = mega; return; }
 
     if (mega) {                                            // Mega Evolution music
@@ -94,8 +101,9 @@
         if (Math.random() < RULES.battle.chance) { const id = pick(RULES.battle.songs); if (id) start(id, 'battle', false); }
       }
     } else {                                               // menus
-      if (RULES.menu && (!cur || cur.why !== 'menu')) start(RULES.menu, 'menu', true);
-      else if (!RULES.menu && cur) stop(true);
+      const menuSongs = RULES.menu && RULES.menu.songs;
+      if (menuSongs && menuSongs.length && (!cur || cur.why !== 'menu')) start(pick(menuSongs), 'menu', menuSongs.length === 1);
+      else if (!(menuSongs && menuSongs.length) && cur) stop(true);
     }
     // the game can re-raise its own music volume (e.g. in Settings): keep ours the only music while it plays
     if (cur && !audio.paused) { const A = gameAudio(); if (A && A.settings && Number(A.settings.music) > 0) quietGame(); }
