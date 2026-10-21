@@ -87,7 +87,7 @@
   717:[beam('oblivion-wing','Oblivion Wing','flying','A crimson beam that drains life.',C.red,'feather',{dmg:14})],
   718:[spikes('lands-wrath','Land\'s Wrath','ground','The land itself erupts in green-veined spikes.','hue-rotate(95deg) saturate(1.4)')],
   719:[spikes('diamond-storm-l','Diamond Storm','rock','Glittering crystal spikes burst out.','hue-rotate(290deg) saturate(1.5) brightness(1.35)')],
-  720:[voidm('hyperspace-hole','Hyperspace Hole','psychic','Hoopa opens a ring portal that swallows foes.',['#000000','#ffb000','#ffe27a'],{fx:{rings:'#ffd23f'}})],
+  // 720 Hoopa: uses its own Hyperspace Hole summon move from js/hoopa.js
   721:[geyser('steam-eruption','Steam Eruption','water','Scalding steam geysers that burn.',['#ffffff','#f0f0f0','#a0c8ff'],{fx:{burn:1,shape:'bubble',pal:'water'}})],
   772:[rift('crush-claw','Crush Claw','normal','Heavy claw slashes.',C.steel,{count:2})],
   773:[beam('multi-attack','Multi-Attack','normal','A prismatic beam of every type.',C.light,'rainbow',{dmg:14})],
