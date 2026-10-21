@@ -19,6 +19,7 @@
     for (const b of G.BANNERS || []) { const s = SCENE[b.gen]; if (s) b.color = [s[1], s[1], s[2]]; }
     // featured: no Legendaries
     G.featured = function (gen) {
+      if (window.PS_STORY && window.PS_STORY.on() && window.PS_SPECIAL_GACHA) return [801, 147, 374];   // Story Mode: the Special Gacha
       const L = legends(), s = SCENE[gen], star = s && N.DEX_BY[s[0]] ? s[0] : null;
       const pool = N.DEX.filter(p => p.gen === gen && !L.has(p.dex) && p.dex !== star && p.rarity >= 3 && N.SPRITE_META[p.dex]).sort((a, b) => b.rarity - a.rarity || b.bst - a.bst);
       const two = pool.slice(0, 2).map(p => p.dex);

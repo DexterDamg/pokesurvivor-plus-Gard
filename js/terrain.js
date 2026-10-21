@@ -723,7 +723,7 @@ G.Layouts = G.Layouts || (() => {
       const n = G.Layouts.fbm(tx / 3.5, ty / 3.5, seed + 821) * 0.7 + H(tx, ty, seed + 822) * 0.3;
       return n < 0.5 - r.edge / (BLEND * 4) ? r.id2 : r.id;
     }
-    const active = () => !!pool() && !(G.Coop && G.Coop.active);
+    const active = () => !!pool() && !(G.Coop && G.Coop.active) && !(window.PS_ROUTE1 && window.PS_ROUTE1.active());   // Story Route 1 has its own hand-made map
     window.PS_TERRAIN = function (tx, ty, seed) {
       try {
         if (!active()) return null;
