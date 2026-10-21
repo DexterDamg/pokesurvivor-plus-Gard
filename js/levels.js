@@ -55,5 +55,9 @@
     const nm = document.querySelector('#pp-info .pp-name'); if (nm && /Level \d+/.test(nm.textContent) && !nm.textContent.startsWith('Level ' + lv + ' ')) nm.textContent = nm.textContent.replace(/Level \d+/, 'Level ' + lv);
     const zone = lv === 4 ? 2 : 3, bn = document.getElementById('pp-banner'); if (bn && !String(bn.style.backgroundImage).includes('zone-' + zone + '.webp')) { bn.style.backgroundImage = 'url("assets/ui/zone-' + zone + '.webp")'; const i = bn.querySelector('.pp-bgs i'); if (i) i.style.backgroundImage = 'url(assets/ui/zone-' + zone + '-anim.webp)'; }
   }
+  // Upgrades screen: 20 levels of pips used to overflow the card. Pips now shrink to fit the card's width.
+  const css = document.createElement('style');
+  css.textContent = '.upg-item{min-width:0}.upg-item>*{min-width:0}.pips{flex-wrap:nowrap;max-width:100%;overflow:hidden}.pips i{flex:1 1 0;min-width:3px;width:auto!important;max-width:12px}';
+  (document.head || document.documentElement).append(css);
   setInterval(() => { try { install(); tabs(); banner(); } catch (e) { console.warn('[levels]', e); } }, 150);
 })();
