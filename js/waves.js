@@ -1,7 +1,7 @@
 /* WAVES & BOSS ENCOUNTERS
    Named enemy waves arrive every ~80 s (from 1:30), always announced first so you can get ready:
      Healer wave     a pack escorted by 2 Healers (green +) that restore nearby enemies. Take the Healers out first.
-     Shield squad    2 Shielders (blue shield) protect everyone close to them: those enemies take 60% less damage.
+     Shield squad    2 Shielders (blue shield) protect everyone close to them: those enemies take 50% less damage.
      Swift pack      fast, fragile melee attackers that rush you.
      Elite ranged    a few Elites (gold ring) with more HP that hang back and shoot.
      Elemental wave  a whole group of one type: bring the right moves.
@@ -41,6 +41,7 @@
   function scale() { try { return E().Enemies.scale(clock()); } catch (_) { return { hp: 1, dmg: 1, spd: 1 }; } }
   function spawnAround(def, n, mul, role, ring) {
     const N = E(), p = B().game.player, W = B().world, out = [], base = Math.random() * TAU;
+    n = Math.max(1, Math.round(n * (CFG.sizeMul || 1)));
     for (let i = 0; i < n; i++) {
       let x = p.x, y = p.y; for (let k = 0; k < 20; k++) { const a = base + (ring ? i / n * TAU : (Math.random() - 0.5) * 1.2) + (k ? Math.random() : 0), d = 430 + Math.random() * 120; x = p.x + Math.cos(a) * d; y = p.y + Math.sin(a) * d * 0.8; try { if (W && W.isFree && !W.isFree(x, y, 16)) continue; } catch (_) {} break; }
       let e; try { e = new N.Enemy(Object.assign({}, def), x, y, mul, false); } catch (err) { console.warn('[waves]', err); continue; }
@@ -69,7 +70,7 @@
     for (const e of tagged) { if (!e || e.dead || e.hp <= 0) { tagged.delete(e); continue; } if (e.__wave === 'healer') healers.push(e); else if (e.__wave === 'shield') shields.push(e); }
     for (const e of all) { if (!e || e.dead) continue; e.__shielded = false;
       if (e.__wave !== 'shield') for (const s of shields) if (s !== e && Math.hypot(s.x - e.x, s.y - e.y) < 170) { e.__shielded = true; break; }
-      if (heal && !e.boss) for (const h of healers) if (h !== e && e.hp < e.maxHp && Math.hypot(h.x - e.x, h.y - e.y) < 180) { e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.03); e.__healFx = 0.4; break; } }
+      if (heal && !e.boss && e.__wave !== 'healer' && e.__wave !== 'shield') for (const h of healers) if (h !== e && e.hp < e.maxHp && Math.hypot(h.x - e.x, h.y - e.y) < 180) { e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.02); e.__healFx = 0.4; break; } }
   }
   // ---------- bosses ----------
   function bossTick(dt) {
@@ -96,7 +97,7 @@
   // damage: shields and exposed bosses
   let hooked = false;
   function hook() { const H = window.PS_HOOKS; if (!H || hooked) return; hooked = true; const deal = H.deal;
-    H.deal = function (...a) { const m = deal ? deal.apply(this, a) : 1; const t = a.find(x => x && typeof x === 'object' && 'hp' in x && 'maxHp' in x && x !== B()?.game?.player); if (!t) return m; return m * (t.__shielded ? 0.4 : 1) * (t.__exposed > 0 ? 1.5 : 1); }; }
+    H.deal = function (...a) { const m = deal ? deal.apply(this, a) : 1; const t = a.find(x => x && typeof x === 'object' && 'hp' in x && 'maxHp' in x && x !== B()?.game?.player); if (!t) return m; return m * (t.__shielded ? 0.5 : 1) * (t.__exposed > 0 ? 1.5 : 1); }; }
   // ---------- main ----------
   function tick(dt) {
     const g = B()?.game, p = g?.player;
