@@ -897,7 +897,7 @@ function start(){
  if(document.getElementById('ps-true-megas'))return;
  const panel=elt('aside');panel.id='ps-true-megas';panel.style.cssText='position:fixed;right:12px;top:100px;z-index:2147483000;background:#101824;color:#f7e4bc;border:2px solid #b89a60;border-radius:8px;padding:12px;width:260px;max-width:calc(100vw - 20px);font:13px/1.45 system-ui,sans-serif;box-shadow:0 4px 18px #000a;';
  const title=elt('strong','MEGA EVOLUTION');title.style.cssText='display:block;font-size:15px;margin-bottom:8px;color:#f2dfa7';
- const status=elt('div');status.style.cssText='white-space:pre-line;margin:8px 0;font-size:12px';
+ const status=elt('div');status.style.cssText='white-space:pre-line;margin:8px 0;font-size:12px;max-height:min(240px,36vh);overflow-y:auto;padding-right:6px;overscroll-behavior:contain';   // long passive lists scroll instead of pushing the Mega button off screen
  const select=elt('select');select.style.cssText='display:block;width:100%;padding:7px;margin-bottom:8px;border-radius:7px;background:#172536;color:#fff';
  const btn=elt('button','✦ Mega Evolve');btn.style.cssText='background:#b88a39;color:white;border:0;border-radius:7px;padding:9px 12px;font-weight:bold;cursor:pointer';
  const hint=elt('div');hint.style.cssText='margin-top:8px;color:#d5c39b;font-size:12px';
