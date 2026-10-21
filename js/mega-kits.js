@@ -123,7 +123,9 @@ window.PS_MEGA_KITS = {
  '381-mega':{passive:{ability:'levitate',deal:{dragon:1.3,psychic:1.3}},
    move:{from:'hydro-pump',id:'luster-purge',name:'Luster Purge',type:'psychic',desc:'A long beam of brilliant light.',dmg:46,radius:300,width:46,cd:1.15}},
  '384-mega':{passive:{ability:'delta-stream',deal:{dragon:1.4,flying:1.4}},
-   move:{from:'aerial-ace',id:'dragon-ascent',name:'Dragon Ascent',type:'flying',desc:'Rayquaza rockets through everything in its path.',dmg:70,radius:235,width:72,knock:160,cd:1.0}},
+   move:{from:'aerial-ace',id:'dragon-ascent',name:'Dragon Ascent',type:'flying',desc:'Rayquaza rockets through everything in its path.',dmg:70,radius:235,width:72,knock:160,cd:1.0},
+   // Bond move: fires together with Dragon Ascent (same slot).
+   bond:{from:'quick-attack',id:'extreme-speed',name:'ExtremeSpeed',type:'normal',desc:'A blindingly fast strike that tears through foes again and again.',dmg:40,radius:250,width:42,knock:70,cd:0.45}},
  '398-mega':{passive:{ability:'contrary',deal:{flying:1.3,fighting:1.3}},
    move:{from:'aerial-ace',id:'brave-bird',name:'Brave Bird',type:'flying',desc:'A reckless high-speed dive.',dmg:56,radius:205,width:50,knock:120,cd:0.85}},
  '428-mega':{passive:{ability:'scrappy',deal:{normal:1.3,fighting:1.3}},

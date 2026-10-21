@@ -497,6 +497,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
          if(A.dealStatus&&(mv.burn||mv.poison||mv.slow))m*=A.dealStatus;
          if(A.dealMulti&&Number(mv.count)>1)m*=A.dealMulti;
        }
+       if(p.__buff&&p.__buff.ab===P.abilityId&&performance.now()<p.__buff.until&&(!p.__buff.type||p.__buff.type==='all'||p.__buff.type===type))m*=p.__buff.deal||1;
        if(A.weatherBoost){const k=W()?.current?.kind;if(k&&A.weatherBoost.kinds.includes(k))m*=A.weatherBoost.deal;}
        if(A.lowHp&&A.lowHp.deal&&p.maxHp>0&&p.hp/p.maxHp<A.lowHp.below)m*=A.lowHp.deal;
        if(A.slowStart){const t=(performance.now()-(p.__bornAt||performance.now()))/1000;m*=t<A.slowStart.secs?A.slowStart.early:A.slowStart.late;}
@@ -513,21 +514,52 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      }
      return m;
    },
-   take(type,pl){
+   take(type,pl,dmg){
      const p=getPlayer();if(!p||pl!==p)return 1;const P=passiveFor(p);if(!P||!P.ability)return 1;
-     const A=P.ability;let m=1;
+     const A=P.ability,now=performance.now();let m=1;
+     const who=window.PS_ATTACKER,fromEnemy=!!who,contact=fromEnemy&&!!window.PS_CONTACT;
+     const att=who===true?nearestEnemy(p,160):(who||null);   // true = enemy shot whose shooter wasn't recorded
      if(A.take){if(type&&Number.isFinite(A.take[type]))m*=A.take[type];if(Number.isFinite(A.take.all))m*=A.take.all;}
+     if(A.takeRanged&&fromEnemy&&!contact)m*=A.takeRanged;
      if(A.highHp&&p.maxHp>0&&p.hp/p.maxHp>A.highHp.above)m*=A.highHp.take;
      if(A.lowHp&&A.lowHp.take&&p.maxHp>0&&p.hp/p.maxHp<A.lowHp.below)m*=A.lowHp.take;
      if(A.superTake&&type&&TY()){if(TY().mult(type,P.types)>1)m*=A.superTake;}
+     if(p.__buff&&p.__buff.ab===P.abilityId&&now<p.__buff.until&&p.__buff.take)m*=p.__buff.take;
      if(A.absorb&&type&&A.absorb.includes(type)){
-       m=0;const now=performance.now();
+       m=0;
        if(!p.__absorbAt||now-p.__absorbAt>250){p.__absorbAt=now;p.hp=Math.min(p.maxHp,p.hp+p.maxHp*(A.absorbHeal||0.03));}
+       if(A.absorbBuff)p.__buff={ab:P.abilityId,type:A.absorbBuff.type||type,deal:A.absorbBuff.deal,until:now+A.absorbBuff.dur*1000};
+       return 0;
      }
      if(A.weatherImmune&&type&&W()){const w=W().mult(type);if(w>1)m/=w;}        // weather can't boost hits against it
+     // reactive effects on the enemy that hit you (only real enemy hits: never lava, weather, etc.)
+     if(fromEnemy&&m>0)reactToHit(A,p,att,type,(Number(dmg)||0)*m,contact,P.abilityId);
+     // Sturdy-style endure: survive a lethal hit with 1 HP (cooldown)
+     if(A.endure&&Number(dmg)>0&&p.hp>1&&p.hp<=dmg*m&&now-(p.__endureAt||-1e9)>A.endure.cd*1000){p.__endureAt=now;m=Math.max(0,(p.hp-1)/dmg);}
      return m;
    }
  };
+ function nearestEnemy(p,maxD){
+   const E=getBridge()?.enemies;if(!E||typeof E.all!=='function')return null;
+   let best=null,bd=maxD*maxD;
+   for(const e of E.all()){if(!e||e.dead)continue;const d=(e.x-p.x)**2+(e.y-p.y)**2;if(d<bd){bd=d;best=e;}}
+   return best;
+ }
+ function reactToHit(A,p,att,type,amount,contact,abId){
+   const o=A.onHit;
+   if(o&&att&&!att.dead&&(!o.types||o.types.includes(type))&&(!o.contact||contact)){
+     try{
+       if(o.stun&&Math.random()<o.stun.chance&&typeof att.applyStun==='function')att.applyStun(o.stun.dur||0.8);
+       if(o.slow&&Math.random()<o.slow.chance&&typeof att.applySlow==='function')att.applySlow(o.slow.amount||0.4,1.5);
+       if(o.burn&&Math.random()<o.burn&&typeof att.applyBurn==='function')att.applyBurn(1);
+       if(o.poison&&Math.random()<o.poison&&typeof att.applyPoison==='function')att.applyPoison(1);
+       if(o.reflect&&amount>0&&typeof att.hurt==='function')att.hurt(Math.max(1,amount*o.reflect),'#ff9ad8');
+     }catch(e){}
+   }
+   const bf=A.onHitBuff;
+   if(bf&&(!bf.types||bf.types.includes(type))&&Math.random()<(bf.chance==null?1:bf.chance))
+     p.__buff={ab:abId,deal:bf.deal||1,take:bf.take||1,until:performance.now()+bf.dur*1000};
+ }
  function activeAbility(){const P=passiveFor(getPlayer());return P&&P.ability?P.ability:null;}
  let lastKitTick=0;
  function megaKitTick(){
@@ -577,6 +609,17 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(A.aura)o.push('Slows nearby foes '+Math.round(A.aura.slow*100)+'%');
    const ch=[['burnChance','burn'],['poisonChance','poison'],['slowChance','slow']].filter(([k])=>A[k]).map(([k,n])=>Math.round(A[k]*100)+'% '+n);
    if(ch.length)o.push('Hits can '+ch.join(' / '));
+   if(A.onHit){const h=A.onHit,r=[];
+     if(h.stun)r.push(Math.round(h.stun.chance*100)+'% '+(h.stunName||'stun')+' foe ('+h.stun.dur+'s)');
+     if(h.slow)r.push(Math.round(h.slow.chance*100)+'% slow foe');
+     if(h.burn)r.push(Math.round(h.burn*100)+'% burn foe');
+     if(h.poison)r.push(Math.round(h.poison*100)+'% poison foe');
+     if(h.reflect)r.push('reflects '+Math.round(h.reflect*100)+'% damage');
+     o.push('When '+(h.contact?'touched':'hit')+(h.types?' by '+h.types.map(TN).join('/'):'')+': '+r.join(', '));}
+   if(A.onHitBuff){const f=A.onHitBuff;o.push('When hit'+(f.types?' by '+f.types.map(TN).join('/'):'')+(f.chance!=null&&f.chance<1?' ('+Math.round(f.chance*100)+'%)':'')+': '+(f.deal?'damage '+X(f.deal):'')+(f.take?' damage taken -'+PCT(f.take):'')+' for '+f.dur+'s');}
+   if(A.absorbBuff)o.push('After absorbing: '+(A.absorbBuff.type==='all'?'all':TN(A.absorbBuff.type||A.absorb[0]))+' moves '+X(A.absorbBuff.deal)+' for '+A.absorbBuff.dur+'s');
+   if(A.takeRanged)o.push('Ranged damage taken -'+PCT(A.takeRanged));
+   if(A.endure)o.push('Survives a lethal hit with 1 HP (every '+A.endure.cd+'s)');
    if(A.slowStart)o.push('First '+A.slowStart.secs+'s of a run: damage '+X(A.slowStart.early)+', then '+X(A.slowStart.late));
    return o.join(' · ');
  }
