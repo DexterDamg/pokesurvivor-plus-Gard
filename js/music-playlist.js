@@ -10,12 +10,11 @@
                  Mega Evolve, plays once, then the battle / special music carries on.
         special  certain moments, by the game's own music name (shown in the ♫ panel as "Game music: ...").
                  rift = inside a Rift, judgment = the Arceus Judgment fight, zz = Area Zero.
-        battle   normal battles: now and then one of these songs plays once.
-                 chance = how likely each roll is (0.3 = 30%), every = seconds between rolls,
-                 first = also roll when the battle starts.
-        late     late game (after 'after' seconds, 900 = minute 15): these songs join the random battle songs.
+        battle   battle music, shuffled back to back: 'early' songs until 'after' seconds into the run
+                 (900 = minute 15), then the 'late' songs.
+        lowhp    when your HP drops below 'below' (0.2 = 20%), this song cuts in, at any point of the run.
         legends  when that legendary appears (Rift legendaries, bosses), its theme cuts in and loops while
-                 it's on the field. Order of importance: Mega Evolution > legendary > special > battle.
+                 it's on the field. Order of importance: Mega Evolution > legendary > low HP > special > battle.
 
    HOW SONGS BEHAVE
    - Mega Evolution music always cuts in right away.
@@ -36,6 +35,10 @@
     'pallet':    { title: 'Pallet Town',                         file: 'assets/music/pallet-town.mp3' },
     'littleroot':{ title: 'Littleroot Town',                     file: 'assets/music/littleroot-town.mp3' },
     'rustboro':  { title: 'Rustboro City',                       file: 'assets/music/rustboro-city.mp3' },
+    'route-1':   { title: 'Route 1',                             file: 'assets/music/route-1.mp3' },
+    'route-4':   { title: 'Route 4',                             file: 'assets/music/route-4.mp3' },
+    'route-11':  { title: 'Route 11',                            file: 'assets/music/route-11.mp3' },
+    'route-24':  { title: 'Route 24 / 25',                       file: 'assets/music/route-24-25.mp3' },
     // legendary battle themes
     'vs-dialga-palkia': { title: 'Battle! Dialga / Palkia',     file: 'assets/music/legend-dialga-palkia.mp3' },
     'vs-mewtwo':        { title: 'Battle! Mewtwo',              file: 'assets/music/legend-mewtwo.mp3' },
@@ -53,9 +56,12 @@
       rift:     { songs: ['tera'] },
       judgment: { songs: ['tera'] },
     },
-    battle:  { songs: ['tera'], chance: 0.3, every: 150, first: true },
-    // late game: after 'after' seconds of a run, the legendary themes join the random battle songs
-    late:    { after: 900, songs: ['vs-dialga-palkia','vs-mewtwo','vs-beasts','vs-lake','vs-giratina','vs-lugia','vs-deoxys','vs-regi'] },
+    // battle music, shuffled one after another: 'early' until 'after' seconds into a run (900 = minute 15), then 'late'
+    battle:  { after: 900,
+               early: ['route-1', 'route-4', 'route-11', 'route-24'],
+               late:  ['vs-dialga-palkia','vs-mewtwo','vs-beasts','vs-lake','vs-giratina','vs-lugia','vs-deoxys','vs-regi'] },
+    // low HP: when your HP drops below 'below' (0.2 = 20%), this cuts in at any time of the run
+    lowhp:   { below: 0.2, songs: ['tera'] },
     // a legendary shows up (Rift / boss): its own theme cuts in and loops while it's around. dex number: song
     legends: { 483:'vs-dialga-palkia', 484:'vs-dialga-palkia', 150:'vs-mewtwo', 151:'vs-mewtwo',
                243:'vs-beasts', 244:'vs-beasts', 245:'vs-beasts', 480:'vs-lake', 481:'vs-lake', 482:'vs-lake',
@@ -111,15 +117,15 @@
     return null;
   }
   const isMega = () => { const p = B()?.game?.player; return !!(p && p.megaForm && !/primal/.test(String(p.megaForm))); };   // Mega only, never Primal
-  const rule = ctx => ctx === 'menu' ? RULES.menu : ctx === 'mega' ? RULES.mega : ctx === 'battle' ? battleRule() : ctx.startsWith('legend:') ? { songs: [ctx.slice(7)] } : (RULES.special || {})[ctx.slice(8)];
+  const rule = ctx => ctx === 'menu' ? RULES.menu : ctx === 'mega' ? RULES.mega : ctx === 'lowhp' ? RULES.lowhp : ctx === 'battle' ? battleRule() : ctx.startsWith('legend:') ? { songs: [ctx.slice(7)] } : (RULES.special || {})[ctx.slice(8)];
   const loops = ctx => ctx.startsWith('special:') || ctx.startsWith('legend:');
   let runTime = 0, runLast = 0;   // seconds of actual play this run (for RULES.late)
-  function battleRule() { const r = RULES.battle; if (!r) return null; const L = RULES.late; return (L && runTime >= (L.after || 900)) ? { ...r, songs: [...(r.songs || []), ...(L.songs || [])] } : r; }   // special moments loop; menu shuffles; battle + Mega play once
+  function battleRule() { const r = RULES.battle; if (!r) return null; return { songs: runTime >= (r.after ?? 900) ? (r.late || []) : (r.early || []) }; }   // special moments loop; menu shuffles; battle + Mega play once
 
   // ---- player ----
   const audio = new Audio(); audio.preload = 'auto'; audio.volume = S.volume;
   let cur = null;               // { id, ctx }  the song playing now
-  let unlocked = false, nextRoll = 0, lastCtx = null, wasMega = false, fadeT = null;
+  let unlocked = false, nextRoll = 0, lastCtx = null, wasMega = false, wasLow = false, fadeT = null;
   function start(id, ctx) {
     const t = TRACKS[id]; if (!t) return false;
     clearInterval(fadeT); fadeT = null; cur = { id, ctx };
@@ -139,7 +145,6 @@
   }
   function chooseNext(ctx, not) {   // which song (if any) should start now in this moment
     const r = rule(ctx); if (!r || !r.songs || !r.songs.length) return null;
-    if (ctx === 'battle') { if (now() < nextRoll) return null; nextRoll = now() + (r.every || 150) * 1000; return Math.random() < (r.chance ?? 0.3) ? pick(r.songs, not) : null; }
     return pick(r.songs, not);
   }
   audio.addEventListener('ended', () => {   // a song finished: the current moment picks what comes next
@@ -166,6 +171,11 @@
       const id = pick(RULES.mega && RULES.mega.songs);
       if (id) { if (cur && cur.id === id) { cur.ctx = 'mega'; audio.loop = false; } else cut(() => start(id, 'mega')); render(); return; }
     }
+    // 1a) low HP: the low-HP song cuts in (not over the Mega song or a legendary theme)
+    { const p = B()?.game?.player, L = RULES.lowhp, low = !!(L && ctx !== 'menu' && p && !p.dead && p.maxHp > 0 && p.hp / p.maxHp < (L.below || 0.2));
+      const lowNow = low && !wasLow; wasLow = low;
+      if (lowNow && !(cur && cur.ctx === 'mega') && !ctx.startsWith('legend:')) { const id = pick(L.songs);
+        if (id) { if (cur && cur.id === id) { cur.ctx = 'lowhp'; audio.loop = false; } else cut(() => start(id, 'lowhp')); render(); return; } } }
     // 1b) a legendary appeared: its theme cuts in (but never over the Mega Evolution song)
     if (ctx.startsWith('legend:') && (!cur || (cur.ctx !== ctx && cur.ctx !== 'mega'))) {
       const id = ctx.slice(7);
@@ -201,7 +211,7 @@
     const ctx = context(), was = cur;
     if (was && (was.ctx === 'battle' || was.ctx === 'mega')) nextRoll = now() + (RULES.battle?.every || 150) * 1000;
     let id = null;
-    if (ctx === 'battle') { const r = RULES.battle; if (r && r.songs) { id = pick(r.songs, was && was.id); if (was && id === was.id) id = null; } }
+    if (ctx === 'battle') { const r = battleRule(); if (r && r.songs) { id = pick(r.songs, was && was.id); if (was && id === was.id) id = null; } }
     else { id = pick(rule(ctx)?.songs, was && was.id); if (was && id === was.id) id = null; }
     cut(() => id ? start(id, ctx) : false);
   }
