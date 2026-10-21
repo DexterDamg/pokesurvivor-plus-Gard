@@ -495,7 +495,11 @@
        hitCircle(c,c.x,c.y,c.R,{skip:c.skip,mult:1.4,knock:160});
        c.gStep+=st;while(c.gStep>=36){c.gStep-=36;c.glit.push({x:c.x+rnd(-c.R*0.5,c.R*0.5),y:c.y+rnd(-c.R*0.4,c.R*0.4),t:0,life:2.6,tick:0,seed:Math.random()*99});}
        if(c.parts.length<40)for(let i=0;i<3;i++)c.parts.push({a:rnd(0,TAU),r:rnd(c.R*0.9,c.R*1.5),t:0,s:rnd(2,5)});
-       if(c.dist>=c.range-0.5){c.phase='fall';c.ft=0;c.fx0=c.x;c.fy0=c.y;}}
+       if(c.dist>=c.range-0.5){c.phase='pop';c.pt=0;c.fx0=c.x;c.fy0=c.y;c.wskip=new Set();   // the ball bursts
+         hitCircle(c,c.x,c.y,c.R*1.8,{mult:c.fx.popMult||1.8,knock:200});kick(0.5);burst(c.x,c.y-20,'#ffffff',30,280);burst(c.x,c.y-20,'#ffb8ec',20,220);ring(c.x,c.y,c.R,c.R*2.2,'#ffffff',0.4,7);}}
+     else if(c.phase==='pop'){c.pt+=dt;const wr=c.R+(c.fx.wave||300)*Math.min(1,c.pt/0.5);   // shockwave rolls outward, hitting what it passes
+       for(const e of enemies()){if(c.wskip.has(e))continue;const d=Math.hypot(e.x-c.fx0,e.y-c.fy0);if(d<=wr+(e.r||10)){c.wskip.add(e);if(!c.ghost)applyHit(c,e,baseDmg(c,c.fx.waveMult||1.1),{knock:220},e.x-c.fx0,e.y-c.fy0);}}
+       if(c.pt>=0.55){c.phase='fall';c.ft=0;}}
      else if(c.phase==='fall'){c.ft+=dt;if(c.ft>=0.55){c.phase='boom';c.bt=0;hitCircle(c,c.fx0,c.fy0,c.fx.boom||175,{mult:c.fx.boomMult||2.6,knock:240});kick(0.75);
          ring(c.fx0,c.fy0,10,(c.fx.boom||175)*1.2,'#ffffff',0.6,8);ring(c.fx0,c.fy0,10,(c.fx.boom||175)*0.8,'#ff9ad8',0.5,6);burst(c.fx0,c.fy0,'#ffe6f6',34,300);burst(c.fx0,c.fy0,'#b8d8ff',20,240);}}
      else c.bt+=dt;
@@ -515,6 +519,13 @@
        ctx.strokeStyle='rgba(255,150,220,0.9)';ctx.lineWidth=3*k;ctx.beginPath();ctx.arc(X,Y,R*1.06,c.t*3,c.t*3+2.2);ctx.stroke();ctx.strokeStyle='rgba(150,190,255,0.9)';ctx.beginPath();ctx.arc(X,Y,R*1.12,-c.t*2.4,-c.t*2.4+1.8);ctx.stroke();
        for(const q of c.parts){const a=1-q.t/0.6;star4(ctx,X+Math.cos(q.a)*q.r*k,Y+Math.sin(q.a)*q.r*0.7*k,q.s*k,a,'#ffffff');}}
      // the meteor falling onto the end point
+     if(c.phase==='pop'||(c.phase==='fall'&&c.ft<0.3)){const u=c.phase==='pop'?c.pt:0.55+c.ft,X=v.sx(c.fx0),Y=v.sy(c.fy0),R0=c.R*k,W=(c.fx.wave||300)*k;
+       ctx.globalCompositeOperation='lighter';
+       if(u<0.3){const f=1-u/0.3;glow(ctx,X,Y-R0*0.6,R0*(1.4+u*5),'rgba(255,255,255,'+f+')','rgba(255,150,230,0)');
+         ctx.fillStyle='rgba(255,255,255,'+f+')';ctx.beginPath();for(let i=0;i<16;i++){const r=i%2?R0*0.5:R0*(1.4+u*3),an=i/16*TAU+0.3;ctx.lineTo(X+Math.cos(an)*r,Y-R0*0.6+Math.sin(an)*r*0.75);}ctx.closePath();ctx.fill();}
+       const wq=Math.min(1,u/0.5),wr=R0+W*wq,wa=Math.max(0,1-u/0.85);
+       for(let j=0;j<3;j++){const rr=wr*(1-j*0.12);ctx.strokeStyle=j===0?'rgba(255,255,255,'+wa+')':(j===1?'rgba(255,150,225,'+(wa*0.8)+')':'rgba(160,170,255,'+(wa*0.6)+')');ctx.lineWidth=Math.max(2,(12-j*3)*k*wa);ctx.beginPath();ctx.ellipse(X,Y,rr,rr*0.5,0,0,TAU);ctx.stroke();}
+       ctx.globalCompositeOperation='source-over';ctx.fillStyle='rgba(230,220,210,'+(0.35*wa)+')';for(let i=0;i<14;i++){const an=i/14*TAU;ctx.beginPath();ctx.arc(X+Math.cos(an)*wr*0.95,Y+Math.sin(an)*wr*0.48-6*k,(8+14*wq)*k,0,TAU);ctx.fill();}}
      if(c.phase==='fall'){const q=Math.min(1,c.ft/0.55),X=v.sx(c.fx0),Y=v.sy(c.fy0),R=(c.fx.boom||175)*k;
        ctx.strokeStyle='rgba(255,170,230,'+(0.4+0.5*q)+')';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(X,Y,R*q,R*q*0.45,0,0,TAU);ctx.stroke();ctx.fillStyle='rgba(255,170,230,'+(0.12+0.15*q)+')';ctx.fill();
        const mx=X+(1-q)*240*k,my=Y-(1-q)*640*k,mr=34*k;ctx.globalCompositeOperation='lighter';const tl=ctx.createLinearGradient(mx,my,mx+150*k,my-380*k);tl.addColorStop(0,'rgba(255,220,250,0.9)');tl.addColorStop(1,'rgba(160,140,255,0)');
