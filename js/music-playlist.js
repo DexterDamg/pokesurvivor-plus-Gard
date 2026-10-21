@@ -61,6 +61,12 @@
     'vs-lugia':         { title: 'Battle! Lugia',               file: 'assets/music/legend-lugia.mp3' },
     'vs-deoxys':        { title: 'Battle! Deoxys',              file: 'assets/music/legend-deoxys.mp3' },
     'vs-regi':          { title: 'Battle! Regi Trio',           file: 'assets/music/legend-regi.mp3' },
+    'vs-forces':        { title: 'Battle! Tornadus / Thundurus / Landorus', file: 'assets/music/legend-forces.mp3' },
+    'vs-lati':          { title: 'Battle! Latias / Latios (Z-A)', file: 'assets/music/legend-lati.mp3' },
+    'vs-birds':         { title: 'Battle! Articuno / Zapdos / Moltres', file: 'assets/music/legend-birds.mp3' },
+    'vs-cresselia':     { title: 'Battle! Cresselia / Heatran / Regigigas', file: 'assets/music/legend-cresselia.mp3' },
+    'boss-red-lgpe':    { title: 'Battle! Trainer Red (Let\'s Go)', file: 'assets/music/boss-red-lgpe.mp3' },
+    'boss-gym-oras':    { title: 'Battle! Gym Leader (ORAS)',    file: 'assets/music/boss-gym-oras.mp3' },
   };
   const RULES = {
     menu:    { songs: ['pallet', 'littleroot', 'rustboro', 'cerulean', 'dewford', 'petalburg', 'oldale', 'viridian'] },
@@ -84,10 +90,13 @@
     // special events (coming soon): play one with PS_MUSIC.event('trainer') from code
     events:  { trainer: { songs: ['trainer-red', 'trainer-gym-oras', 'trainer-oras', 'trainer-zinnia', 'trainer-xy'] } },
     // a legendary shows up (Rift / boss): its own theme cuts in and loops while it's around. dex number: song
-    legends: { 483:'vs-dialga-palkia', 484:'vs-dialga-palkia', 150:'vs-mewtwo', 151:'vs-mewtwo',
+    legends: { 483:'vs-dialga-palkia', 484:'vs-dialga-palkia', 150:'vs-mewtwo', 151:'vs-birds', 144:'vs-birds', 145:'vs-birds', 146:'vs-birds',
+               641:'vs-forces', 642:'vs-forces', 645:'vs-forces', 905:'vs-forces', 380:'vs-lati', 381:'vs-lati', 488:'vs-cresselia', 485:'vs-cresselia',
                243:'vs-beasts', 244:'vs-beasts', 245:'vs-beasts', 480:'vs-lake', 481:'vs-lake', 482:'vs-lake',
                487:'vs-giratina', 249:'vs-lugia', 250:'vs-lugia', 386:'vs-deoxys',
-               377:'vs-regi', 378:'vs-regi', 379:'vs-regi', 486:'vs-regi', 894:'vs-regi', 895:'vs-regi' },
+               377:'vs-regi', 378:'vs-regi', 379:'vs-regi', 486:'vs-cresselia', 894:'vs-regi', 895:'vs-regi' },
+    // any other legendary / Dynamax raid / den boss without its own theme gets one of these (picked once per Pokémon)
+    legendDefault: ['boss-red-lgpe', 'boss-gym-oras'],
   };
 
   // ------------------------------------------------------------------------------------------
@@ -140,7 +149,9 @@
   }
   function legendSong() {   // a legendary with its own theme on the field?
     const E = B()?.enemies, p = B()?.game?.player; if (!E || !RULES.legends || typeof E.all !== 'function') return null;
-    try { for (const e of E.all()) { if (!e || e.dead) continue; const id = RULES.legends[Number(e.dex)]; if (id && TRACKS[id] && (e.boss || e.legend || e.isLegend) && (!p || Math.hypot(e.x - p.x, e.y - p.y) < 1100)) return id; } } catch (_) {}
+    try { const L = E.all(); for (let i = L.length - 1; i >= 0; i--) { const e = L[i]; if (!e || e.dead) continue; const big = e.legend || e.isLegend || e.__maxRaid || e.__legendDen || e.__roamer; if (!(e.boss || big) || (p && Math.hypot(e.x - p.x, e.y - p.y) >= 1100)) continue;
+      let id = RULES.legends[Number(e.dex)]; if (!(id && TRACKS[id]) && big && (RULES.legendDefault || []).length) { if (!e.__psSong) e.__psSong = pick(RULES.legendDefault); id = e.__psSong; }
+      if (id && TRACKS[id]) return id; } } catch (_) {}
     return null;
   }
   const isMega = () => { const p = B()?.game?.player; return !!(p && p.megaForm && !/primal/.test(String(p.megaForm))); };   // Mega only, never Primal
@@ -160,16 +171,21 @@
   function start(id, ctx) {
     const t = TRACKS[id]; if (!t) return false;
     clearInterval(fadeT); fadeT = null; cur = { id, ctx };
-    audio.src = new URL(t.file, document.baseURI).href; audio.loop = loops(ctx); audio.currentTime = 0; audio.volume = V();
+    audio.src = new URL(t.file, document.baseURI).href; audio.loop = loops(ctx); audio.currentTime = 0; audio.volume = 0; fadeIn();
     audio.play().then(() => { quietGame(); render(); }).catch(() => render());
     render(); return true;
   }
+  // smooth transitions: songs fade in over FADE_IN seconds, fade out over FADE_OUT, and the last seconds of a song taper off
+  const FADE_IN = 1.4, FADE_OUT = 1.1, TAIL = 2.0; let fadeInT = null, fadeAt = 0;
+  function fadeIn() { clearInterval(fadeInT); fadeAt = performance.now(); fadeInT = setInterval(() => { if (fadeT) { clearInterval(fadeInT); fadeInT = null; return; } const u = Math.min(1, (performance.now() - fadeAt) / (FADE_IN * 1000)); audio.volume = V() * u * u; if (u >= 1) { clearInterval(fadeInT); fadeInT = null; } }, 40); }
+  audio.addEventListener('timeupdate', () => { if (fadeT || fadeInT || audio.loop || !audio.duration || !isFinite(audio.duration)) return; const left = audio.duration - audio.currentTime; audio.volume = left < TAIL ? V() * Math.max(0, left / TAIL) : V(); });
   function hush() { clearInterval(fadeT); fadeT = null; cur = null; audio.pause(); audio.volume = V(); if (S.on) quietGame(); else restoreGame(); render(); }
   function cut(then) {          // quick fade-out of the current song, then run 'then' (or go back to the game's music)
     clearInterval(fadeT); fadeT = null; const was = cur; cur = null;
     if (!was || audio.paused) { audio.pause(); audio.volume = V(); if (!(then && then())) { if (S.on) quietGame(); else restoreGame(); } render(); return; }
+    clearInterval(fadeInT); fadeInT = null; const step = Math.max(0.002, audio.volume / (FADE_OUT * 1000 / 50));
     fadeT = setInterval(() => {
-      audio.volume = Math.max(0, audio.volume - V() / 6);
+      audio.volume = Math.max(0, audio.volume - step);
       if (audio.volume <= 0.001) { clearInterval(fadeT); fadeT = null; audio.pause(); audio.volume = V(); if (!(then && then())) { if (S.on) quietGame(); else restoreGame(); } render(); }
     }, 50);
     render();
