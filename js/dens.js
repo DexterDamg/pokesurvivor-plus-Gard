@@ -152,7 +152,7 @@
       if (kind === 'mode') setTimeout(() => { try { if (B()?.game?.player === p && B()?.game?.state !== 'over') E().Game.winRun(0); } catch (_) {} }, 3500);
     }
   }
-  function spawnLegendDen() { const d = spawnDen(true); if (!d) return null; const idx = dens.indexOf(d); if (idx >= 0) dens.splice(idx, 1); d.legend = true; d.life = 90; ldens.push(d); say('A LEGENDARY DEN appeared! Follow the golden beacon!', 3.5); return d; }
+  function spawnLegendDen() { const d = spawnDen(true); if (!d) return null; const idx = dens.indexOf(d); if (idx >= 0) dens.splice(idx, 1); d.legend = true; d.life = 90; ldens.push(d); say('A LEGENDARY DEN appeared! Follow the orange beacon!', 3.5); return d; }
   // Dynamax vs Dynamax: while you're Dynamaxed you deal 1.5x damage to Dynamax Pokémon
   let dmgWrapped = false;
   function wrapDyn() { const H = window.PS_HOOKS; if (!H || dmgWrapped) return; dmgWrapped = true; const deal = H.deal;
@@ -174,44 +174,81 @@
 
   // Pixel-art den supplied by the map artist. The *entire* stone ring and beam are
   // one image. Never scale the stone base separately or regenerate its pixels.
-  const denArt = new Image();
-  denArt.src = 'assets/dens/pink-energy-den.png';
+  // The den art (assets/dens): full picture + a "beam" layer (just the glowing parts) used for the animation.
+  // Max Raid Dens are pink, Legendary Dens orange. The rocks never move; only the light does.
+  const DEN = {}; for (const c of ['pink', 'orange']) { DEN[c] = new Image(); DEN[c].src = 'assets/dens/den-' + c + '.png?v=1'; DEN['b' + c] = new Image(); DEN['b' + c].src = 'assets/dens/den-beam-' + c + '.png?v=1'; }
+  // The art's beam is cut off at the top of the picture, so the den is painted on a scratch canvas, the top of the
+  // pillar is faded out, and a swirling, tapering tip is drawn above it instead.
+  const dc = document.createElement('canvas');
   function drawDenArt(ctx, X, Y, k, legendary, t, opening) {
-    const w = 150 * k, h = 150 * k;
-    // The opening is around y=0.80 in the source; anchor it to the den location.
-    const dx = X - w / 2, dy = Y - h * 0.80;
-    if (!denArt.complete || denArt.naturalWidth === 0) {
-      ctx.save();ctx.fillStyle='#523843';ctx.beginPath();ctx.ellipse(X,Y,48*k,21*k,0,0,TAU);ctx.fill();ctx.strokeStyle='#ee449c';ctx.lineWidth=7*k;ctx.stroke();ctx.restore();
-      return;
+    const w = 150 * k, h = 150 * k, pad = Math.ceil(h * 0.55), dpr = ctx.getTransform().a || 1, W = Math.ceil(w * dpr), H = Math.ceil((h + pad) * dpr);
+    if (dc.width < W || dc.height < H) { dc.width = Math.max(dc.width, W); dc.height = Math.max(dc.height, H); }
+    const c = dc.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, dc.width, dc.height); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const lx = w / 2, ly = pad + h * 0.80;   // den position on the scratch canvas
+    paintDen(c, lx, ly, k, legendary, t, opening);
+    // fade the top of the pillar so it never looks cropped
+    c.globalCompositeOperation = 'destination-out';
+    const top = pad + h * 0.02, fadeTo = pad + h * 0.30, g = c.createLinearGradient(0, top, 0, fadeTo); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, fadeTo);
+    c.globalCompositeOperation = 'lighter';
+    // swirling tip: two glowing strands wind around the pillar and narrow to a point
+    const col = legendary ? [255, 120, 30] : [255, 80, 180], hi = legendary ? [255, 214, 140] : [255, 200, 240];
+    const baseY = pad + h * 0.32, tipY = pad * 0.08, bw = w * 0.13;
+    for (let s = 0; s < 2; s++) {
+      c.beginPath();
+      for (let i = 0; i <= 40; i++) { const u = i / 40, y = baseY - (baseY - tipY) * u, r = bw * (1 - u) ** 1.3, x = lx + Math.sin(u * 9 + t * 4 + s * Math.PI) * r; i ? c.lineTo(x, y) : c.moveTo(x, y); }
+      const sg = c.createLinearGradient(0, baseY, 0, tipY); sg.addColorStop(0, 'rgba(' + hi + ',' + 0.85 * opening + ')'); sg.addColorStop(1, 'rgba(' + hi + ',0)');
+      c.strokeStyle = sg; c.lineWidth = Math.max(1.5, 3 * k); c.lineCap = 'round'; c.stroke();
     }
-    ctx.save();ctx.imageSmoothingEnabled=false;
-    ctx.globalAlpha=opening;
-    if (legendary) { // distinction behind, not over, the original asset
-      ctx.globalCompositeOperation='lighter';
-      const gr=ctx.createRadialGradient(X,Y,6*k,X,Y,80*k);
-      gr.addColorStop(0,'rgba(255,225,116,.18)');gr.addColorStop(1,'rgba(255,225,116,0)');
-      ctx.fillStyle=gr;ctx.beginPath();ctx.ellipse(X,Y,75*k,35*k,0,0,TAU);ctx.fill();
-      ctx.globalCompositeOperation='source-over';
+    // soft tapering glow cone up the middle
+    const cg = c.createLinearGradient(0, baseY + h * 0.08, 0, tipY); cg.addColorStop(0, 'rgba(' + col + ',' + (0.55 * opening) + ')'); cg.addColorStop(1, 'rgba(' + col + ',0)');
+    c.fillStyle = cg; c.beginPath(); c.moveTo(lx - bw * 1.25, baseY + h * 0.08); c.quadraticCurveTo(lx - bw * 0.3, baseY - (baseY - tipY) * 0.5, lx, tipY); c.quadraticCurveTo(lx + bw * 0.3, baseY - (baseY - tipY) * 0.5, lx + bw * 1.25, baseY + h * 0.08); c.closePath(); c.fill();
+    // a few sparks spiralling up out of the tip
+    for (let i = 0; i < 6; i++) { const f = (t * 0.45 + i / 6) % 1, y = baseY - (baseY - tipY) * f, r = bw * 1.1 * (1 - f), x = lx + Math.cos(f * 12 + i + t * 3) * r;
+      c.globalAlpha = opening * (1 - f); c.fillStyle = 'rgb(' + hi + ')'; c.fillRect(Math.round(x), Math.round(y), Math.max(1.5, 2 * k), Math.max(1.5, 2 * k)); }
+    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+    ctx.drawImage(dc, 0, 0, W, H, X - lx, Y - ly, w, h + pad);
+  }
+  function paintDen(ctx, X, Y, k, legendary, t, opening) {
+    const c = legendary ? 'orange' : 'pink', img = DEN[c], beam = DEN['b' + c], w = 150 * k, h = 150 * k, dx = X - w / 2, dy = Y - h * 0.80;
+    if (!img.complete || !img.naturalWidth) { ctx.save(); ctx.fillStyle = '#523843'; ctx.beginPath(); ctx.ellipse(X, Y, 48 * k, 21 * k, 0, 0, TAU); ctx.fill(); ctx.strokeStyle = legendary ? '#ff9a2e' : '#ee449c'; ctx.lineWidth = 7 * k; ctx.stroke(); ctx.restore(); return; }
+    const col = legendary ? [255, 110, 20] : [255, 70, 170], LK = legendary ? 0.55 : 1;   // additive light turns orange into yellow fast, so it's gentler
+    ctx.save(); ctx.imageSmoothingEnabled = false; ctx.globalAlpha = opening;
+    // soft light on the ground that breathes
+    ctx.globalCompositeOperation = 'lighter';
+    const pu = 0.5 + 0.5 * Math.sin(t * 3.1), gr = ctx.createRadialGradient(X, Y, 4 * k, X, Y, 85 * k);
+    gr.addColorStop(0, 'rgba(' + col + ',' + (0.22 + 0.14 * pu) + ')'); gr.addColorStop(1, 'rgba(' + col + ',0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(X, Y, 85 * k, 36 * k, 0, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    // the den itself; the beam grows out of it while the den opens
+    ctx.drawImage(img, dx, dy, w, h);
+    if (beam.complete && beam.naturalWidth) {
+      ctx.globalCompositeOperation = 'lighter';
+      // 1) the whole glow pulses
+      ctx.globalAlpha = opening * (0.18 + 0.32 * pu) * LK; ctx.drawImage(beam, dx, dy, w, h);
+      // 2) energy flowing up the pillar: the beam texture scrolls upward inside the pillar, with a slight width wobble
+      ctx.save(); ctx.beginPath(); ctx.rect(dx + w * 0.33, dy - 2, w * 0.34, h * 0.66); ctx.clip();
+      const sh = (t * 0.55 % 1) * h * 0.66, wob = 1 + 0.05 * Math.sin(t * 7.3), bw = w * wob, bx = X - bw / 2;
+      ctx.globalAlpha = opening * 0.55 * LK;
+      ctx.drawImage(beam, bx, dy - sh, bw, h); ctx.drawImage(beam, bx, dy - sh + h * 0.66, bw, h);
+      // bright core flicker
+      ctx.globalAlpha = opening * (0.10 + 0.12 * Math.sin(t * 13.7) ** 2) * LK;
+      ctx.fillStyle = 'rgb(' + col + ')'; ctx.fillRect(X - w * 0.07, dy, w * 0.14, h * 0.64);
+      ctx.restore();
+      // 3) light rings sliding up the pillar
+      for (let i = 0; i < 3; i++) { const f = (t * 0.7 + i / 3) % 1, yy = Y - h * 0.08 - f * h * 0.58;
+        ctx.globalAlpha = opening * (1 - f) * 0.55; ctx.strokeStyle = 'rgb(' + col + ')'; ctx.lineWidth = Math.max(1.5, 2.2 * k);
+        ctx.beginPath(); ctx.ellipse(X, yy, w * (0.12 + 0.04 * (1 - f)), w * 0.035, 0, 0, TAU); ctx.stroke(); }
+      ctx.globalCompositeOperation = 'source-over';
     }
-    ctx.drawImage(denArt,dx,dy,w,h);
-    // Very small glow oscillation limited to the *upper* beam — rock pixels stay static.
-    ctx.save();ctx.beginPath();ctx.rect(dx+w*.36,dy, w*.28,h*.40);ctx.clip();
-    ctx.globalCompositeOperation='lighter';ctx.globalAlpha=opening*(.045+.065*(.5+.5*Math.sin(t*3.2)));
-    ctx.drawImage(denArt,dx,dy,w,h);
-    ctx.restore();
-    // Slow-moving tiny pixel particles. No animated redraw of the base.
-    ctx.globalAlpha=opening;
-    for(let i=0;i<8;i++){
-      const f=(t*(.13+i*.008)+i*.157)%1;
-      const xx=X+Math.sin(i*2.7+t*.5)*w*.23;
-      const yy=Y-h*.1-f*h*.63;
-      ctx.globalAlpha=opening*(1-f)*.75;
-      ctx.fillStyle=legendary?'#ffe5a0':'#ff9cdf';
-      const sz=Math.max(1.5,k*1.9);
-      ctx.fillRect(Math.round(xx),Math.round(yy),sz,sz);
+    // pixel sparks drifting up
+    for (let i = 0; i < 12; i++) {
+      const f = (t * (0.22 + i * 0.013) + i * 0.157) % 1, xx = X + Math.sin(i * 2.7 + t * 0.9) * w * (0.08 + 0.02 * (i % 5)), yy = Y - h * 0.08 - f * h * 0.66;
+      ctx.globalAlpha = opening * (1 - f) * 0.9; ctx.fillStyle = i % 3 ? (legendary ? '#ffd27a' : '#ff9cdf') : '#ffffff';
+      const sz = Math.max(1.5, k * (i % 4 === 0 ? 2.8 : 1.9)); ctx.fillRect(Math.round(xx), Math.round(yy), sz, sz);
     }
     ctx.restore();
   }
+
   // ---------------- drawing (overlay canvas, world -> screen with the game camera) ----------------
   const ov = document.createElement('canvas'); ov.id = 'ps-dens'; ov.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:18';
   function gameCanvas() { let best = null, area = 0; for (const c of document.querySelectorAll('canvas')) { if (c.id && c.id.startsWith('ps-')) continue; const r = c.getBoundingClientRect(), a = r.width * r.height; if (a > area) { area = a; best = { c, r }; } } return best; }
@@ -242,11 +279,11 @@
       drawDenArt(ctx,X,Y,k,legend,now,open);
       const hgt = 138 * k * open;
       ctx.font = '700 ' + Math.round(13 * Math.max(1, k * 0.8)) + 'px Pixelify, "Segoe UI", system-ui, sans-serif';
-      ctx.textAlign='center';ctx.lineWidth=4;ctx.lineJoin='round';ctx.strokeStyle='rgba(0,0,0,.85)';ctx.fillStyle=legend?'#ffdf83':'#ff9bcc';
+      ctx.textAlign='center';ctx.lineWidth=4;ctx.lineJoin='round';ctx.strokeStyle='rgba(0,0,0,.85)';ctx.fillStyle=legend?'#ffb45c':'#ff9bcc';
       const lb=(legend?'LEGENDARY DEN · ':'MAX RAID DEN · ')+Math.ceil(d.life-d.t)+'s';
       ctx.strokeText(lb,X,Y-hgt-12);ctx.fillText(lb,X,Y-hgt-12);
       ctx.restore();
-      const p = B()?.game?.player; if (p) edgeArrow(ctx, X, Y - 20 * k, W, H, d.legend ? '#ffd23f' : '#ff4d7a', (d.legend ? 'LEGENDARY DEN · ' : 'MAX RAID DEN · ') + Math.round(Math.hypot(d.x - p.x, d.y - p.y) / 32) + ' m');
+      const p = B()?.game?.player; if (p) edgeArrow(ctx, X, Y - 20 * k, W, H, d.legend ? '#ff9a2e' : '#ff4d7a', (d.legend ? 'LEGENDARY DEN · ' : 'MAX RAID DEN · ') + Math.round(Math.hypot(d.x - p.x, d.y - p.y) / 32) + ' m');
     }
     ctx.filter = 'none';
     if (lden && lden.e && !lden.e.dead) { const p = B()?.game?.player; if (p) edgeArrow(ctx, sx(lden.e.x), sy(lden.e.y) - 30 * k, W, H, '#ffd23f', String(lden.e.name).toUpperCase() + ' · ' + Math.round(Math.hypot(lden.e.x - p.x, lden.e.y - p.y) / 32) + ' m'); }

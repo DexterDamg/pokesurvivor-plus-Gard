@@ -876,13 +876,13 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      return true;}catch(e){console.warn("J's Will",e);return false;}};
  function echoText(p){
    if(!echoOn(p))return '';const B2=ECHO.bond,bd=p.__echoBond,now=performance.now();
-   const l=['\u{1F496} Echo (only you can see this): EXP ×1.6 · damage ×1.3 · speed ×1.15',
-     "\u{1F496} Echo's Resolve For J: +2 second chances (extra hearts) each run",
-     "\u{1F496} J's Intuition: twice the rerolls (e.g. 6 \u2192 12)",
-     "\u{1F496} Echo's Love: +25% critical-hit chance \u00b7 15% less damage taken",
-     "\u{1F496} J and Echo's Bond (Mega Gardevoir): when HP drops below 50% → heals 20 HP/s for 10s, attack ×10 for 10s, speed ×1.5 for 5s, 20% less damage taken for 30s (every 30s at most)"+(bd&&now<bd.take?' — ACTIVE':''),
-     "\u{1F496} Friends For Life: every KO gives +0.5% damage, EXP, defense and critical chance (now: damage +"+(fflBonus(p,'deal')*100).toFixed(1)+"% \u00b7 EXP +"+(fflBonus(p,'xp')*100).toFixed(1)+"% \u00b7 defense +"+(fflBonus(p,'take')*100).toFixed(1)+"% \u00b7 crit +"+(fflBonus(p,'crit')*100).toFixed(1)+"%; caps: damage/defense +500%, EXP +600%, crit +30%)",
-     "\u{1F496} J's Will: at level 50+, if you're not Mega yet and you run out of hearts, you revive with 2 hearts and instantly Mega Evolve (once per run)"+(p.__jWillUsed?' — USED':'')];
+   const l=['\u{1F496} Echo: EXP ×1.6 · dmg ×1.3 · speed ×1.15',
+     "\u{1F496} Echo's Resolve For J: +2 hearts",
+     "\u{1F496} J's Intuition: 2× rerolls",
+     "\u{1F496} Echo's Love: +25% crit · -15% dmg taken",
+     "\u{1F496} J and Echo's Bond (Mega, <50% HP): regen, ×10 dmg, speed, defense"+(bd&&now<bd.take?' — ACTIVE':''),
+     "\u{1F496} Friends For Life: +"+(fflBonus(p,'deal')*100).toFixed(0)+"% dmg/def · +"+(fflBonus(p,'xp')*100).toFixed(0)+"% EXP · +"+(fflBonus(p,'crit')*100).toFixed(0)+"% crit",
+     "\u{1F496} J's Will: Lv 50+, out of hearts → revive & Mega"+(p.__jWillUsed?' (used)':'')];
    return '\n\n'+l.join('\n');}
  function passiveLines(title,abilityId,types,deal,inScope){
    const A=ABIL[abilityId],out=[];
