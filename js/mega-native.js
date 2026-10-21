@@ -63,8 +63,35 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    for(const k in mv){if(k!=='from')def[k]=mv[k];}
    def.kind=tpl.kind;return def;
  }
+ const LEGEND_DEFS={}; // dex -> [move defs] (reward-pool only)
+ let poolHooked=false;
+ function hookPool(m){
+   if(poolHooked||typeof m.poolFor!=='function')return;poolHooked=true;
+   const orig=m.poolFor;
+   // A legendary's own signature move(s) join ITS level-up reward pool (never at run start, never for others).
+   // While unlearned, the pool is trimmed so the move reliably shows up among the new-move candidates.
+   m.poolFor=function(mon){
+     const r=orig.apply(this,arguments);
+     try{
+       const p=getPlayer(),defs=mon&&LEGEND_DEFS[Number(mon.dex)];
+       if(!defs||!p||Number(p.level)<2)return r;
+       const unlearned=defs.filter(d=>!(typeof p.hasMove==='function'&&p.hasMove(d.id)));
+       if(!unlearned.length)return r;
+       const rest=r.filter(id=>!unlearned.some(d=>d.id===id)).sort(()=>Math.random()-0.5).slice(0,5);
+       return [...unlearned.map(d=>d.id),...rest];
+     }catch(e){return r;}
+   };
+ }
  function buildKitMoves(m){
    if(kitMovesBuilt)return;
+   hookPool(m);
+   const LM=window.PS_LEGEND_MOVES||{};
+   for(const [dex,list] of Object.entries(LM)){
+     LEGEND_DEFS[dex]=[];
+     for(const mv of list){const d=fromTemplate(m,mv);if(d)LEGEND_DEFS[dex].push(d);else console.warn('Legend move: unknown template',mv.from);}
+   }
+   const MFX=window.PS_MEGA_FX||{};
+   for(const [form,fx] of Object.entries(MFX)){const k=MEGA_KITS[form];if(k&&k.move){const fxm=Object.assign({},k.move.fx||{},fx.fx||{});Object.assign(k.move,fx);k.move.fx=fxm;}}
    for(const [form,kit] of Object.entries(MEGA_KITS)){
      if(kit&&kit.bond&&!BOND_MOVES[form]){const d=fromTemplate(m,kit.bond);if(d)BOND_MOVES[form]=d;else console.warn('Mega kit: unknown bond template',kit.bond.from);}
      const mv=kit&&kit.move;if(!mv||SIGNATURE_MOVES[form])continue;
@@ -81,7 +108,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const m=getBridge()?.moves;
    if(!m||!m.BY_ID||!Array.isArray(m.ALL))return false;
    buildKitMoves(m);
-   for(const def of [...Object.values(SIGNATURE_MOVES),...Object.values(BOND_MOVES)]){
+   for(const def of [...Object.values(SIGNATURE_MOVES),...Object.values(BOND_MOVES),...Object.values(LEGEND_DEFS).flat()]){
      // The engine adds 'ups' (upgrade table) and 'maxLvl' to every move at boot.
      // Moves injected later must get them too, or the level-up reward screen
      // crashes on def.ups[lvl-1] and freezes the game.
@@ -205,6 +232,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(!player||!move)return;
    const waves=(Number(move.count)||16)>=24?4:3;
    if(move.psCast==='blackhole'){castBlackhole(player,move,hit,ghost);return;}
+   if(move.psCast!=='eruption'&&window.PS_FX&&window.PS_FX.has(move.psCast)){window.PS_FX.cast(move.psCast,player,move,hit,ghost);return;}
    eruptions.push({x:player.x,y:player.y,player,move,hit,ghost:!!ghost,t:0,next:0,waves});
    try{getBridge()?.camera?.kick?.(0.06);}catch(e){}
  };
@@ -386,7 +414,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const playing=getBridge()?.game?.state==='playing';
    const on=activePrimal&&p===activePrimal.player&&playing;
    // Custom move effects (Precipice Blades, Blackhole...) draw on this overlay too, Primal or not.
-   const fxActive=playing&&(eruptions.length||spikes.length||debris.length||holes.length);
+   const fxActive=playing&&(eruptions.length||spikes.length||debris.length||holes.length||(window.PS_FX&&window.PS_FX.active()));
    if(!on){fx.drops.length=fx.ripples.length=fx.motes.length=0;}
    if(!on&&!fxActive){if(ring.style.display!=='none')ring.style.display='none';return;}
    const d=domainOnScreen(p);if(!d){ring.style.display='none';return;}
@@ -443,6 +471,15 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    }
    updateEruptions(dt);drawEruptions(ctx,d.box);
    updateHoles(dt);drawHoles(ctx,d.box);
+   if(window.PS_FX&&window.PS_FX.active()){
+     window.PS_FX.update(dt);
+     const cam=getBridge()?.camera,g=gameCanvas();
+     if(cam&&g&&typeof cam.left==='function'){
+       const css=Number(cam._cw)>0?g.r.width/cam._cw:1,k=cam.scale*css;
+       const view={k,box:d.box,sx:wx=>g.r.left+(wx-cam.left())*k,sy:wy=>g.r.top+(wy-cam.top())*k};
+       ctx.save();ctx.beginPath();ctx.rect(d.box.left,d.box.top,d.box.width,d.box.height);ctx.clip();window.PS_FX.draw(ctx,view);ctx.restore();
+     }
+   }
  }
  requestAnimationFrame(drawPrimalDomain);
 
@@ -479,7 +516,76 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(src.mid){const m=getBridge()?.moves;return m&&m.BY_ID?m.BY_ID[src.mid]||null:null;}
    return null;
  }
+ // ---- Traits (js/traits.js): extra conditional passives per legendary / Mega ----
+ const TRAITS=window.PS_TRAITS||{};
+ function traitsFor(p){
+   if(!p)return null;
+   if(p.megaForm){if(p.megaKit===p.megaForm)return TRAITS[p.megaForm]||null;if(WEATHER[p.megaForm])return TRAITS[Number(p.dex)]||null;return null;}
+   return LEGENDS[Number(p.dex)]?TRAITS[Number(p.dex)]||null:null;
+ }
+ function wxKind(){let k=W()?.current?.kind||null;if(k&&k.indexOf('primal-')===0)k=k.slice(7);return k;}
+ function condOK(w,p,t){
+   if(!w)return true;const hp=p.maxHp>0?p.hp/p.maxHp:1,now=performance.now();
+   if(w.hpBelow!=null&&!(hp<w.hpBelow))return false;
+   if(w.hpAbove!=null&&!(hp>w.hpAbove))return false;
+   if(w.moving&&!p.walking)return false;
+   if(w.still&&p.walking)return false;
+   if(w.weather){const k=wxKind();if(!k||!w.weather.includes(k))return false;}
+   if(w.crowd&&(p.__crowd||0)<w.crowd)return false;
+   if(w.hurt&&now-(p.__hitAt||-1e9)>w.hurt*1000)return false;
+   const needT=w.vsStatus||w.vsBurn||w.vsPoison||w.vsSlow||w.vsBoss||w.far||w.near;
+   if(needT){
+     if(!t||typeof t.x!=='number')return false;
+     const burn=t.burn>0,pois=t.poison>0,slow=t.slow>0||t.slowT>0;
+     if(w.vsBurn&&!burn)return false;if(w.vsPoison&&!pois)return false;if(w.vsSlow&&!slow)return false;
+     if(w.vsStatus&&!(burn||pois||slow))return false;
+     if(w.vsBoss&&!(t.boss||t.legend))return false;
+     const d=Math.hypot(t.x-p.x,t.y-p.y);if(w.far&&d<w.far)return false;if(w.near&&d>w.near)return false;
+   }
+   return true;
+ }
+ function traitDeal(p,target){
+   const TR=traitsFor(p);if(!TR)return 1;let m=1;const now=performance.now();
+   TR.forEach((tr,i)=>{
+     if(tr.deal&&condOK(tr.when,p,target))m*=tr.deal;
+     if(tr.charge&&p.__chargeReady&&p.__chargeReady[i]&&target&&typeof target.x==='number'){
+       p.__chargeReady[i]=false;(p.__chargeAt=p.__chargeAt||{})[i]=now;m*=tr.charge.mult;
+       if(tr.charge.stun&&typeof target.applyStun==='function')try{target.applyStun(tr.charge.stun);}catch(e){}
+     }
+   });
+   if(p.__ks&&now<p.__ks.until)m*=1+p.__ks.n*p.__ks.per;
+   return m;
+ }
+ function traitTake(p){const TR=traitsFor(p);if(!TR)return 1;let m=1;for(const tr of TR)if(tr.take&&condOK(tr.when,p,null))m*=tr.take;return m;}
+ function traitTick(p,dt,now){
+   const TR=traitsFor(p);if(!TR)return;
+   if(!p.__crowdAt||now-p.__crowdAt>250){p.__crowdAt=now;let n=0;const E=getBridge()?.enemies;if(E&&typeof E.all==='function')for(const e of E.all())if(e&&!e.dead&&Math.hypot(e.x-p.x,e.y-p.y)<160)n++;p.__crowd=n;}
+   let kills=null;try{kills=typeof p.myKills==='function'?p.myKills():null;}catch(e){}
+   const newKills=(kills!=null&&p.__kills!=null&&kills>p.__kills)?kills-p.__kills:0;if(kills!=null)p.__kills=kills;
+   TR.forEach((tr,i)=>{
+     if(tr.regen&&condOK(tr.when,p,null)&&p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+p.maxHp*tr.regen*dt);
+     if(tr.charge){p.__chargeReady=p.__chargeReady||{};p.__chargeAt=p.__chargeAt||{};if(p.__chargeAt[i]==null)p.__chargeAt[i]=now;if(!p.__chargeReady[i]&&now-p.__chargeAt[i]>=tr.charge.secs*1000)p.__chargeReady[i]=true;}
+     if(tr.onKill&&newKills>0){
+       if(tr.onKill.deal){const act=p.__ks&&now<p.__ks.until?p.__ks.n:0;p.__ks={n:Math.min(tr.onKill.max||10,act+newKills),per:tr.onKill.deal,until:now+(tr.onKill.dur||6)*1000};}
+       if(tr.onKill.heal)p.hp=Math.min(p.maxHp,p.hp+p.maxHp*tr.onKill.heal*newKills);
+     }
+   });
+ }
+ function describeTrait(tr){
+   const w=tr.when||{},c=[],e=[];
+   if(w.hpBelow!=null)c.push('below '+Math.round(w.hpBelow*100)+'% HP');if(w.hpAbove!=null)c.push('above '+Math.round(w.hpAbove*100)+'% HP');
+   if(w.moving)c.push('while moving');if(w.still)c.push('while standing still');if(w.weather)c.push('in '+w.weather.map(TN).join('/'));
+   if(w.crowd)c.push('with '+w.crowd+'+ foes nearby');if(w.hurt)c.push('for '+w.hurt+'s after being hit');
+   if(w.vsBurn)c.push('vs burned foes');if(w.vsPoison)c.push('vs poisoned foes');if(w.vsSlow)c.push('vs slowed foes');if(w.vsStatus)c.push('vs burned/poisoned/slowed foes');
+   if(w.vsBoss)c.push('vs bosses');if(w.far)c.push('vs far foes');if(w.near)c.push('vs close foes');
+   if(tr.deal)e.push('damage '+X(tr.deal));if(tr.take)e.push('damage taken -'+PCT(tr.take));if(tr.spd)e.push('speed '+X(tr.spd));
+   if(tr.regen)e.push('heals '+(tr.regen*100).toFixed(1).replace(/\.0$/,'')+'% HP/s');
+   if(tr.onKill){if(tr.onKill.deal)e.push('each KO +'+Math.round(tr.onKill.deal*100)+'% damage (max '+(tr.onKill.max||10)+', '+(tr.onKill.dur||6)+'s)');if(tr.onKill.heal)e.push('each KO heals '+Math.round(tr.onKill.heal*100)+'% HP');}
+   if(tr.charge)e.push('every '+tr.charge.secs+'s the next hit deals '+X(tr.charge.mult)+(tr.charge.stun?' and stuns':''));
+   return tr.name+': '+(c.length?c.join(', ')+' → ':'')+e.join(', ');
+ }
  window.PS_HOOKS={
+   spd(pl){const p=getPlayer();if(!p||pl!==p)return 1;const TR=traitsFor(p);if(!TR)return 1;let m=1;for(const tr of TR)if(tr.spd&&condOK(tr.when,p,null))m*=tr.spd;return m;},
    deal(type,target,src){
      const p=getPlayer(),P=passiveFor(p);if(!P)return 1;
      let m=1;const D=P.deal||{};
@@ -512,11 +618,12 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
          if(A.slowChance&&Math.random()<A.slowChance&&typeof target.applySlow==='function')target.applySlow(0.35);
        }
      }
+     m*=traitDeal(p,target);
      return m;
    },
    take(type,pl,dmg){
-     const p=getPlayer();if(!p||pl!==p)return 1;const P=passiveFor(p);if(!P||!P.ability)return 1;
-     const A=P.ability,now=performance.now();let m=1;
+     const p=getPlayer();if(!p||pl!==p)return 1;const P=passiveFor(p);if(!P)return 1;
+     const A=P.ability||{},now=performance.now();let m=1;
      const who=window.PS_ATTACKER,fromEnemy=!!who,contact=fromEnemy&&!!window.PS_CONTACT;
      const att=who===true?nearestEnemy(p,160):(who||null);   // true = enemy shot whose shooter wasn't recorded
      if(A.take){if(type&&Number.isFinite(A.take[type]))m*=A.take[type];if(Number.isFinite(A.take.all))m*=A.take.all;}
@@ -533,6 +640,8 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      }
      if(A.weatherImmune&&type&&W()){const w=W().mult(type);if(w>1)m/=w;}        // weather can't boost hits against it
      // reactive effects on the enemy that hit you (only real enemy hits: never lava, weather, etc.)
+     m*=traitTake(p);
+     if(fromEnemy)p.__hitAt=now;
      if(fromEnemy&&m>0)reactToHit(A,p,att,type,(Number(dmg)||0)*m,contact,P.abilityId);
      // Sturdy-style endure: survive a lethal hit with 1 HP (cooldown)
      if(A.endure&&Number(dmg)>0&&p.hp>1&&p.hp<=dmg*m&&now-(p.__endureAt||-1e9)>A.endure.cd*1000){p.__endureAt=now;m=Math.max(0,(p.hp-1)/dmg);}
@@ -568,7 +677,9 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(!p.__bornAt)p.__bornAt=now;
    const P=passiveFor(p),A=P&&P.ability;
    p.weatherImmune=!!(A&&A.weatherImmune);   // engine: no weather chip damage
-   if(!A||b.game.state!=='playing'||p.dead)return;
+   if(b.game.state!=='playing'||p.dead)return;
+   traitTick(p,dt,now);
+   if(!A)return;
    if(A.regen&&p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+p.maxHp*A.regen*dt);
    if(A.aura&&b.enemies&&(!p.__auraAt||now-p.__auraAt>500)){
      p.__auraAt=now;const r=A.aura.radius;
@@ -633,6 +744,8 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(!p||p.megaForm)return '';
    const P=passiveFor(p);if(!P||(P.src!=='legend'&&P.src!=='mono'))return '';
    const lines=P.src==='legend'?passiveLines('Legendary ability',P.abilityId,P.types,P.deal,true):[describeDamage(P.types,{},true)];
+   if(P.src==='legend'&&TRAITS[Number(p.dex)])for(const t of TRAITS[Number(p.dex)])lines.push('Trait \u2013 '+describeTrait(t));
+   if(P.src==='legend'&&window.PS_LEGEND_MOVES&&window.PS_LEGEND_MOVES[Number(p.dex)])lines.push('Signature move (from level-up rewards): '+window.PS_LEGEND_MOVES[Number(p.dex)].map(m=>m.name).join(', '));
    return '\n\n'+lines.filter(Boolean).join('\n');
  }
  function passiveLines(title,abilityId,types,deal,inScope){
@@ -709,7 +822,7 @@ function start(){
  const visible=isRunScreen();
  mini.style.display=visible?'block':'none';
  if(!visible)panel.style.display='none';
- setLines(status,(!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(f0?'\nForm: '+(f0.en||f0.name)+(f0.spr?'':' (no sprite yet: keeps the normal look)'):'')+(f0&&MEGA_KITS[f0.key]?'\n\n'+passiveLines('Mega ability',MEGA_KITS[f0.key].passive.ability,f0.types||[],MEGA_KITS[f0.key].passive.deal,true).join('\n')+'\nSignature move: '+MEGA_KITS[f0.key].move.name+' (max level)\n'+(MEGA_KITS[f0.key].move.desc||'')+(MEGA_KITS[f0.key].bond?'\nBond move: '+MEGA_KITS[f0.key].bond.name+' (fires together with '+MEGA_KITS[f0.key].move.name+')\n'+(MEGA_KITS[f0.key].bond.desc||''):''):'')+currentPassiveText(p)).split('\n'));
+ setLines(status,(!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(f0?'\nForm: '+(f0.en||f0.name)+(f0.spr?'':' (no sprite yet: keeps the normal look)'):'')+(f0&&MEGA_KITS[f0.key]?'\n\n'+passiveLines('Mega ability',MEGA_KITS[f0.key].passive.ability,f0.types||[],MEGA_KITS[f0.key].passive.deal,true).join('\n')+(TRAITS[f0.key]?'\n'+TRAITS[f0.key].map(t=>'Trait \u2013 '+describeTrait(t)).join('\n'):'')+'\nSignature move: '+MEGA_KITS[f0.key].move.name+' (max level)\n'+(MEGA_KITS[f0.key].move.desc||'')+(MEGA_KITS[f0.key].bond?'\nBond move: '+MEGA_KITS[f0.key].bond.name+' (fires together with '+MEGA_KITS[f0.key].move.name+')\n'+(MEGA_KITS[f0.key].bond.desc||''):''):'')+currentPassiveText(p)).split('\n'));
 
  // Species is fixed to the current player; no clickable Pokémon/form selector.
 
