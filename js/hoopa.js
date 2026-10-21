@@ -40,7 +40,7 @@
     1001:['Ruination','dark','burst'],1002:['Ruination','dark','burst'],1003:['Ruination','dark','burst'],1004:['Ruination','dark','burst'],1007:['Collision Course','fighting','strike'],1008:['Electro Drift','electric','strike'],
     1014:['Gunk Shot','poison','burst'],1015:['Psychic','psychic','burst'],1016:['Moonblast','fairy','burst'],1017:['Ivy Cudgel','grass','strike'],1024:['Tera Starstorm','normal','burst'],1025:['Malignant Chain','poison','beam']
   };
-  const roster = Object.values(E.DEX_BY).filter(mon => E.SPRITE_META[mon.dex]);
+  const roster = Object.values(E.DEX_BY).filter(mon => E.SPRITE_META[mon.dex] && mon.dex !== 386);   // Deoxys: Birth Island only
   // Match exact rarity, across every region. Legendary flags never enter an earlier pool.
   const pools = stages.map(({tier}) => roster.filter(mon => tier===5 ? mon.rarity===5 : mon.rarity===tier && !mon.leg));
   const move = {id:ID,name:'Hyperspace Hole',type:'psychic',kind:'summon',psCast:ID,

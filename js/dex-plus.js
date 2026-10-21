@@ -139,6 +139,7 @@
         (p.types.length === 1 ? '<p class="sub center" style="margin:4px 0 0">Single type: +20% damage with its ' + tname(p.types[0]) + ' moves</p>' : '') +
         (start ? '<p class="center" style="margin:6px 0 2px;font-size:14px">Starts with <b class="gold">' + start + '</b></p>' : '') + (moves ? '<div class="moves">' + moves + '</div>' : '') +
         (using ? '<button class="btn" disabled style="width:100%">Your partner</button>' : '<button class="btn gold" data-pick="1" style="width:100%">Choose as partner' + (viewShiny ? ' (shiny)' : '') + '</button>')
+        : p.dex === 386 ? '<p class="center mut">You don\'t have it yet.<br>It is only found on <b class="gold">Birth Island</b>: a strange island you may wash up on when the map shifts (Original Mode).</p>'   // Deoxys: Birth Island only
         : '<p class="center mut">You don\'t have it yet.<br>Get it from the <b class="gold">' + (GEN[p.gen - 1] || '') + '</b> banner' + (p.rarity === 5 ? ', a Legendary Den,' : '') + ' or by defeating it when it shows up shiny.</p>');
     const cv = d.querySelector('.stage'); cv.style.setProperty('--stage-c', !own ? '#5b83d6' : viewShiny ? '#9ae6ff' : ((N.U.TYPE_COLOR || {})[p.types[0]] || '#5b83d6')); cv.classList.toggle('shiny', own && viewShiny);
     try { N.UI.sprite(cv, dex, { lively: own, spin: own, silhouette: !own, scale: 3, hero: true, shiny: own && viewShiny }); } catch (_) {}

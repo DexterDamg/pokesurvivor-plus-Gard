@@ -49,7 +49,7 @@
     else say('Legendary ' + d.name + ' joins the Boss Rush!', 3);
     return e;
   }
-  function rushPool() { const L = Object.keys(window.PS_LEGEND_MOVES || {}).map(Number).filter(d => !GACHA_ONLY.has(d) && d !== 493 && E()?.SPRITE_META?.[d]); return L; }
+  function rushPool() { const L = Object.keys(window.PS_LEGEND_MOVES || {}).map(Number).filter(d => !GACHA_ONLY.has(d) && d !== 493 && d !== 386 && E()?.SPRITE_META?.[d]); return L; }   // Deoxys: Birth Island only
   function remove(e) { try { e.dead = true; const L = E().EnemyMgr.all(), i = L.indexOf(e); if (i >= 0) L.splice(i, 1); } catch (_) {} }
   function caught(r) {
     const N = E(), dex = r.dex, sh = !!r.e.shiny, name = (N.DEX_BY[dex] || {}).name || 'Pokémon';
