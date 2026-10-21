@@ -1131,7 +1131,8 @@ function start(){
  }
  // Pokemon cries played when the orb breaks during Mega Evolution. Add more: dex number -> file in assets/cries/
  const MEGA_CRIES={
-   '282':'assets/cries/282.mp3'   // Gardevoir
+   '282':'assets/cries/282.mp3',   // Gardevoir
+   '384':'assets/cries/384-mega.mp3'   // Mega Rayquaza
  };
  function orbIcon(red,size){
    // Pixel-art Red Orb (Groudon) / Blue Orb (Kyogre), drawn inline so no image files are needed.

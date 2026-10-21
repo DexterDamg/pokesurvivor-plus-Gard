@@ -1,11 +1,13 @@
-/* TERRAIN GENERATORS (only the terrain generator, taken from the newer PokéSurvivor's js/world/layouts.js by Reed Liu).
-   Each map now has its own terrain shape, not just its colors:
-     Shady Forest -> plains (exactly the old terrain, nothing changes)
-     Crystal Cave -> cave   (rooms and straight corridors)
-     Ash Volcano  -> lava   (winding lava rivers with stone bridges)
-     Area Zero    -> bog    (islands joined by bridges)
-   The generator is chosen once per run from the map you picked, so terrain never changes under your feet.
-   Rift arenas, Safe Zones and co-op keep the original terrain. Everything is deterministic from the run seed. */
+/* TERRAIN + BIOME REGIONS
+   Terrain generators taken from the newer PokéSurvivor's js/world/layouts.js (by Reed Liu), plus big biome regions (v59):
+   the world is split into areas about 150 tiles across. Each one is a real biome with its own terrain shape,
+   ground colors, liquid (water, lava, ice, quicksand, electric pools), trees and ground details:
+     Shady Forest, Flower Meadow, Sunny Beach (palm trees), Lava Fields (charred trees), Power Plant (power poles
+     and wires), Red Desert (cacti), Frozen Glacier (snowy pines), Emerald Jungle, Old Graveyard (graves),
+     Crystal Caves, Sea Grotto.
+   You start in the middle of the map's own biome (about 55 tiles of it in every direction). The borders blend
+   over a strip of open ground. Rift arenas, Safe Zones, Area Zero and co-op keep the original world.
+   Everything is deterministic from the run seed. Needs the PS_TERRAIN and PS_PROP_AT hooks in js/app.min.js. */
 (() => {
   'use strict';
   if (window.PS_TERRAIN_INSTALLED) return; window.PS_TERRAIN_INSTALLED = true;
@@ -656,58 +658,283 @@ G.Layouts = G.Layouts || (() => {
   };
 })();
 
-    // ---- regions: the world is split into big areas (about 130 tiles across), each with its own terrain ----
-    // Your starting area is the map's own terrain; walk far enough and you cross a strip of open ground into another
-    // area (open fields, an archipelago, marshland, a river valley, a rocky maze...). The open strip between areas keeps
-    // everything connected. Which terrains appear depends on the map (no wading islands where the liquid burns).
-    const POOLS = {
-      0: { home: 'plains', list: ['plains', 'islands', 'marsh', 'lava', 'cave', 'plains'] },
-      1: { home: 'cave', list: ['cave', 'plant', 'plains', 'bog', 'cave'] },
-      2: { home: 'lava', list: ['lava', 'cave', 'plains', 'lava'] },
-      22: { home: 'bog', list: ['bog', 'cave', 'plains', 'plant'] }, 23: { home: 'bog', list: ['bog', 'cave', 'plains', 'plant'] }, 24: { home: 'bog', list: ['bog', 'cave', 'plains', 'plant'] },
+    // ======================= BIOME REGIONS (v59) =======================
+    // The world is split into big areas (about 150 tiles across, ~30-40 s of walking). Each area is a real biome:
+    // its own terrain shape, its own ground colors, its own liquid (water, lava, ice, quicksand, electric pools...),
+    // its own trees (palm trees on the beach, power poles in the power plant, cacti in the desert, graves in the
+    // graveyard, snowy pines on the glacier...) and little ground details (shells, cracks, bones, grates...).
+    // Your starting area is the map's own biome. Between two areas there's a strip of open ground where the colors
+    // blend, so everything stays connected. Rift arenas, Safe Zones, Area Zero and co-op keep the original world.
+    const H = (x, y, s) => G.U.hash(x, y, s);
+    const T = G.Tiles, BI = T.BIOMES;
+    // ---- palettes: copies of the game's own biome colors (so rifts using those colors are never touched) + the beach
+    const clone = (i, name, extra) => { BI.push(Object.assign({}, BI[i], { name }, extra || {})); return BI.length - 1; };
+    const BEACH = {
+      name: 'Sunny Beach', liquid: 'water', floor: ['#e9d7a0', '#efdeaa', '#e2cf95'], dirt: ['#d8c088', '#d2b980', '#ddc690'], speck: '#cdb57e', light: '#fff2c8',
+      flowers: ['#ff8fb0', '#ffffff', '#ffd23f'], wallTop: ['#b39a6e', '#bfa67a', '#a88f64'], wallLight: '#dcc79a', wallEdge: '#4a3a22', wallFace: ['#8a7048', '#7d6440'], wallFaceDark: '#5e4a2e',
+      liq: '#2fb5e0', liqDeep: '#1f8ec4', foam: '#e8fbff', shore: '#f6e9bf', prop: 'tree', leaf: ['#2f8a3a', '#3fa64a', '#5cc45a', '#8ade6a'], trunk: ['#8a5a2a', '#a87038'],
+      rock: ['#a8a29a', '#c4beb4', '#dcd6cc'], grass: ['#7aa84a', '#9ac45a', '#c4dc7a'] };
+    const R = {   // name, terrain layout, palette, tree look, liquid note
+      forest:  { name: 'Shady Forest',   lay: 'plains',  pal: clone(0, 'Shady Forest') },
+      meadow:  { name: 'Flower Meadow',  lay: 'plains',  pal: clone(3, 'Flower Meadow') },
+      beach:   { name: 'Sunny Beach',    lay: 'islands', pal: (BI.push(BEACH), BI.length - 1), deco: 'palm' },
+      lava:    { name: 'Lava Fields',    lay: 'lava',    pal: clone(2, 'Lava Fields'), deco: 'charred' },
+      power:   { name: 'Power Plant',    lay: 'plains',  pal: clone(7, 'Power Plant', { prop: 'tree' }), deco: 'pole' },
+      desert:  { name: 'Red Desert',     lay: 'plains',  pal: clone(11, 'Red Desert'), deco: 'cactus' },
+      glacier: { name: 'Frozen Glacier', lay: 'islands', pal: clone(8, 'Frozen Glacier'), deco: 'pine' },
+      jungle:  { name: 'Emerald Jungle', lay: 'marsh',   pal: clone(6, 'Emerald Jungle'), deco: 'jungle' },
+      grave:   { name: 'Old Graveyard',  lay: 'plains',  pal: clone(16, 'Old Graveyard'), deco: 'grave' },
+      crystal: { name: 'Crystal Caves',  lay: 'cave',    pal: clone(1, 'Crystal Caves') },
+      grotto:  { name: 'Sea Grotto',     lay: 'bog',     pal: clone(5, 'Sea Grotto') },
     };
-    const NAMES = { plains: 'Open Fields', islands: 'Archipelago', marsh: 'Marshlands', lava: 'River Valley', cave: 'Rocky Maze', plant: 'Hollow Caverns', bog: 'Island Bridges' };
-    const NAMES_HOT = { lava: 'Lava Rivers' };
-    const CELL = 85, BAND = 6, JIT = 0.35;   // areas ~85 tiles across: you reach a new one after ~40 tiles of walking
+    const MINE = new Set(Object.values(R).map(r => r.pal));
+    const POOLS = {   // which areas each map can have (home = where you start)
+      0: { home: 'forest', list: ['beach', 'meadow', 'desert', 'jungle', 'power', 'glacier', 'grave', 'lava', 'crystal', 'grotto'] },
+      1: { home: 'crystal', list: ['grave', 'glacier', 'power', 'forest', 'lava', 'beach', 'desert', 'jungle', 'grotto'] },
+      2: { home: 'lava', list: ['beach', 'desert', 'power', 'grave', 'forest', 'glacier', 'jungle', 'meadow', 'grotto'] },
+    };
+    const CELL = 150, BAND = 5, JIT = 0.33, BLEND = 4;
     const lays = {}; const L = id => lays[id] || (lays[id] = G.Layouts.make(id));
     const seedPt = new Map();
     function pt(i, j, seed) { const key = i * 100003 + j + seed * 7; let v = seedPt.get(key); if (!v) { if (seedPt.size > 20000) seedPt.clear();
-      v = [(i + 0.5 + (G.U.hash(i, j, seed + 811) - 0.5) * 2 * JIT) * CELL, (j + 0.5 + (G.U.hash(i, j, seed + 812) - 0.5) * 2 * JIT) * CELL]; seedPt.set(key, v); } return v; }
-    const homes = new Map();
-    function homeCell(seed) { let h = homes.get(seed); if (h) return h; let best = 1e18; for (let j = -1; j <= 0; j++) for (let i = -1; i <= 0; i++) { const q = pt(i, j, seed), d = q[0] * q[0] + q[1] * q[1]; if (d < best) { best = d; h = [i, j]; } } homes.set(seed, h); return h; }
-    function region(tx, ty, seed, pool) {
-      const ci = Math.floor(tx / CELL), cj = Math.floor(ty / CELL); let d1 = 1e18, d2 = 1e18, bi = 0, bj = 0;
-      for (let j = cj - 1; j <= cj + 1; j++) for (let i = ci - 1; i <= ci + 1; i++) { const q = pt(i, j, seed), d = (q[0] - tx) ** 2 + (q[1] - ty) ** 2; if (d < d1) { d2 = d1; d1 = d; bi = i; bj = j; } else if (d < d2) d2 = d; }
-      const hc = homeCell(seed), isHome = bi === hc[0] && bj === hc[1];
-      const id = isHome ? pool.home : pool.list[Math.floor(G.U.hash(bi, bj, seed + 813) * pool.list.length)];
-      return { id, edge: Math.sqrt(d2) - Math.sqrt(d1) };   // edge: how far from the border with the next area (tiles, x2)
+      const jit = i === 0 && j === 0 ? 0 : JIT;   // your starting area is centred on the spawn point
+      v = [(i + 0.5 + (H(i, j, seed + 811) - 0.5) * 2 * jit) * CELL, (j + 0.5 + (H(i, j, seed + 812) - 0.5) * 2 * jit) * CELL]; seedPt.set(key, v); } return v; }
+    const homeCell = () => [0, 0];
+    function typeOf(i, j, seed, pool) {
+      const hc = homeCell(seed); if (i === hc[0] && j === hc[1]) return pool.home;
+      let k = Math.floor(H(i, j, seed + 813) * pool.list.length), t = pool.list[k];
+      // neighbours rarely share a biome, so you really do walk from one world into another
+      if (H(i, j, seed + 814) < 0.75) { const hl = H(i - 1, j, seed + 813), hu = H(i, j - 1, seed + 813);
+        for (let n = 0; n < pool.list.length && (pool.list[Math.floor(hl * pool.list.length)] === t || pool.list[Math.floor(hu * pool.list.length)] === t); n++) { k = (k + 1) % pool.list.length; t = pool.list[k]; } }
+      return t;
     }
+    const pool = () => { const b = G.Maps && G.Maps.cur ? G.Maps.cur.biome : 0; return POOLS[b] || null; };
+    function region(tx, ty, seed, P) {
+      tx += CELL / 2; ty += CELL / 2;   // shift so the spawn point (0,0) sits in the middle of cell (0,0)
+      const ci = Math.floor(tx / CELL), cj = Math.floor(ty / CELL); let d1 = 1e18, d2 = 1e18, bi = 0, bj = 0, si = 0, sj = 0;
+      for (let j = cj - 1; j <= cj + 1; j++) for (let i = ci - 1; i <= ci + 1; i++) { const q = pt(i, j, seed), d = (q[0] - tx) ** 2 + (q[1] - ty) ** 2;
+        if (d < d1) { d2 = d1; si = bi; sj = bj; d1 = d; bi = i; bj = j; } else if (d < d2) { d2 = d; si = i; sj = j; } }
+      const edge = Math.sqrt(d2) - Math.sqrt(d1);
+      return { id: typeOf(bi, bj, seed, P), id2: typeOf(si, sj, seed, P), edge };
+    }
+    // which biome a tile LOOKS like (the border is ragged, not a straight line)
+    function look(tx, ty, seed, P) {
+      const r = region(tx, ty, seed, P); if (r.edge >= BLEND * 2 || r.id === r.id2) return r.id;
+      const n = G.Layouts.fbm(tx / 3.5, ty / 3.5, seed + 821) * 0.7 + H(tx, ty, seed + 822) * 0.3;
+      return n < 0.5 - r.edge / (BLEND * 4) ? r.id2 : r.id;
+    }
+    const active = () => !!pool() && !(G.Coop && G.Coop.active);
     window.PS_TERRAIN = function (tx, ty, seed) {
       try {
-        if (G.Coop && G.Coop.active) return null;
+        if (!active()) return null;
         window.PS_TERRAIN_SEED = seed;
-        const b = G.Maps && G.Maps.cur ? G.Maps.cur.biome : 0, pool = POOLS[b] || POOLS[0];
-        const r = region(tx, ty, seed, pool);
-        if (r.edge < BAND && tx * tx + ty * ty > 400) {   // the open strip between two areas (a little noise so it isn't a straight line)
-          const n = G.Layouts.fbm(tx / 6, ty / 6, seed + 815); return n < 0.18 ? 2 : 0; }
-        return L(r.id).terrain(tx, ty, seed);
+        const P = pool(), r = region(tx, ty, seed, P);
+        if (r.edge < BAND && tx * tx + ty * ty > 400) {   // the open strip between two areas
+          const n = G.Layouts.fbm(tx / 6, ty / 6, seed + 815); return n < 0.14 ? 2 : 0; }
+        return L(R[r.id].lay).terrain(tx, ty, seed);
       } catch (e) { return null; }
     };
-    window.PS_TERRAIN_REGION = function (x, y) { try { const b = G.Maps && G.Maps.cur ? G.Maps.cur.biome : 0, pool = POOLS[b] || POOLS[0], seed = window.PS_TERRAIN_SEED; if (seed == null) return null; const id = region(Math.floor(x / 32), Math.floor(y / 32), seed, pool).id; return (b === 2 && NAMES_HOT[id]) || NAMES[id] || id; } catch (_) { return null; } };
+    const regionAtPx = (x, y) => { const P = pool(), seed = window.PS_TERRAIN_SEED; if (!P || seed == null) return null; return look(Math.floor(x / 32), Math.floor(y / 32), seed, P); };
+    window.PS_TERRAIN_REGION = function (x, y) { try { const id = regionAtPx(x, y); return id ? R[id].name : null; } catch (_) { return null; } };
+    window.PS_BIOME_AT = regionAtPx;
+
+    // ---- ground painting: each tile gets its own biome's colors + little details ----
+    const managed = b => active() && (MINE.has(b) || b === (G.Maps && G.Maps.cur ? G.Maps.cur.biome : 0)) && !(G.Judgment && G.Judgment.active);
+    const groundCache = new Map();
+    const origPaint = T.paintChunk;
+    T.paintChunk = function (cx, cy, size, terrAt, noise, biome, seed) {
+      if (!managed(biome)) return origPaint.apply(this, arguments);
+      const P = pool(), key = cx + ',' + cy + ',' + seed + ',' + (G.Maps.cur ? G.Maps.cur.biome : 0);
+      const hit = groundCache.get(key); if (hit) return hit;
+      const ids = new Array(size * size), used = new Set();
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) { const id = look(cx * size + x, cy * size + y, seed, P); ids[y * size + x] = id; used.add(id); }
+      const first = ids[0], out = origPaint.call(this, cx, cy, size, terrAt, noise, R[first].pal, seed);
+      if (used.size > 1) { const g = out.getContext('2d'), Tp = out.width / size, imgs = {};
+        for (const id of used) if (id !== first) imgs[id] = origPaint.call(this, cx, cy, size, terrAt, noise, R[id].pal, seed);
+        for (let i = 0; i < ids.length; i++) if (ids[i] !== first) { const x = (i % size) * Tp, y = Math.floor(i / size) * Tp; g.drawImage(imgs[ids[i]], x, y, Tp, Tp, x, y, Tp, Tp); } }
+      try { decorate(out, cx, cy, size, terrAt, ids, seed); } catch (e) { console.warn('[terrain] decor', e); }
+      if (groundCache.size > 110) groundCache.delete(groundCache.keys().next().value);
+      groundCache.set(key, out); return out;
+    };
+    function decorate(cv, cx, cy, size, terrAt, ids, seed) {
+      const g = cv.getContext('2d'), Tp = cv.width / size, k = Tp / 16, f = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x * k), Math.round(y * k), Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))); };
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        const tx = cx * size + x, ty = cy * size + y; if (terrAt(tx, ty) !== 'floor') continue;
+        const id = ids[y * size + x], h = H(tx, ty, seed + 830), h2 = H(tx, ty, seed + 831), ox = x * 16, oy = y * 16, a = 2 + Math.floor(h2 * 9), b = 2 + Math.floor(H(tx, ty, seed + 832) * 9);
+        if (id === 'beach') {
+          if (h < 0.035) { f(ox + a, oy + b, 3, 2, '#fff4e8'); f(ox + a + 1, oy + b - 1, 1, 1, '#ffd0c0'); }                       // shell
+          else if (h < 0.05) { const c = '#ff8a4a'; f(ox + a + 2, oy + b, 1, 5, c); f(ox + a, oy + b + 2, 5, 1, c); f(ox + a + 1, oy + b + 1, 3, 3, c); }   // starfish
+          else if (h < 0.16) { f(ox + 2, oy + b, 9, 1, 'rgba(160,130,80,.35)'); f(ox + 4, oy + b + 3, 8, 1, 'rgba(160,130,80,.25)'); }   // sand ripples
+        } else if (id === 'desert') {
+          if (h < 0.06) { f(ox + a, oy + b, 2, 2, '#7a5a38'); f(ox + a + 3, oy + b + 1, 1, 1, '#6a4a2a'); }
+          else if (h < 0.09) { f(ox + a, oy + b, 6, 1, 'rgba(90,60,30,.5)'); f(ox + a + 5, oy + b + 1, 1, 3, 'rgba(90,60,30,.5)'); }
+          else if (h < 0.095) { f(ox + a, oy + b, 4, 3, '#efe6d2'); f(ox + a + 1, oy + b + 1, 1, 1, '#3a2a1a'); f(ox + a + 2, oy + b + 1, 1, 1, '#3a2a1a'); }   // little skull
+        } else if (id === 'lava') {
+          if (h < 0.12) { f(ox + a, oy + b, 5, 1, '#ff7a1a'); f(ox + a + 4, oy + b + 1, 1, 3, '#ff7a1a'); f(ox + a + 1, oy + b, 2, 1, '#ffd23f'); }   // glowing cracks
+          else if (h < 0.2) f(ox + a, oy + b, 2, 2, '#2a1a14');
+        } else if (id === 'power') {
+          const plate = G.Layouts.fbm(tx / 7, ty / 7, seed + 840) > 0.58;
+          if (plate) { f(ox, oy, 16, 16, 'rgba(120,124,132,.55)'); f(ox, oy, 16, 1, 'rgba(255,255,255,.12)'); f(ox + 2, oy + 2, 1, 1, '#2a2a30'); f(ox + 13, oy + 13, 1, 1, '#2a2a30'); if (h < 0.3) for (let i = 0; i < 4; i++) f(ox + 3 + i * 3, oy + 5, 1, 6, 'rgba(20,20,26,.55)'); }
+          else if (h < 0.05) { for (let i = 0; i < 4; i++) f(ox + 2 + i * 3, oy + 6, 2, 3, i % 2 ? '#1a1a1a' : '#ffd23f'); }       // hazard stripe
+          else if (h < 0.12) { f(ox, oy + b, 16, 1, '#26262c'); f(ox + a, oy + b - 1, 2, 3, '#3a3a44'); }                       // cable
+        } else if (id === 'grave') {
+          if (h < 0.04) { f(ox + a, oy + b, 6, 1, '#d8d0c0'); f(ox + a - 1, oy + b - 1, 2, 3, '#d8d0c0'); f(ox + a + 5, oy + b - 1, 2, 3, '#d8d0c0'); }   // bone
+          else if (h < 0.12) f(ox + a, oy + b, 3, 2, 'rgba(20,18,30,.5)');
+        } else if (id === 'glacier') {
+          if (h < 0.1) { f(ox + a, oy + b, 1, 1, '#ffffff'); f(ox + a - 1, oy + b + 1, 3, 1, 'rgba(255,255,255,.7)'); }
+          else if (h < 0.15) { f(ox + a, oy + b, 6, 1, 'rgba(90,130,170,.45)'); f(ox + a + 3, oy + b + 1, 1, 3, 'rgba(90,130,170,.45)'); }
+        } else if (id === 'jungle') {
+          if (h < 0.08) { f(ox + a, oy + b, 5, 3, '#2f8a2a'); f(ox + a + 1, oy + b + 1, 3, 1, '#58c04a'); }
+          else if (h < 0.1) { f(ox + a, oy + b + 2, 1, 2, '#e8e0c8'); f(ox + a - 1, oy + b, 3, 2, '#d8402a'); f(ox + a, oy + b, 1, 1, '#ffffff'); }   // mushroom
+        } else if (id === 'meadow') {
+          if (h < 0.16) { const c = ['#ffd23f', '#ff8ad8', '#ffffff', '#9ad0ff'][Math.floor(h2 * 4)]; f(ox + a, oy + b, 1, 1, c); f(ox + a - 1, oy + b + 1, 3, 1, c); f(ox + a, oy + b + 2, 1, 1, c); f(ox + a, oy + b + 1, 1, 1, '#ffef9a'); }
+        } else if (id === 'forest') {
+          if (h < 0.05) { f(ox + a, oy + b, 3, 2, '#8a5a2a'); f(ox + a + 3, oy + b + 1, 2, 2, '#a6702a'); }
+          else if (h < 0.065) { f(ox + a, oy + b + 2, 1, 2, '#e8e0c8'); f(ox + a - 1, oy + b, 3, 2, '#c8402a'); }
+        } else if (id === 'crystal' || id === 'grotto') {
+          if (h < 0.04) { const c = id === 'grotto' ? '#7ef0d0' : '#a8c8ff'; f(ox + a, oy + b, 2, 3, c); f(ox + a, oy + b, 1, 1, '#ffffff'); }
+        }
+      }
+    }
+
+    // ---- extra props (trees, palm trees, power poles, cacti, graves...) through the engine's PS_PROP_AT hook ----
+    const near = (tx, ty, seed, P, id) => { try { return look(tx, ty, seed, P) === id && L(R[region(tx, ty, seed, P).id].lay) && window.PS_TERRAIN(tx, ty, seed) === 0; } catch (_) { return false; } };
+    const poleRow = (tx, ty, seed) => ((ty % 10) + 10) % 10 === 0 && ((tx % 7) + 7) % 7 === 0 && H(Math.floor(tx / 35), ty, seed + 901) < 0.85;
+    window.PS_PROP_AT = function (tx, ty, open) {
+      const res = propAt(tx, ty); return (res === 'tree' || res === 'rock') && open === false ? undefined : res;
+    };
+    function propAt(tx, ty) {
+      try {
+        const P = pool(), seed = window.PS_TERRAIN_SEED; if (!P || seed == null || !active() || tx * tx + ty * ty < 144) return undefined;
+        const id = look(tx, ty, seed, P), h = H(tx, ty, seed + 850), n = G.Layouts.fbm(tx / 9, ty / 9, seed + 851);
+        if (region(tx, ty, seed, P).edge < 3) return undefined;
+        switch (id) {
+          case 'power': return poleRow(tx, ty, seed) ? 'tree' : h < 0.006 ? 'rock' : null;
+          case 'beach': return h < 0.03 ? 'tree' : h < 0.06 ? 'grass' : undefined;
+          case 'desert': return h < 0.022 ? 'tree' : h < 0.03 ? 'rock' : null;
+          case 'grave': return (((tx % 4) + 4) % 4 === 0 && ((ty % 5) + 5) % 5 === 0 && n > 0.45) || h < 0.006 ? 'tree' : undefined;
+          case 'glacier': return n > 0.55 && h < 0.14 ? 'tree' : undefined;
+          case 'jungle': return n > 0.42 && h < 0.16 ? 'tree' : h < 0.06 ? 'grass' : undefined;
+          case 'forest': return n > 0.58 && h < 0.13 ? 'tree' : undefined;
+          case 'lava': return h < 0.018 ? 'tree' : h < 0.04 ? 'rock' : undefined;
+          case 'meadow': return h < 0.08 ? 'grass' : h < 0.09 ? 'tree' : undefined;
+        }
+      } catch (_) {}
+      return undefined;
+    }
+
+    // ---- props are drawn in the colors of the biome they stand in; trees get each biome's own look ----
+    let cur = null;
+    const W = G.World, origDraw = W.drawProp, origSprite = T.propSprite;
+    W.drawProp = function (ctx, prop) { cur = prop; try { return origDraw.apply(this, arguments); } finally { cur = null; } };
+    T.propSprite = function (biome, type, v) {
+      if (cur && managed(biome)) {
+        const p = cur; if (p.__rg === undefined) { const seed = window.PS_TERRAIN_SEED, P = pool(); p.__rg = seed == null || !P ? null : look(p.tx, p.ty, seed, P); }
+        const r = p.__rg && R[p.__rg];
+        if (r) { if (type === 'tree' && r.deco) return SPR(r.deco, variantFor(r.deco, p)); return origSprite.call(this, r.pal, type, v); }
+      }
+      return origSprite.apply(this, arguments);
+    };
+    function variantFor(kind, p) {
+      const h = H(p.tx, p.ty, 77);
+      if (kind === 'pole') { const seed = window.PS_TERRAIN_SEED, P = pool(); const l = near(p.tx - 7, p.ty, seed, P, 'power') && poleRow(p.tx - 7, p.ty, seed), r = near(p.tx + 7, p.ty, seed, P, 'power') && poleRow(p.tx + 7, p.ty, seed); return (l ? 1 : 0) + (r ? 2 : 0) + (h < 0.25 ? 4 : 0); }
+      return Math.floor(h * 3);
+    }
+
+    // ---- the global biome follows you (liquids: lava burns, water slows, ice slides, electric pools shock...) ----
+    let lastSet = null, lastName = null, runP = null;
+    setInterval(() => { try {
+      const B = window.PS_MEGA_BRIDGE_V5, p = B?.game?.player; if (!p || B.game.state !== 'playing' || !active()) { lastSet = null; return; }
+      if ((G.Rift && G.Rift.inArena) || (G.Judgment && G.Judgment.active) || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) { lastSet = null; return; }
+      if (p !== runP) { runP = p; lastName = null; }
+      const id = regionAtPx(p.x, p.y); if (!id) return; const pal = R[id].pal;
+      if (lastSet !== pal) { lastSet = pal; try { W.setBiome(pal, true); } catch (_) {} }
+      if (lastName && lastName !== id) { try { G.Spawner.say('— ' + R[id].name + ' —', 2.5); } catch (_) {} }
+      lastName = id;
+    } catch (e) {} }, 250);
+
+    // ---- the sprites (pixel art drawn once, then cached) ----
+    const sprites = new Map();
+    function SPR(kind, v) { const key = kind + v; let c = sprites.get(key); if (!c) { c = build(kind, v); sprites.set(key, c); } return c; }
+    function finish(c, outline) {   // hard pixel edges + a dark outline like the game's own sprites
+      const g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height), a = d.data, w = c.width, h = c.height, solid = new Uint8Array(w * h);
+      for (let i = 0; i < w * h; i++) { if (a[i * 4 + 3] > 110) { a[i * 4 + 3] = 255; solid[i] = 1; } else a[i * 4 + 3] = 0; }
+      if (outline) { const o = [parseInt(outline.slice(1, 3), 16), parseInt(outline.slice(3, 5), 16), parseInt(outline.slice(5, 7), 16)];
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (solid[i]) continue;
+          if ((x > 0 && solid[i - 1]) || (x < w - 1 && solid[i + 1]) || (y > 0 && solid[i - w]) || (y < h - 1 && solid[i + w])) { a[i * 4] = o[0]; a[i * 4 + 1] = o[1]; a[i * 4 + 2] = o[2]; a[i * 4 + 3] = 255; } } }
+      g.putImageData(d, 0, 0); return c;
+    }
+    function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+    function build(kind, v) {
+      if (kind === 'palm') {
+        const c = canvas(44, 62), g = c.getContext('2d'), lean = v === 1 ? -1 : 1, bx = 22, by = 61, topX = bx + lean * 7, topY = 16;
+        for (let i = 0; i <= 44; i++) { const u = i / 44, x = bx + (topX - bx) * u * u, y = by - (by - topY) * u, w = 4.6 - u * 1.4; g.fillStyle = (Math.floor(i / 3) % 2) ? '#8a5a2a' : '#a87038'; g.fillRect(Math.round(x - w / 2), Math.round(y), Math.ceil(w), 2); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(Math.round(x + w / 2 - 1), Math.round(y), 1, 2); }
+        const fr = [[-2.9, 18], [-2.3, 20], [-1.7, 15], [-1.25, 17], [-0.6, 18], [-0.15, 19], [0.45, 15]];
+        for (const [ang, len] of fr) { for (let s = 0; s <= len; s++) { const u = s / len, x = topX + Math.cos(ang) * s, y = topY + Math.sin(ang) * s + u * u * 9, w = 3.4 * (1 - u * 0.7);
+          g.fillStyle = s % 3 === 0 ? '#3fa64a' : '#2f8a3a'; g.beginPath(); g.ellipse(x, y, w, w * 0.7, ang, 0, Math.PI * 2); g.fill();
+          if (s % 2 === 0 && s > 2) { g.fillStyle = '#5cc45a'; g.fillRect(Math.round(x), Math.round(y + w * 0.6), 1, 2); } } }
+        g.fillStyle = '#5a3a1a'; for (const [dx, dy] of [[-2, 2], [1, 3], [-1, 4]]) { g.beginPath(); g.arc(topX + dx, topY + dy, 2, 0, Math.PI * 2); g.fill(); }
+        g.fillStyle = '#8ade6a'; g.fillRect(topX - 1, topY - 2, 3, 2);
+        return finish(c, '#1c2a14');
+      }
+      if (kind === 'pole') {
+        const half = 56, c = canvas(half * 2 + 4, 76), g = c.getContext('2d'), mx = half + 2, L = v & 1, Rr = v & 2, tr = v & 4;
+        g.fillStyle = '#5a3a22'; g.fillRect(mx - 2, 10, 4, 66); g.fillStyle = '#7a5130'; g.fillRect(mx - 2, 10, 2, 66); g.fillStyle = '#3e2816'; for (let y = 16; y < 76; y += 9) g.fillRect(mx - 2, y, 4, 1);
+        g.fillStyle = '#4a3020'; g.fillRect(mx - 12, 13, 24, 3); g.fillRect(mx - 9, 21, 18, 2);
+        g.fillStyle = '#cfe8ff'; for (const x of [mx - 11, mx - 1, mx + 9]) g.fillRect(x, 10, 2, 3); for (const x of [mx - 8, mx + 6]) g.fillRect(x, 18, 2, 3);
+        if (tr) { g.fillStyle = '#7d8590'; g.fillRect(mx + 2, 30, 7, 11); g.fillStyle = '#a4adb8'; g.fillRect(mx + 2, 30, 7, 2); g.fillStyle = '#4b525b'; g.fillRect(mx + 3, 41, 5, 1); }
+        g.strokeStyle = '#18181c'; g.lineWidth = 1;
+        const wire = (x0, y0, x1, sag) => { g.beginPath(); for (let i = 0; i <= 40; i++) { const u = i / 40, x = x0 + (x1 - x0) * u, y = y0 + sag * (1 - (1 - u) * (1 - u)); i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); };
+        if (L) { wire(mx - 11, 11, 0, 9); wire(mx - 8, 19, 0, 8); } else { wire(mx - 11, 11, mx - 20, 6); }
+        if (Rr) { wire(mx + 11, 11, c.width, 9); wire(mx + 8, 19, c.width, 8); } else { wire(mx + 11, 11, mx + 20, 6); }
+        // no outline (it would thicken the wires); keep edges crisp
+        const d = g.getImageData(0, 0, c.width, c.height); for (let i = 3; i < d.data.length; i += 4) d.data[i] = d.data[i] > 60 ? 255 : 0; g.putImageData(d, 0, 0); return c;
+      }
+      if (kind === 'cactus') {
+        const c = canvas(26, 42), g = c.getContext('2d'), G1 = '#3f8a3a', G2 = '#5aae4a', D = '#2a6a2a';
+        const col = (x, y, w, h) => { g.fillStyle = G1; g.fillRect(x, y + 2, w, h - 2); g.fillRect(x + 1, y, w - 2, 2); g.fillStyle = G2; g.fillRect(x + 1, y + 2, 1, h - 3); g.fillStyle = D; g.fillRect(x + w - 2, y + 2, 1, h - 3); };
+        col(10, 4, 7, 38); if (v !== 2) { col(3, 14, 5, 12); g.fillStyle = G1; g.fillRect(6, 23, 5, 4); } if (v !== 1) { col(19, 10, 5, 13); g.fillStyle = G1; g.fillRect(16, 20, 4, 4); }
+        g.fillStyle = '#e8f0c0'; for (let y = 8; y < 40; y += 4) { g.fillRect(9, y, 1, 1); g.fillRect(17, y + 2, 1, 1); }
+        if (v === 0) { g.fillStyle = '#ff6a8a'; g.fillRect(12, 2, 3, 2); g.fillStyle = '#ffd23f'; g.fillRect(13, 2, 1, 1); }
+        return finish(c, '#1a2a12');
+      }
+      if (kind === 'grave') {
+        const c = canvas(24, 30), g = c.getContext('2d');
+        if (v === 1) { g.fillStyle = '#8a8a96'; g.fillRect(10, 2, 5, 26); g.fillRect(4, 8, 17, 5); g.fillStyle = '#a8a8b4'; g.fillRect(10, 2, 2, 26); g.fillRect(4, 8, 17, 2); }
+        else { g.fillStyle = '#7d7d8a'; g.beginPath(); g.moveTo(3, 29); g.lineTo(3, 9); g.quadraticCurveTo(3, 1, 12, 1); g.quadraticCurveTo(21, 1, 21, 9); g.lineTo(21, 29); g.fill();
+          g.fillStyle = '#9a9aa8'; g.fillRect(4, 8, 3, 20); g.fillStyle = '#4a4a56'; g.fillRect(8, 10, 8, 1); g.fillRect(8, 13, 8, 1); g.fillRect(8, 16, 6, 1); if (v === 2) { g.fillStyle = '#5a7a4a'; g.fillRect(3, 24, 6, 5); g.fillRect(16, 22, 5, 7); } }
+        g.fillStyle = '#3a3a2a'; g.fillRect(1, 28, 22, 2);
+        return finish(c, '#15141c');
+      }
+      if (kind === 'pine') {
+        const c = canvas(34, 54), g = c.getContext('2d');
+        g.fillStyle = '#4a3020'; g.fillRect(15, 42, 5, 12);
+        for (let k = 0; k < 4; k++) { const y = 6 + k * 10, w = 7 + k * 4; g.fillStyle = '#1f5a46'; g.beginPath(); g.moveTo(17, y - 6); g.lineTo(17 + w, y + 10); g.lineTo(17 - w, y + 10); g.fill();
+          g.fillStyle = '#2f7a5e'; g.beginPath(); g.moveTo(17, y - 6); g.lineTo(17 - w + 2, y + 9); g.lineTo(15, y + 9); g.fill();
+          g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(17, y - 6); g.lineTo(17 + w * 0.55, y + 3); g.lineTo(17 - w * 0.55, y + 3); g.fill(); g.fillStyle = '#e4f2ff'; g.fillRect(17 - Math.round(w * 0.9), y + 8, 3, 2); g.fillRect(17 + Math.round(w * 0.6), y + 7, 3, 2); }
+        return finish(c, '#0f241e');
+      }
+      if (kind === 'jungle') {
+        const c = canvas(50, 60), g = c.getContext('2d');
+        g.fillStyle = '#5a3a1e'; g.fillRect(21, 26, 8, 34); g.fillStyle = '#6e4a26'; g.fillRect(21, 26, 3, 34); g.fillRect(14, 54, 22, 6);
+        const blob = (x, y, r, c1, c2) => { g.fillStyle = c1; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.fillStyle = c2; g.beginPath(); g.arc(x - r * 0.3, y - r * 0.35, r * 0.55, 0, Math.PI * 2); g.fill(); };
+        blob(14, 22, 11, '#1f6a26', '#2f8a32'); blob(36, 22, 11, '#1f6a26', '#2f8a32'); blob(25, 13, 13, '#26782c', '#3fa63e'); blob(25, 26, 10, '#1f6a26', '#2f8a32');
+        g.fillStyle = '#58c04a'; for (const [x, y] of [[20, 8], [30, 10], [12, 18], [38, 18], [24, 20]]) g.fillRect(x, y, 2, 2);
+        g.fillStyle = '#2f7a2a'; for (const x of [9, 16, 33, 41]) for (let y = 28; y < 28 + 8 + (x % 7); y += 2) g.fillRect(x + ((y >> 2) % 2), y, 1, 2);
+        if (v === 0) { g.fillStyle = '#ff5a8a'; g.fillRect(31, 15, 3, 3); g.fillStyle = '#ffd23f'; g.fillRect(32, 16, 1, 1); }
+        return finish(c, '#0c200e');
+      }
+      if (kind === 'charred') {
+        const c = canvas(32, 48), g = c.getContext('2d');
+        g.strokeStyle = '#1e1614'; g.lineCap = 'round';
+        const br = (x0, y0, x1, y1, w) => { g.lineWidth = w; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); };
+        br(16, 48, 16, 14, 5); br(16, 30, 6, 18, 3); br(16, 24, 26, 12, 3); br(16, 18, 12, 6, 2); br(8, 20, 4, 12, 2); br(24, 14, 28, 6, 2);
+        g.fillStyle = '#ff7a1a'; g.fillRect(15, 34, 1, 4); g.fillRect(17, 26, 1, 3); g.fillRect(15, 42, 2, 1); g.fillStyle = '#ffd23f'; g.fillRect(15, 35, 1, 1);
+        if (v === 0) { g.fillStyle = '#ff5a1a'; g.fillRect(25, 12, 2, 1); }
+        return finish(c, '#0c0806');
+      }
+      return canvas(1, 1);
+    }
   }
-  // each area gets its own color mood (a soft tint that fades in when you cross into it; your starting area looks normal)
-  const TINT = { 'Archipelago': '#2f9cff', 'Marshlands': '#5f8a2a', 'River Valley': '#ffb060', 'Rocky Maze': '#7b7b9a', 'Hollow Caverns': '#7a5cff', 'Island Bridges': '#2fd0c0', 'Lava Rivers': '#ff5a2a', 'Open Fields': '#ffe08a' };
-  const tint = document.createElement('div'); tint.id = 'ps-region-tint'; tint.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:14;mix-blend-mode:soft-light;opacity:0;transition:opacity 2.5s ease,background-color 2.5s ease';
-  const addTint = () => { if (document.body && !tint.isConnected) document.body.append(tint); };
-  let homeName = null;
-  function setTint(name, show) { addTint(); if (!show || !name || name === homeName || !TINT[name]) { tint.style.opacity = '0'; return; } tint.style.backgroundColor = TINT[name]; tint.style.opacity = '0.35'; }
-  // the region name pops up when you walk into a new area
-  (function regionWatch() {
-    let last = null, runP = null;
-    setInterval(() => { try { const B = window.PS_MEGA_BRIDGE_V5, N = window.PS_HOOPA_ENGINE, p = B?.game?.player; if (!p || B.game.state !== 'playing' || (N.Coop && N.Coop.active) || (N.Rift && N.Rift.inArena)) return;
-      if (p !== runP) { runP = p; last = null; homeName = window.PS_TERRAIN_REGION && window.PS_TERRAIN_REGION(0, 0); }
-      const n = window.PS_TERRAIN_REGION && window.PS_TERRAIN_REGION(p.x, p.y); if (!n) return; if (last && n !== last) { try { N.Spawner.say('— ' + n + ' —', 2.5); } catch (_) {} } last = n; setTint(n, true); } catch (_) {} }, 500);
-    setInterval(() => { try { const B = window.PS_MEGA_BRIDGE_V5, N = window.PS_HOOPA_ENGINE, st = B?.game?.state; if (!B?.game?.player || st === 'ui' || st === 'over' || (N.Rift && N.Rift.inArena) || (N.Coop && N.Coop.active) || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) setTint(null, false); } catch (_) {} }, 400);
-  })();
-  const t = setInterval(() => { const G = window.PS_HOOPA_ENGINE; if (G && G.U && G.U.hash) { clearInterval(t); install(G); } }, 20);
+  const t = setInterval(() => { const G = window.PS_HOOPA_ENGINE; if (G && G.U && G.U.hash && G.Tiles && G.Tiles.paintChunk && G.World && G.World.drawProp) { clearInterval(t); install(G); } }, 20);
 })();
