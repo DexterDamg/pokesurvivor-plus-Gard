@@ -668,7 +668,7 @@ G.Layouts = G.Layouts || (() => {
     };
     const NAMES = { plains: 'Open Fields', islands: 'Archipelago', marsh: 'Marshlands', lava: 'River Valley', cave: 'Rocky Maze', plant: 'Hollow Caverns', bog: 'Island Bridges' };
     const NAMES_HOT = { lava: 'Lava Rivers' };
-    const CELL = 130, BAND = 7, JIT = 0.35;
+    const CELL = 85, BAND = 6, JIT = 0.35;   // areas ~85 tiles across: you reach a new one after ~40 tiles of walking
     const lays = {}; const L = id => lays[id] || (lays[id] = G.Layouts.make(id));
     const seedPt = new Map();
     function pt(i, j, seed) { const key = i * 100003 + j + seed * 7; let v = seedPt.get(key); if (!v) { if (seedPt.size > 20000) seedPt.clear();

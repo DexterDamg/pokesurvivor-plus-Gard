@@ -27,7 +27,8 @@
     const lv5 = Object.assign({}, volc, { n: L.length + 2, psLevel: 5, name: 'Volcanic Nightmare', diff: 'Nightmare', col: '#ff3d6d', k: 4.5, dk: 2.6, bonus: 1, coins: 60000, t10: 10, arceusMin: 3000000, legendMin: 300000, arceusK: 60, legendK: 3 });
     L.push(lv4, lv5);
     const wins = () => (N.DB.save && N.DB.save.mapWins) || {};
-    const open4 = () => !!wins()[3] || !!(N.DevMenu && N.DevMenu.on), open5 = () => !!wins()[lv4.n] || !!(N.DevMenu && N.DevMenu.on);
+    const tester = () => String(window.PS_MEGA_BRIDGE_V5?.user || '').trim().toLowerCase() === 'lovergare';   // LoverGare can always pick them (testing)
+    const open4 = () => !!wins()[3] || tester() || !!(N.DevMenu && N.DevMenu.on), open5 = () => !!wins()[lv4.n] || tester() || !!(N.DevMenu && N.DevMenu.on);
     const isOpen = M.isOpen, selected = M.selected;
     M.isOpen = n => n === lv4.n ? open4() : n === lv5.n ? open5() : isOpen(n);
     M.selected = function () { const s = N.DB.save, sel = s && s.mapSel; if (sel === lv4.n && open4()) return lv4.n; if (sel === lv5.n && open5()) return lv5.n; return selected.call(this); };
