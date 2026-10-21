@@ -78,10 +78,27 @@
   }
 
   // ---------------- in-run HUD ----------------
+  // ---- side notifications (slide in on the right, game-style box) — shared with dens.js via window.PS_TOAST ----
+  const toastBox = document.createElement('div'); toastBox.id = 'ps-toasts';
+  window.PS_TOAST = function (title, sub, opt) {
+    opt = opt || {}; const el = document.createElement('div'); el.className = 'box ps-toast' + (opt.gold ? ' gold' : '');
+    let ic = ''; try { if (opt.dex && E()?.UI?.spriteCanvas) { const c = E().UI.spriteCanvas(opt.dex, 56, 56, { scale: 1, shiny: !!opt.shiny }); c.classList.add('ti'); ic = c; } else if (opt.icon) ic = ico(opt.icon, 40); } catch (_) {}
+    el.innerHTML = '<div class="tx"><b>' + title + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
+    if (ic && typeof ic === 'object') el.prepend(ic); else if (ic) el.insertAdjacentHTML('afterbegin', '<span class="ti">' + ic + '</span>');
+    toastBox.appendChild(el); requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('in')));
+    setTimeout(() => { el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 450); }, opt.ms || 5200);
+    try { B()?.audio?.sfx?.(opt.gold ? 'legend' : 'levelup'); } catch (_) {}
+  };
   const css = document.createElement('style');
   css.textContent = `
-  #ps-mode-hud{position:fixed;left:50%;top:46px;transform:translateX(-50%);z-index:24;display:none;align-items:center;gap:10px;padding:5px 16px !important;font-size:17px;pointer-events:none;animation:none !important;overflow:visible !important;white-space:nowrap}
-  #ps-mode-hud img{width:22px;height:22px;image-rendering:pixelated}#ps-mode-hud .tm{font-size:24px;color:var(--gold);min-width:64px;text-align:center}#ps-mode-hud .mu{color:var(--muted);font-size:14px}
+  #ps-toasts{position:fixed;right:14px;top:150px;z-index:85;display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:none}
+  .ps-toast{display:flex;align-items:center;gap:12px;padding:10px 16px !important;min-width:250px;max-width:340px;transform:translateX(120%);opacity:0;transition:transform .45s cubic-bezier(.2,1.3,.4,1),opacity .3s;animation:none !important}
+  .ps-toast.in{transform:none;opacity:1}.ps-toast.out{transform:translateX(120%);opacity:0}
+  .ps-toast.gold{border-color:#fff7d6;box-shadow:0 0 0 3px var(--edge-out),inset 0 0 0 2px var(--gold),0 0 24px rgba(255,210,63,.45)}
+  .ps-toast .ti,.ps-toast canvas.ti{flex:none;image-rendering:pixelated}.ps-toast .ti img{width:40px;height:40px;image-rendering:pixelated}
+  .ps-toast .tx{display:flex;flex-direction:column}.ps-toast b{font-size:17px;color:var(--gold)}.ps-toast small{font-size:13px;color:var(--muted)}
+  #ps-mode-hud{position:fixed;left:12px;top:62px;z-index:24;display:none;align-items:center;gap:8px;padding:4px 12px !important;font-size:15px;pointer-events:none;animation:none !important;overflow:visible !important;white-space:nowrap}
+  #ps-mode-hud img{width:20px;height:20px;image-rendering:pixelated}#ps-mode-hud .tm{font-size:19px;color:var(--gold);min-width:64px;text-align:center}#ps-mode-hud .mu{color:var(--muted);font-size:14px}
   #ps-mode-hud.low .tm{color:var(--red);animation:psModePulse .6s infinite alternate}@keyframes psModePulse{to{transform:scale(1.12)}}
   #ps-mode-win{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;pointer-events:none}
   #ps-mode-win .box{text-align:center;min-width:min(460px,90vw)}#ps-mode-win h2{color:var(--gold)}#ps-mode-win .sub{margin:0}
@@ -99,7 +116,7 @@
   const ico = (k, n) => { try { const I = E()?.Icons; if (I && E().ITEM_ICONS && E().ITEM_ICONS[k]) return I.html(k, n || 22); } catch (_) {} return ''; };
   const hud = document.createElement('div'); hud.id = 'ps-mode-hud'; hud.className = 'box';
   const winEl = document.createElement('div'); winEl.id = 'ps-mode-win';
-  const win = { show(b) { winEl.innerHTML = '<div class="box"><h2>You survived!</h2><p class="sub">' + fmt(run.len) + ' cleared · +' + b + ' PokéCoins</p></div>'; winEl.style.display = 'flex'; }, hide() { winEl.style.display = 'none'; } };
+  const win = { show(b) { if (window.PS_TOAST) { window.PS_TOAST('You survived!', fmt(run.len) + ' cleared · +' + b + ' PokéCoins', { gold: true, icon: 'quickclaw' }); return; } winEl.innerHTML = '<div class="box"><h2>You survived!</h2><p class="sub">' + fmt(run.len) + ' cleared · +' + b + ' PokéCoins</p></div>'; winEl.style.display = 'flex'; }, hide() { winEl.style.display = 'none'; } };
   let lastHud = '';
   function renderHud() {
     const st = B()?.game?.state;
@@ -148,7 +165,7 @@
     requestAnimationFrame(loop); const dt = Math.min(0.1, (now - last) / 1000); last = now;
     try { wrapHooks(); wrapSpawner(); tick(dt); menuT += dt; if (menuT > 0.5) { menuT = 0; if (B()?.game?.state === 'ui' || !B()?.game?.player) injectBtn(); } } catch (e) { console.warn('[modes]', e); }
   }
-  function init() { document.head.append(css); document.body.append(hud, winEl, pick); requestAnimationFrame(loop); }
+  function init() { document.head.append(css); document.body.append(hud, winEl, pick, toastBox); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
   window.PS_MODES = { modes: MODES, get selected() { return sel; }, set selected(v) { if (MODES[v]) { sel = v; store.set('mode', v); injectBtn(); } }, get length() { return len; }, set length(v) { if (LENGTHS.includes(v)) { len = v; store.set('timed_len', v); } }, get run() { return Object.assign({}, run, { player: !!run.player }); }, open: openPick, _debugLen(s) { run.len = s; } };
 })();
