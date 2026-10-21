@@ -87,7 +87,7 @@ window.PS_MEGA_KITS = {
    move:{from:'meteor-mash',id:'true-moon-blast',name:'True Moon Blast',type:'fairy',desc:'A gigantic blast of moonlight crashes down on foes. Double damage.',dmg:68,count:1,radius:150,knock:140,cd:2.0},
    // Bond move: shares True Moon Blast's slot, so both fire at the same time.
    // psCast:'blackhole' = custom effect: pulls nearby foes in for ~1s, then a dark blast for 'mult' x damage.
-   bond:{from:'meteor-mash',id:'blackhole',name:'Blackhole',type:'dark',psCast:'blackhole',desc:'A black hole opens on the biggest group of foes, sucks them in, then collapses in a dark blast for triple damage.',dmg:68,mult:3,count:1,radius:170,knock:170,cd:3.2}},
+   bond:{from:'meteor-mash',id:'blackhole',name:'Blackhole',type:'dark',psCast:'blackhole',desc:'A black hole opens on the biggest group of foes, sucks them in, then collapses in a dark blast for triple damage.',dmg:68,mult:3,count:1,radius:135,knock:170,cd:3.2}},
  '302-mega':{passive:{ability:'magic-bounce',deal:{ghost:1.2,dark:1.2}},
    move:{from:'will-o-wisp',id:'gem-sentinel',name:'Gem Sentinel',type:'dark',desc:'Two floating gems shoot at foes for a while.',dmg:22,count:2,rate:0.4,dur:8,range:300,speed:320,size:8,burn:0,cd:3.5}},
  '303-mega':{passive:{ability:'huge-power'},

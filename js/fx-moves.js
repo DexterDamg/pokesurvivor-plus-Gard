@@ -484,6 +484,78 @@
        ctx.globalCompositeOperation='source-over';ctx.drawImage(megaSym,X-sw/2,hy-sh/2,sw,sh);}
      ctx.restore();}};
 
+ // ---------------------------------------------------------------- ECHO'S TRUE POTENTIAL (LoverGare's Mega Gardevoir)
+ //  a giant white moon orb rolls forward in the aim direction (as big as a tree), leaves damaging glitter behind,
+ //  then a moon meteor crashes down where it ends for a big AOE.
+ S.echoblast={cast(c){const p=c.player;c.aim=Number(p.aim)||0;c.R=c.fx.size||58;c.speed=c.fx.speed||430;c.range=wallClip(p.x,p.y,c.aim,c.fx.range||620);
+     c.x=p.x+Math.cos(c.aim)*30;c.y=p.y+Math.sin(c.aim)*30;c.dist=0;c.skip=new Set();c.glit=[];c.gStep=0;c.parts=[];c.phase='roll';kick(0.15);
+     ring(p.x,p.y,10,90,'#ffffff',0.35,5);return c;},
+   update(c,dt){c.t+=dt;
+     if(c.phase==='roll'){const st=Math.min(c.speed*dt,c.range-c.dist);c.dist+=st;c.x+=Math.cos(c.aim)*st;c.y+=Math.sin(c.aim)*st;
+       hitCircle(c,c.x,c.y,c.R,{skip:c.skip,mult:1.4,knock:160});
+       c.gStep+=st;while(c.gStep>=36){c.gStep-=36;c.glit.push({x:c.x+rnd(-c.R*0.5,c.R*0.5),y:c.y+rnd(-c.R*0.4,c.R*0.4),t:0,life:2.6,tick:0,seed:Math.random()*99});}
+       if(c.parts.length<40)for(let i=0;i<3;i++)c.parts.push({a:rnd(0,TAU),r:rnd(c.R*0.9,c.R*1.5),t:0,s:rnd(2,5)});
+       if(c.dist>=c.range-0.5){c.phase='fall';c.ft=0;c.fx0=c.x;c.fy0=c.y;}}
+     else if(c.phase==='fall'){c.ft+=dt;if(c.ft>=0.55){c.phase='boom';c.bt=0;hitCircle(c,c.fx0,c.fy0,c.fx.boom||175,{mult:c.fx.boomMult||2.6,knock:240});kick(0.75);
+         ring(c.fx0,c.fy0,10,(c.fx.boom||175)*1.2,'#ffffff',0.6,8);ring(c.fx0,c.fy0,10,(c.fx.boom||175)*0.8,'#ff9ad8',0.5,6);burst(c.fx0,c.fy0,'#ffe6f6',34,300);burst(c.fx0,c.fy0,'#b8d8ff',20,240);}}
+     else c.bt+=dt;
+     for(const g of c.glit){g.t+=dt;g.tick-=dt;if(g.tick<=0&&g.t<g.life){g.tick=0.4;hitCircle(c,g.x,g.y,30,{mult:0.22,knock:0});}}
+     for(const q of c.parts){q.t+=dt;q.a+=dt*4;}c.parts=c.parts.filter(q=>q.t<0.6);
+     return c.phase!=='boom'||c.bt<0.9||c.glit.some(g=>g.t<g.life);},
+   draw(c,ctx,v){const k=v.k;ctx.save();
+     // glitter trail on the ground
+     for(const g of c.glit){if(g.t>=g.life)continue;const a=Math.min(1,(g.life-g.t)/0.5),X=v.sx(g.x),Y=v.sy(g.y);ctx.globalCompositeOperation='lighter';glow(ctx,X,Y,26*k,'rgba(255,190,240,'+(0.28*a)+')','rgba(160,180,255,0)');
+       for(let i=0;i<5;i++){const tw=0.5+0.5*Math.sin(c.t*9+g.seed+i*1.7),gx=X+Math.cos(g.seed+i*1.3)*20*k,gy=Y+Math.sin(g.seed*1.7+i)*9*k;star4(ctx,gx,gy,(2+3*tw)*k,a*tw,i%2?'#ffffff':(i%3?'#ffc8f0':'#c8dcff'));}}
+     // the moon orb
+     if(c.phase==='roll'){const X=v.sx(c.x),Y=v.sy(c.y)-c.R*0.6*k,R=c.R*k;ctx.globalCompositeOperation='lighter';
+       for(let i=1;i<=5;i++){const bx=X-Math.cos(c.aim)*i*R*0.45,by=Y-Math.sin(c.aim)*i*R*0.45;glow(ctx,bx,by,R*(1-i*0.12),'rgba(255,220,250,'+(0.22-i*0.035)+')','rgba(200,180,255,0)');}
+       glow(ctx,X,Y,R*1.9,'rgba(255,200,245,0.45)','rgba(140,170,255,0)');
+       ctx.globalCompositeOperation='source-over';const g=ctx.createRadialGradient(X-R*0.3,Y-R*0.35,R*0.1,X,Y,R);g.addColorStop(0,'#ffffff');g.addColorStop(0.7,'#fdf4ff');g.addColorStop(1,'#f0d8ff');ctx.fillStyle=g;ctx.beginPath();ctx.arc(X,Y,R,0,TAU);ctx.fill();
+       ctx.fillStyle='rgba(225,205,245,0.55)';[[0.3,-0.2,0.18],[-0.35,0.25,0.13],[0.1,0.42,0.1],[-0.1,-0.45,0.08]].forEach(([cx,cy,cr])=>{ctx.beginPath();ctx.arc(X+cx*R,Y+cy*R,cr*R,0,TAU);ctx.fill();});
+       ctx.strokeStyle='rgba(255,150,220,0.9)';ctx.lineWidth=3*k;ctx.beginPath();ctx.arc(X,Y,R*1.06,c.t*3,c.t*3+2.2);ctx.stroke();ctx.strokeStyle='rgba(150,190,255,0.9)';ctx.beginPath();ctx.arc(X,Y,R*1.12,-c.t*2.4,-c.t*2.4+1.8);ctx.stroke();
+       for(const q of c.parts){const a=1-q.t/0.6;star4(ctx,X+Math.cos(q.a)*q.r*k,Y+Math.sin(q.a)*q.r*0.7*k,q.s*k,a,'#ffffff');}}
+     // the meteor falling onto the end point
+     if(c.phase==='fall'){const q=Math.min(1,c.ft/0.55),X=v.sx(c.fx0),Y=v.sy(c.fy0),R=(c.fx.boom||175)*k;
+       ctx.strokeStyle='rgba(255,170,230,'+(0.4+0.5*q)+')';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(X,Y,R*q,R*q*0.45,0,0,TAU);ctx.stroke();ctx.fillStyle='rgba(255,170,230,'+(0.12+0.15*q)+')';ctx.fill();
+       const mx=X+(1-q)*240*k,my=Y-(1-q)*640*k,mr=34*k;ctx.globalCompositeOperation='lighter';const tl=ctx.createLinearGradient(mx,my,mx+150*k,my-380*k);tl.addColorStop(0,'rgba(255,220,250,0.9)');tl.addColorStop(1,'rgba(160,140,255,0)');
+       ctx.strokeStyle=tl;ctx.lineCap='round';ctx.lineWidth=mr*1.6;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx+150*k,my-380*k);ctx.stroke();glow(ctx,mx,my,mr*2.2,'rgba(255,255,255,0.95)','rgba(255,150,230,0)');
+       ctx.globalCompositeOperation='source-over';ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(mx,my,mr,0,TAU);ctx.fill();}
+     if(c.phase==='boom'&&c.bt<0.9){const u=c.bt/0.9,X=v.sx(c.fx0),Y=v.sy(c.fy0),R=(c.fx.boom||175)*k;ctx.globalCompositeOperation='lighter';
+       glow(ctx,X,Y,R*(0.5+u*1.2),'rgba(255,255,255,'+(1-u)+')','rgba(255,140,220,0)');ctx.strokeStyle='rgba(255,200,240,'+(1-u)+')';ctx.lineWidth=10*k*(1-u)+1;ctx.beginPath();ctx.ellipse(X,Y,R*(0.3+u*1.4),R*(0.3+u*1.4)*0.45,0,0,TAU);ctx.stroke();
+       for(let i=0;i<12;i++){const a=i/12*TAU,d=R*(0.2+u*1.1);star4(ctx,X+Math.cos(a)*d,Y+Math.sin(a)*d*0.5-20*k*u,(6-4*u)*k,1-u,'#ffffff');}}
+     ctx.restore();}};
+
+ // ---------------------------------------------------------------- "I'LL CALL YOU... ECHO" (LoverGare's Psychic Z-move)
+ //  4 huge psychic orbs circle Gardevoir and swing in and out across a big field, hitting whatever they touch;
+ //  a psychic barrier shoves anyone who gets too close away; at the end the orbs collapse into a giant explosion.
+ S.echoz={cast(c){c.dur=c.fx.dur||9;c.n=4;c.hits=new Map();c.ang=0;c.trails=[[],[],[],[]];kick(0.5);try{B()?.audio?.sfx?.('shinyGet');}catch(e){}return c;},
+   update(c,dt){c.t+=dt;const p=c.player;if(!p)return false;c.x=p.x;c.y=p.y;const all=enemies();
+     if(c.t<c.dur){c.ang+=dt*(2.4+0.6*Math.sin(c.t));const ph=(Math.sin(c.t*TAU/1.8)+1)/2,R=90+ph*(c.fx.reach||330);c.R=R;c.orbs=[];
+       for(let i=0;i<c.n;i++){const a=c.ang+i*TAU/c.n,ox=p.x+Math.cos(a)*R,oy=p.y+Math.sin(a)*R*0.8;c.orbs.push({x:ox,y:oy});c.trails[i].push({x:ox,y:oy});if(c.trails[i].length>9)c.trails[i].shift();
+         for(const e of all){if(Math.hypot(e.x-ox,e.y-oy)>34+(e.r||12))continue;const last=c.hits.get(e)||-9;if(c.t-last<0.3)continue;c.hits.set(e,c.t);applyHit(c,e,baseDmg(c,1.6),{knock:180},e.x-p.x,e.y-p.y);}}
+       for(const e of all){const dx=e.x-p.x,dy=e.y-p.y,d=Math.hypot(dx,dy)||1;if(d<(c.fx.barrier||130)){const push=(e.boss?90:420)*dt*(1-d/(c.fx.barrier||130))+8;e.x+=dx/d*push;e.y+=dy/d*push;}}
+       if(Math.random()<dt*6){const o=c.orbs[(Math.random()*4)|0];burst(o.x,o.y-10,'#ff7ad8',4,90);}}
+     else if(!c.boom){c.boom=1;hitCircle(c,p.x,p.y,c.fx.boomR||420,{mult:c.fx.boomMult||6,knock:300});kick(1.2);ring(p.x,p.y,20,(c.fx.boomR||420)*1.1,'#ffffff',0.7,9);ring(p.x,p.y,10,(c.fx.boomR||420)*0.8,'#ff5ab4',0.6,7);burst(p.x,p.y-20,'#ff9ad8',50,360);burst(p.x,p.y-20,'#ffffff',30,280);}
+     return c.t<c.dur+1.1;},
+   draw(c,ctx,v){const k=v.k,X=v.sx(c.x),Y=v.sy(c.y);ctx.save();
+     if(c.t<c.dur){const fade=Math.min(1,c.t/0.3,(c.dur-c.t)/0.3+0.3),FR=((c.fx.reach||330)+110)*k;
+       // psychic field on the ground
+       ctx.globalAlpha=0.55*fade;const g=ctx.createRadialGradient(X,Y,0,X,Y,FR);g.addColorStop(0,'rgba(255,120,220,0.18)');g.addColorStop(0.8,'rgba(160,80,255,0.12)');g.addColorStop(1,'rgba(160,80,255,0)');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(X,Y,FR,FR*0.8,0,0,TAU);ctx.fill();
+       ctx.globalAlpha=fade;ctx.strokeStyle='rgba(255,140,230,0.7)';ctx.lineWidth=2;ctx.setLineDash([10*k,8*k]);ctx.lineDashOffset=-c.t*60;ctx.beginPath();ctx.ellipse(X,Y,FR*0.97,FR*0.97*0.8,0,0,TAU);ctx.stroke();ctx.setLineDash([]);
+       // barrier bubble
+       const BR=(c.fx.barrier||130)*k;ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(255,180,240,'+(0.45+0.25*Math.sin(c.t*8))+')';ctx.lineWidth=3*k;ctx.beginPath();ctx.ellipse(X,Y-20*k,BR,BR*0.8,0,0,TAU);ctx.stroke();
+       glow(ctx,X,Y-20*k,BR,'rgba(255,150,230,0.12)','rgba(255,150,230,0)');
+       // tethers between orbs
+       if(c.orbs){ctx.strokeStyle='rgba(255,170,240,0.5)';ctx.lineWidth=2*k;ctx.beginPath();c.orbs.forEach((o,i)=>{const ox=v.sx(o.x),oy=v.sy(o.y)-26*k;i?ctx.lineTo(ox,oy):ctx.moveTo(ox,oy);});ctx.closePath();ctx.stroke();
+         c.orbs.forEach((o,i)=>{c.trails[i].forEach((q,j)=>{glow(ctx,v.sx(q.x),v.sy(q.y)-26*k,30*k*(j/9),'rgba(255,90,200,0.22)','rgba(150,60,255,0)');});
+           const ox=v.sx(o.x),oy=v.sy(o.y)-26*k,R=32*k;glow(ctx,ox,oy,R*2.2,'rgba(255,120,220,0.55)','rgba(140,60,255,0)');
+           ctx.globalCompositeOperation='source-over';const gg=ctx.createRadialGradient(ox-R*0.3,oy-R*0.3,R*0.1,ox,oy,R);gg.addColorStop(0,'#ffffff');gg.addColorStop(0.35,'#ffb8ec');gg.addColorStop(0.8,'#e040b8');gg.addColorStop(1,'#8a2cff');ctx.fillStyle=gg;ctx.beginPath();ctx.arc(ox,oy,R,0,TAU);ctx.fill();
+           ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=2*k;ctx.beginPath();ctx.arc(ox,oy,R*1.15,c.t*6+i,c.t*6+i+2);ctx.stroke();});}}
+     else{const u=Math.min(1,(c.t-c.dur)/1.1),R=(c.fx.boomR||420)*k;ctx.globalCompositeOperation='lighter';
+       if(u<0.25&&v.box){ctx.fillStyle='rgba(255,220,245,'+(0.7*(1-u/0.25))+')';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);}
+       glow(ctx,X,Y-20*k,R*(0.3+u),'rgba(255,255,255,'+(1-u)+')','rgba(255,80,200,0)');ctx.strokeStyle='rgba(255,140,230,'+(1-u)+')';ctx.lineWidth=12*k*(1-u)+1;ctx.beginPath();ctx.ellipse(X,Y,R*(0.2+u),R*(0.2+u)*0.8,0,0,TAU);ctx.stroke();}
+     ctx.restore();}};
+
  // ---------------------------------------------------------------- SHINY FLAIR
  //  shiny Pokemon (you, and shiny wild ones) get twinkling stars above their head and leave sparkles when they move
  const shinySp=[];let shinyLast=0;
@@ -509,7 +581,7 @@
    list(name){return live.filter(c=>c.style===S[name]);},
    has(name){return !!S[name];},
    cast(name,player,move,hit,ghost){const st=S[name];if(!st)return false;
-     const c={style:st,player,move,hit,ghost:!!ghost,fx:Object.assign({},move.fx||{}),t:0};
+     const c={style:st,player,move,hit:hit||window.__psHit||((pl,e,dmg,col,kx,ky,kn)=>e.hurt(dmg,col,kx,ky,kn)),ghost:!!ghost,fx:Object.assign({},move.fx||{}),t:0};
      try{const r=st.cast(c);if(r)live.push(r);}catch(e){console.warn('fx cast',name,e);}return true;},
    active(){if(live.length||shinySp.length)return true;const p=B()?.game?.player;if(shinyOf(p))return true;for(const e of enemies())if(e.shiny===true)return true;return false;},
    update(dt){for(let i=live.length-1;i>=0;i--){let keep=false;try{keep=live[i].style.update(live[i],dt);}catch(e){console.warn('fx update',e);}if(!keep)live.splice(i,1);}},

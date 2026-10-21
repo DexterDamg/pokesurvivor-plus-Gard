@@ -64,6 +64,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    def.kind=tpl.kind;return def;
  }
  const LEGEND_DEFS={}; // dex -> [move defs] (reward-pool only)
+ const TYPE_MOVES={};  // type -> [move defs] any Pokemon of that type can be offered (reward-pool only)
  let poolHooked=false;
  function hookPool(m){
    if(poolHooked||typeof m.poolFor!=='function')return;poolHooked=true;
@@ -71,7 +72,11 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    // A legendary's own signature move(s) join ITS level-up reward pool (never at run start, never for others).
    // While unlearned, the pool is trimmed so the move reliably shows up among the new-move candidates.
    m.poolFor=function(mon){
-     const r=orig.apply(this,arguments);
+     let r=orig.apply(this,arguments);
+     try{ // type moves (e.g. Calm Mind for Psychic types) join the pool like any other move
+       const p0=getPlayer(),types=(mon&&mon.types)||[];
+       for(const t of types)for(const d of TYPE_MOVES[t]||[])if(!r.includes(d.id)&&!(p0&&typeof p0.hasMove==='function'&&p0.hasMove(d.id)))r=[...r,d.id];
+     }catch(e){}
      try{
        const p=getPlayer(),defs=mon&&LEGEND_DEFS[Number(mon.dex)];
        if(!defs||!p||Number(p.level)<2)return r;
@@ -90,6 +95,9 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      LEGEND_DEFS[dex]=[];
      for(const mv of list){const d=fromTemplate(m,mv);if(d)LEGEND_DEFS[dex].push(d);else console.warn('Legend move: unknown template',mv.from);}
    }
+   // Calm Mind: a new learnable move for Psychic-type Pokemon (works like Dragon Dance: stacks Attack + Speed)
+   {const cm=fromTemplate(m,{from:'dragon-dance',id:'calm-mind',name:'Calm Mind',type:'psychic',desc:'Clears the mind: stacks ATTACK and SPEED while active. Learnable by Psychic types.'});
+    if(cm){const tpl=m.BY_ID['dragon-dance'];if(tpl&&Array.isArray(tpl.ups)){cm.ups=tpl.ups;cm.maxLvl=tpl.maxLvl||tpl.ups.length+1;}TYPE_MOVES.psychic=[cm];}}
    const MFX=window.PS_MEGA_FX||{};
    for(const [form,fx] of Object.entries(MFX)){const k=MEGA_KITS[form];if(k&&k.move){const fxm=Object.assign({},k.move.fx||{},fx.fx||{});Object.assign(k.move,fx);k.move.fx=fxm;}}
    for(const [form,kit] of Object.entries(MEGA_KITS)){
@@ -108,7 +116,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const m=getBridge()?.moves;
    if(!m||!m.BY_ID||!Array.isArray(m.ALL))return false;
    buildKitMoves(m);
-   for(const def of [...Object.values(SIGNATURE_MOVES),...Object.values(BOND_MOVES),...Object.values(LEGEND_DEFS).flat()]){
+   for(const def of [...Object.values(SIGNATURE_MOVES),...Object.values(BOND_MOVES),...Object.values(LEGEND_DEFS).flat(),...Object.values(TYPE_MOVES).flat()]){
      // The engine adds 'ups' (upgrade table) and 'maxLvl' to every move at boot.
      // Moves injected later must get them too, or the level-up reward screen
      // crashes on def.ups[lvl-1] and freezes the game.
@@ -230,6 +238,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  const eruptions=[],spikes=[],debris=[];
  window.PS_CAST=function(player,move,hit,ghost){
    if(!player||!move)return;
+   if(typeof hit==='function')window.__psHit=hit;   // remembered so effects started outside a move (Z-move) can deal proper damage
    const waves=(Number(move.count)||16)>=24?4:3;
    if(move.psCast==='blackhole'){castBlackhole(player,move,hit,ghost);return;}
    if(move.psCast!=='eruption'&&window.PS_FX&&window.PS_FX.has(move.psCast)){window.PS_FX.cast(move.psCast,player,move,hit,ghost);return;}
@@ -362,35 +371,41 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  function drawHoles(ctx,box){
    if(!holes.length)return;
    const cam=getBridge()?.camera,g=gameCanvas();if(!cam||!g||typeof cam.left!=='function')return;
-   const css=Number(cam._cw)>0?g.r.width/cam._cw:1,k=cam.scale*css;
+   const css=Number(cam._cw)>0?g.r.width/cam._cw:1,k=cam.scale*css,TAU=6.283;
    ctx.save();ctx.beginPath();ctx.rect(box.left,box.top,box.width,box.height);ctx.clip();
    for(const h of holes){
-     const X=g.r.left+(h.x-cam.left())*k,Y=g.r.top+(h.y-cam.top())*k,R=h.R*k;
+     const X=g.r.left+(h.x-cam.left())*k,Y=g.r.top+(h.y-cam.top())*k-14*k,R=h.R*k;
      if(h.t<HOLE_PULL_T){
-       const grow=Math.min(1,h.t/0.25),core=(16+10*Math.sin(h.t*9))*k*grow+10*k*grow;
-       // dark lens
-       let gr=ctx.createRadialGradient(X,Y,0,X,Y,R);
-       gr.addColorStop(0,'rgba(10,0,20,0.55)');gr.addColorStop(0.35,'rgba(60,20,110,0.28)');gr.addColorStop(1,'rgba(60,20,110,0)');
-       ctx.fillStyle=gr;ctx.beginPath();ctx.arc(X,Y,R*grow,0,6.283);ctx.fill();
-       // accretion ring (rotating arcs)
-       ctx.lineWidth=Math.max(2,3*k);
-       for(let j=0;j<5;j++){const a0=h.seed+h.t*(3.2+j*0.4)+j*1.26,rr=core*(1.7+j*0.32);
-         ctx.strokeStyle=j%2?'rgba(215,180,255,0.85)':'rgba(140,70,255,0.9)';
-         ctx.beginPath();ctx.ellipse(X,Y,rr,rr*0.62,0,a0,a0+1.6);ctx.stroke();}
-       // infalling particles
-       for(const q of h.parts){ctx.fillStyle=q.c;const qx=X+Math.cos(q.a)*q.r*k,qy=Y+Math.sin(q.a)*q.r*k*0.62,sz=Math.max(2,2*k);ctx.fillRect(Math.round(qx),Math.round(qy),sz,sz);}
-       // event horizon
-       ctx.fillStyle='#000';ctx.beginPath();ctx.arc(X,Y,core,0,6.283);ctx.fill();
-       ctx.strokeStyle='rgba(230,200,255,0.9)';ctx.lineWidth=Math.max(1.5,2*k);ctx.beginPath();ctx.arc(X,Y,core+1.5*k,0,6.283);ctx.stroke();
+       const grow=Math.min(1,h.t/0.22),pulse=1+0.06*Math.sin(h.t*14),core=(20*k+8*k*Math.sin(h.t*7))*grow*pulse;
+       // gravity well: darkened, warped ground
+       let gr=ctx.createRadialGradient(X,Y,core,X,Y,R*grow);gr.addColorStop(0,'rgba(8,0,18,0.72)');gr.addColorStop(0.4,'rgba(40,8,80,0.38)');gr.addColorStop(1,'rgba(40,8,80,0)');
+       ctx.fillStyle=gr;ctx.beginPath();ctx.ellipse(X,Y,R*grow,R*grow*0.7,0,0,TAU);ctx.fill();
+       // spiralling streams of light being sucked in
+       ctx.globalCompositeOperation='lighter';ctx.lineCap='round';
+       for(let j=0;j<6;j++){ctx.strokeStyle=j%2?'rgba(200,160,255,0.55)':'rgba(255,120,220,0.45)';ctx.lineWidth=Math.max(1.5,2.5*k);ctx.beginPath();
+         for(let s2=0;s2<=24;s2++){const f=s2/24,rr=(R*0.95*grow)*(1-f)+core*f,a=h.seed+j*TAU/6+f*4.2-h.t*3;const px=X+Math.cos(a)*rr,py=Y+Math.sin(a)*rr*0.62;s2?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.stroke();}
+       // accretion disk (tilted, bright on one side)
+       for(let j=0;j<3;j++){const rr=core*(2.1+j*0.55),a0=h.t*(4-j);const dg=ctx.createLinearGradient(X-rr,Y,X+rr,Y);dg.addColorStop(0,'rgba(255,230,255,0.95)');dg.addColorStop(0.5,'rgba(190,110,255,0.75)');dg.addColorStop(1,'rgba(90,40,200,0.35)');
+         ctx.strokeStyle=dg;ctx.lineWidth=Math.max(2,(5-j*1.3)*k);ctx.beginPath();ctx.ellipse(X,Y,rr,rr*0.32,Math.sin(h.t)*0.15,a0,a0+TAU*0.85);ctx.stroke();}
+       // infalling sparks
+       for(const q of h.parts){const qx=X+Math.cos(q.a)*q.r*k,qy=Y+Math.sin(q.a)*q.r*k*0.62,sz=Math.max(2,2.4*k);ctx.fillStyle=q.c;ctx.fillRect(Math.round(qx),Math.round(qy),sz,sz);}
+       // photon ring + event horizon
+       ctx.globalCompositeOperation='source-over';const hg=ctx.createRadialGradient(X,Y,core*0.6,X,Y,core*1.25);hg.addColorStop(0,'#000');hg.addColorStop(0.75,'#05000a');hg.addColorStop(1,'rgba(5,0,10,0)');
+       ctx.fillStyle=hg;ctx.beginPath();ctx.arc(X,Y,core*1.25,0,TAU);ctx.fill();
+       ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(255,220,255,0.95)';ctx.lineWidth=Math.max(1.5,2.2*k);ctx.beginPath();ctx.arc(X,Y,core*1.02,0,TAU);ctx.stroke();
+       ctx.strokeStyle='rgba(255,120,230,0.5)';ctx.lineWidth=Math.max(3,6*k);ctx.beginPath();ctx.arc(X,Y,core*1.12,0,TAU);ctx.stroke();
+       ctx.globalCompositeOperation='source-over';
      }else{
-       // collapse -> dark blast shockwave
-       const u=Math.min(1,(h.t-HOLE_PULL_T)/(HOLE_LIFE-HOLE_PULL_T)),rr=R*(0.15+0.95*u);
-       ctx.globalAlpha=1-u;
-       let gr=ctx.createRadialGradient(X,Y,0,X,Y,rr);
-       gr.addColorStop(0,'rgba(255,255,255,0.9)');gr.addColorStop(0.25,'rgba(176,124,255,0.75)');gr.addColorStop(0.7,'rgba(40,0,80,0.55)');gr.addColorStop(1,'rgba(40,0,80,0)');
-       ctx.fillStyle=gr;ctx.beginPath();ctx.arc(X,Y,rr,0,6.283);ctx.fill();
-       ctx.strokeStyle='rgba(215,180,255,0.95)';ctx.lineWidth=Math.max(2,5*k*(1-u));ctx.beginPath();ctx.arc(X,Y,rr,0,6.283);ctx.stroke();
-       ctx.globalAlpha=1;
+       // collapse: implosion flash, then a dark blast with purple lightning
+       const u=Math.min(1,(h.t-HOLE_PULL_T)/(HOLE_LIFE-HOLE_PULL_T)),rr=R*(0.12+1.05*u);
+       ctx.globalCompositeOperation='lighter';
+       if(u<0.2){const f=1-u/0.2;let fg=ctx.createRadialGradient(X,Y,0,X,Y,R*0.6);fg.addColorStop(0,'rgba(255,255,255,'+f+')');fg.addColorStop(1,'rgba(200,120,255,0)');ctx.fillStyle=fg;ctx.beginPath();ctx.arc(X,Y,R*0.6,0,TAU);ctx.fill();}
+       let gr=ctx.createRadialGradient(X,Y,0,X,Y,rr);gr.addColorStop(0,'rgba(255,230,255,'+(0.8*(1-u))+')');gr.addColorStop(0.35,'rgba(170,90,255,'+(0.65*(1-u))+')');gr.addColorStop(1,'rgba(40,0,90,0)');
+       ctx.fillStyle=gr;ctx.beginPath();ctx.ellipse(X,Y,rr,rr*0.7,0,0,TAU);ctx.fill();
+       ctx.strokeStyle='rgba(230,190,255,'+(1-u)+')';ctx.lineWidth=Math.max(2,7*k*(1-u));ctx.beginPath();ctx.ellipse(X,Y,rr,rr*0.7,0,0,TAU);ctx.stroke();
+       ctx.strokeStyle='rgba(255,130,230,'+(0.8*(1-u))+')';ctx.lineWidth=Math.max(1,3*k*(1-u));ctx.beginPath();ctx.ellipse(X,Y,rr*0.7,rr*0.49,0,0,TAU);ctx.stroke();
+       if(u<0.6){ctx.strokeStyle='rgba(210,170,255,'+(1-u/0.6)+')';ctx.lineWidth=Math.max(1.5,2*k);for(let j=0;j<7;j++){let a=h.seed+j*0.9,px=X,py=Y;ctx.beginPath();ctx.moveTo(px,py);for(let s2=0;s2<5;s2++){a+=(Math.random()-0.5)*0.8;const L=rr*0.22;px+=Math.cos(a)*L;py+=Math.sin(a)*L*0.7;ctx.lineTo(px,py);}ctx.stroke();}}
+       ctx.globalCompositeOperation='source-over';
      }
    }
    ctx.restore();
@@ -634,6 +649,8 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      try{getBridge().fx.dmgText(p.x,p.y-(p.bodyH||40)-24,"Echo's Resolve For J: +2 ♥",'#ff9ad8');}catch(e){}}
    if(!p.__echoCrit){p.__echoCrit=true;p.critChance=(Number(p.critChance)||0)+ECHO.crit;}   // Echo's Love: +25% crit chance
    if(!p.__jInt){p.__jInt=true;p.rerollBonus=(Number(p.rerollBonus)||0)*2+1;}   // J's Intuition: double rerolls (6 -> 12)
+   if(p.megaForm==='282-mega'){const d=getBridge()?.moves?.BY_ID?.['true-moon-blast'];   // Echo's True Potential replaces True Moon Blast (her game only)
+     if(d&&!d.__echo){d.__echo=true;d.psCast='echoblast';d.name="Echo's True Potential";d.desc='A giant moon orb rolls forward leaving damaging glitter, then a moon meteor crashes down where it stops.';d.fx=Object.assign({},d.fx||{},{size:54,speed:380,range:290,boom:165,boomMult:2.6,colors:['#ffffff','#ffc8f0','#b8a0ff']});}}
    const B2=ECHO.bond;if(p.megaForm!==B2.form)return;
    const hp=p.maxHp>0?p.hp/p.maxHp:1,bd=p.__echoBond;
    if(hp<B2.below&&!p.__echoLow&&(!bd||now-bd.at>B2.cooldown*1000)){
@@ -642,6 +659,13 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    p.__echoLow=hp<B2.below;
    if(p.__echoBond&&now<p.__echoBond.regen&&p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+B2.regen*dt);
  }
+ // Echo's own Psychic Z-move: "I'll Call You... Echo" (her game only; everyone else gets the normal Shattered Psyche)
+ window.PS_ZCAST=function(p,def){
+   try{if(!echoOn(p)||!def||def.type!=='psychic'||!window.PS_FX||!window.PS_FX.has('echoz'))return false;
+     window.PS_FX.cast('echoz',p,{id:'echo-z',type:'psychic',dmg:Number(def.dmg)||28,knock:220,fx:{dur:Math.min(9,Number(def.dur)||9),reach:330,barrier:130,boomR:420,boomMult:6}},null,false);
+     try{trainerLine('Echo',"I'll call you... {n}!");}catch(e){}
+     return true;}catch(e){console.warn('echo z',e);return false;}
+ };
  function echoUndo(p){if(p&&p.__echoXp&&!echoOn(p)){p.xpMul=(Number(p.xpMul)||ECHO.xp)/ECHO.xp;p.__echoXp=false;}}
  // Beast Boost (Ultra Beasts): each KO stacks a boost to one stat for a few seconds
  function bbMult(p,stat){const P=passiveFor(p),A=P&&P.ability,bb=A&&A.beastBoost;if(!bb||bb.stat!==stat||!p.__bb||performance.now()>p.__bb.until||p.__bb.ab!==P.abilityId)return 1;
@@ -996,7 +1020,7 @@ function start(){
    "Show them what we're made of, {n}!","You've got this, {n}!","Hang in there, {n}!","Let's go all out, {n}!",
    "This is our moment, {n}!","Together we're unstoppable, {n}!","I believe in you, {n}!","Let's turn this around, {n}!",
    "Unleash your true power, {n}!","Our bond is our strength, {n}!","Time to shine, {n}!","No holding back now, {n}!"];
- function trainerLine(name){
+ function trainerLine(name,forced){
    // Pokemon-game style text box: white panel, double border, name tag, typewriter text, blinking arrow
    if(!document.getElementById('ps-trainer-css')){const st=document.createElement('style');st.id='ps-trainer-css';st.textContent=`
    #ps-trainer{position:fixed;left:50%;bottom:120px;z-index:65;pointer-events:none;width:min(560px,calc(100vw - 32px));transform:translate(-50%,24px);opacity:0;transition:opacity .22s ease,transform .3s cubic-bezier(.2,1.4,.4,1)}
@@ -1011,7 +1035,7 @@ function start(){
    @media (max-width:700px){#ps-trainer{bottom:96px}#ps-trainer .tb-text{font-size:16px}#ps-trainer img{width:32px}}`;document.head.append(st);}
    let el=document.getElementById('ps-trainer');
    if(!el){el=document.createElement('div');el.id='ps-trainer';el.innerHTML='<div class="tb-box"><span class="tb-tag">Trainer</span><img src="assets/fx/mega-symbol.png?v=1" alt=""><div class="tb-text"></div><span class="tb-arrow"></span></div>';document.body.append(el);}
-   const line=TRAINER_LINES[Math.floor(Math.random()*TRAINER_LINES.length)].replace('{n}',name),tx=el.querySelector('.tb-text');
+   const line=(forced||TRAINER_LINES[Math.floor(Math.random()*TRAINER_LINES.length)]).replace('{n}',name),tx=el.querySelector('.tb-text');
    clearInterval(el.__type);clearTimeout(el.__t);tx.textContent='';el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
    let n=0;el.__type=setInterval(()=>{n+=1;tx.textContent=line.slice(0,n);if(n>=line.length)clearInterval(el.__type);},28);
    el.__t=setTimeout(()=>el.classList.remove('show'),3200);
