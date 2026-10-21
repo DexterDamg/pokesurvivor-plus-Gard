@@ -111,7 +111,12 @@
   function quietGame() {
     const A = gameAudio(); if (!A || !A.settings) return;
     const v = Number(A.settings.music);
-    if (v > 0) { S.gameMusicWas = v; save(); try { A.setVolume('music', 0); } catch (_) {} }
+    if (v > 0) {
+      // Remember the normal music setting once, then mute ONLY the built-in
+      // music bus. Never mute SFX or the custom HTMLAudioElement.
+      if (S.gameMusicWas == null) { S.gameMusicWas = v; save(); }
+      try { A.setVolume('music', 0); } catch (_) {}
+    }
   }
   function restoreGame() {
     const A = gameAudio(); if (!A || !A.settings || S.gameMusicWas == null) return;
@@ -159,13 +164,13 @@
     audio.play().then(() => { quietGame(); render(); }).catch(() => render());
     render(); return true;
   }
-  function hush() { clearInterval(fadeT); fadeT = null; cur = null; audio.pause(); audio.volume = V(); restoreGame(); render(); }
+  function hush() { clearInterval(fadeT); fadeT = null; cur = null; audio.pause(); audio.volume = V(); if (S.on) quietGame(); else restoreGame(); render(); }
   function cut(then) {          // quick fade-out of the current song, then run 'then' (or go back to the game's music)
     clearInterval(fadeT); fadeT = null; const was = cur; cur = null;
-    if (!was || audio.paused) { audio.pause(); audio.volume = V(); if (!(then && then())) restoreGame(); render(); return; }
+    if (!was || audio.paused) { audio.pause(); audio.volume = V(); if (!(then && then())) { if (S.on) quietGame(); else restoreGame(); } render(); return; }
     fadeT = setInterval(() => {
       audio.volume = Math.max(0, audio.volume - V() / 6);
-      if (audio.volume <= 0.001) { clearInterval(fadeT); fadeT = null; audio.pause(); audio.volume = V(); if (!(then && then())) restoreGame(); render(); }
+      if (audio.volume <= 0.001) { clearInterval(fadeT); fadeT = null; audio.pause(); audio.volume = V(); if (!(then && then())) { if (S.on) quietGame(); else restoreGame(); } render(); }
     }, 50);
     render();
   }
@@ -185,13 +190,17 @@
 
   function tick() {
     watchGame();
+    // Mute the game's soundtrack even before the first browser gesture.
+    // Otherwise the built-in soundtrack starts while our MP3 is blocked by autoplay policy.
+    if (S.on) quietGame();
     const ctx = context(), mega = isMega();
     const megaNow = mega && !wasMega; wasMega = mega;
     { const st = B()?.game?.state, t = now(); if (ctx === 'menu') runTime = 0; else if (st === 'playing' && runLast) runTime += Math.min(1, (t - runLast) / 1000); runLast = t; }
     const leftOrEnteredMenu = lastCtx != null && ctx !== lastCtx && (menuish(ctx) || menuish(lastCtx));
     if (ctx !== lastCtx) { if (ctx === 'battle' && (lastCtx === 'menu' || lastCtx == null)) nextRoll = RULES.battle?.random?.first ? now() : now() + (RULES.battle?.random?.every ?? 150) * 1000; }
     lastCtx = ctx;
-    if (!S.on || !unlocked) { if (cur) hush(); return; }
+    if (!S.on) { if (cur) hush(); else restoreGame(); return; }
+    if (!unlocked) return; // Custom playback waits for user activation; the original game stays muted.
 
     // 1) Mega Evolution has top priority: it cuts off whatever is playing (unless it's already that song), plays once
     if (megaNow) {
@@ -270,7 +279,7 @@
   vol.addEventListener('input', () => { S.volume = Number(vol.value); audio.volume = V(); save(); });
   function render() {
     const t = cur && TRACKS[cur.id];
-    $('.pm-title').textContent = !S.on ? 'Custom music off' : t ? (cur.ctx === 'mega' ? '✨ ' : '') + t.title : 'Game music' + (gameTrack ? ': ' + gameTrack : '');
+    $('.pm-title').textContent = !S.on ? 'Custom music off' : t ? (cur.ctx === 'mega' ? '✨ ' : '') + t.title : unlocked ? 'Custom music waiting…' : 'Click game once to start MP3 music';
     $('.pm-title').title = $('.pm-title').textContent;
     $('.pm-on').textContent = S.on ? 'ON' : 'OFF';
     $('.pm-on').title = S.on ? 'Turn custom music off' : 'Turn custom music on';
@@ -279,7 +288,7 @@
     root.classList.toggle('open', !!S.open);
   }
   setInterval(() => root.classList.toggle('battle', B()?.game?.state === 'playing'), 300);
-  function init() { document.head.append(css); document.body.append(root); restoreGame(); render(); }
+  function init() { document.head.append(css); document.body.append(root); watchGame(); if (S.on) quietGame(); else restoreGame(); render(); }
   audio.addEventListener('play', render); audio.addEventListener('pause', render);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
   function event(name) {   // special events: PS_MUSIC.event('trainer') plays one of that event's songs right away (once)

@@ -172,21 +172,45 @@
     if (raid) { raid.t -= dt; if (raid.e.dead || raid.e.hp <= 0) endRaid(true); else if (raid.t <= 0 || p.dead) endRaid(false); }
   }
 
-  // Pixel-art den base assets; canvas rings remain as graceful fallbacks when images are missing.
-  const denArt = { normal: new Image(), legendary: new Image() };
-  denArt.normal.src = 'assets/dens/den-rock-ring.png';
-  denArt.legendary.src = 'assets/dens/legendary-den-rock-ring.png';
-  function drawDenStone(ctx, X, Y, k, legendary) {
-    const art = legendary ? denArt.legendary : denArt.normal;
-    if (art.complete && art.naturalWidth > 0) {
-      const w = 110 * k, h = 71.5 * k;
-      ctx.save(); ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(art, X - w / 2, Y - h * 0.52, w, h);
-      ctx.restore();
+  // Pixel-art den supplied by the map artist. The *entire* stone ring and beam are
+  // one image. Never scale the stone base separately or regenerate its pixels.
+  const denArt = new Image();
+  denArt.src = 'assets/dens/pink-energy-den.png';
+  function drawDenArt(ctx, X, Y, k, legendary, t, opening) {
+    const w = 150 * k, h = 150 * k;
+    // The opening is around y=0.80 in the source; anchor it to the den location.
+    const dx = X - w / 2, dy = Y - h * 0.80;
+    if (!denArt.complete || denArt.naturalWidth === 0) {
+      ctx.save();ctx.fillStyle='#523843';ctx.beginPath();ctx.ellipse(X,Y,48*k,21*k,0,0,TAU);ctx.fill();ctx.strokeStyle='#ee449c';ctx.lineWidth=7*k;ctx.stroke();ctx.restore();
       return;
     }
-    ctx.fillStyle = '#24202b'; ctx.beginPath(); ctx.ellipse(X, Y, 36*k, 18*k, 0, 0, TAU); ctx.fill();
-    ctx.strokeStyle = legendary ? '#efc365' : '#846d67'; ctx.lineWidth = 8*k; ctx.stroke();
+    ctx.save();ctx.imageSmoothingEnabled=false;
+    ctx.globalAlpha=opening;
+    if (legendary) { // distinction behind, not over, the original asset
+      ctx.globalCompositeOperation='lighter';
+      const gr=ctx.createRadialGradient(X,Y,6*k,X,Y,80*k);
+      gr.addColorStop(0,'rgba(255,225,116,.18)');gr.addColorStop(1,'rgba(255,225,116,0)');
+      ctx.fillStyle=gr;ctx.beginPath();ctx.ellipse(X,Y,75*k,35*k,0,0,TAU);ctx.fill();
+      ctx.globalCompositeOperation='source-over';
+    }
+    ctx.drawImage(denArt,dx,dy,w,h);
+    // Very small glow oscillation limited to the *upper* beam — rock pixels stay static.
+    ctx.save();ctx.beginPath();ctx.rect(dx+w*.36,dy, w*.28,h*.40);ctx.clip();
+    ctx.globalCompositeOperation='lighter';ctx.globalAlpha=opening*(.045+.065*(.5+.5*Math.sin(t*3.2)));
+    ctx.drawImage(denArt,dx,dy,w,h);
+    ctx.restore();
+    // Slow-moving tiny pixel particles. No animated redraw of the base.
+    ctx.globalAlpha=opening;
+    for(let i=0;i<8;i++){
+      const f=(t*(.13+i*.008)+i*.157)%1;
+      const xx=X+Math.sin(i*2.7+t*.5)*w*.23;
+      const yy=Y-h*.1-f*h*.63;
+      ctx.globalAlpha=opening*(1-f)*.75;
+      ctx.fillStyle=legendary?'#ffe5a0':'#ff9cdf';
+      const sz=Math.max(1.5,k*1.9);
+      ctx.fillRect(Math.round(xx),Math.round(yy),sz,sz);
+    }
+    ctx.restore();
   }
   // ---------------- drawing (overlay canvas, world -> screen with the game camera) ----------------
   const ov = document.createElement('canvas'); ov.id = 'ps-dens'; ov.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:18';
@@ -213,40 +237,10 @@
       const X = sx(d.x), Y = sy(d.y), open = Math.min(1, d.t / 0.8), fade = Math.max(0, Math.min(1, (d.life - d.t) / 1.5));
       const legend = !!d.legend;
       ctx.save(); ctx.globalAlpha = fade;
-      const pink = legend ? [246, 105, 186] : [255, 56, 137];
-      const hgt = 275 * k * open, w = (22 + 3 * Math.sin(now * 4 + d.x)) * k;
-      // Transparent vertical beam, animated from world time. Fixed geometry ensures the ring never flickers.
-      ctx.globalCompositeOperation = 'lighter';
-      for (let layer = 0; layer < 4; layer++) {
-        const f = [1.75, 1.25, 0.72, 0.24][layer], aa = [0.10, 0.18, 0.27, 0.32][layer];
-        const g1 = ctx.createLinearGradient(X, Y - hgt, X, Y);
-        g1.addColorStop(0, 'rgba(' + pink.join(',') + ',0)');
-        g1.addColorStop(0.35, 'rgba(' + pink.join(',') + ',' + (aa * 0.4) + ')');
-        g1.addColorStop(1, 'rgba(' + pink.join(',') + ',' + aa + ')');
-        ctx.fillStyle = g1;
-        ctx.fillRect(X - w * f / 2, Y - hgt, w * f, hgt);
-      }
-      // Bright moving vertical energy streaks.
-      for (let i = 0; i < 5; i++) {
-        const shift = ((now * (35 + i * 11) + i * 51) % 140) / 140;
-        const lx = X + (i - 2) * w * 0.23;
-        const top = Y - hgt * (0.15 + 0.8 * shift);
-        ctx.fillStyle = legend ? 'rgba(255,239,191,.25)' : 'rgba(255,218,245,.3)';
-        ctx.fillRect(Math.round(lx), Math.round(top), Math.max(1.5, 1.8*k), Math.max(5, 16*k));
-      }
-      for (let i = 0; i < 12; i++) {
-        const ph = (now * 0.30 + i / 12 + (d.x % 13) * 0.013) % 1;
-        const xx = X + Math.sin(i * 2.15 + now * 1.1) * w * 1.25;
-        ctx.fillStyle = legend ? 'rgba(255,215,125,' + (1-ph) + ')' : 'rgba(255,139,209,' + (1-ph) + ')';
-        ctx.fillRect(Math.round(xx), Math.round(Y - ph*hgt), Math.max(2,3*k), Math.max(2,3*k));
-      }
-      // Wide glow around the rim, anchored at the den's world position.
-      const glow = ctx.createRadialGradient(X,Y,0,X,Y,75*k);
-      glow.addColorStop(0,legend?'rgba(255,200,106,.34)':'rgba(255,65,159,.34)');
-      glow.addColorStop(1,'rgba(255,80,150,0)');
-      ctx.fillStyle=glow;ctx.beginPath();ctx.ellipse(X,Y,75*k,32*k,0,0,TAU);ctx.fill();
-      ctx.globalCompositeOperation='source-over';
-      drawDenStone(ctx,X,Y,k,legend);
+      // Draw the user's original den artwork, with isolated beam shimmer.
+      // Open animation applies to the entire sprite but the stone never pulses in size.
+      drawDenArt(ctx,X,Y,k,legend,now,open);
+      const hgt = 138 * k * open;
       ctx.font = '700 ' + Math.round(13 * Math.max(1, k * 0.8)) + 'px Pixelify, "Segoe UI", system-ui, sans-serif';
       ctx.textAlign='center';ctx.lineWidth=4;ctx.lineJoin='round';ctx.strokeStyle='rgba(0,0,0,.85)';ctx.fillStyle=legend?'#ffdf83':'#ff9bcc';
       const lb=(legend?'LEGENDARY DEN · ':'MAX RAID DEN · ')+Math.ceil(d.life-d.t)+'s';
@@ -300,5 +294,5 @@
   }
   function init() { document.head.append(css); document.body.append(ov, hud, bannerEl); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
-  window.PS_DENS = { version: 'den-fix-2', spawn: spawnDen, spawnLegend: spawnLegendDen, startLegend: startLegendDen, get legend() { return lden && { kind: lden.kind, stage: lden.stage, list: lden.list.slice(), boss: lden.e && { name: lden.e.name, hp: lden.e.hp, shiny: !!lden.e.shiny } }; }, lcfg: LCFG, get dens() { return dens.slice(); }, get raid() { return raid && { name: raid.name, t: raid.t, hp: raid.e.hp, maxHp: raid.e.maxHp, dead: raid.e.dead }; }, cfg: CFG };
+  window.PS_DENS = { version: 'den-art-music-v2', spawn: spawnDen, spawnLegend: spawnLegendDen, startLegend: startLegendDen, get legend() { return lden && { kind: lden.kind, stage: lden.stage, list: lden.list.slice(), boss: lden.e && { name: lden.e.name, hp: lden.e.hp, shiny: !!lden.e.shiny } }; }, lcfg: LCFG, get dens() { return dens.slice(); }, get raid() { return raid && { name: raid.name, t: raid.t, hp: raid.e.hp, maxHp: raid.e.maxHp, dead: raid.e.dead }; }, cfg: CFG };
 })();
