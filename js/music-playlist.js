@@ -6,10 +6,9 @@
 
   // Add files you have permission to use to assets/music and edit this list.
   const TRACKS = [
-    { title: 'Zone Zero', file: 'assets/music/zone-zero.mp3' },
-    // { title: 'Tera Raid Battle', file: 'assets/music/tera-raid-battle.mp3' },
-    // { title: 'Legendary Battle', file: 'assets/music/legendary-battle.mp3' },
-    // { title: 'Champion Battle', file: 'assets/music/champion-battle.mp3' },
+    { title: 'Tera Raid Battle — Orchestral Remix', file: 'assets/music/tera-raid-orchestral-remix.mp3' },
+    // Add other permitted tracks here to cycle automatically when a song ends.
+    // { title: 'Zone Zero', file: 'assets/music/zone-zero.mp3' },
   ];
   const KEY = 'ps.music.playlist.v1';
   const defaults = { index: 0, volume: 0.24, shuffle: false };
@@ -28,6 +27,8 @@
   audio.loop = false;
   let running = false;
   let failed = 0;
+  let wanted = false; // User opted in to music during battles
+  const inBattle = () => window.PS_MEGA_BRIDGE_V5?.game?.state === 'playing';
   const element = (tag, text) => { const x = document.createElement(tag); if (text) x.textContent = text; return x; };
   const panel = element('div');
   panel.id = 'ps-music-playlist';
@@ -58,7 +59,7 @@
     const t = TRACKS[settings.index];
     label.textContent = t ? '♫ ' + t.title : '♫ No tracks';
     label.title = t ? t.title : 'Add tracks to js/music-playlist.js';
-    toggle.textContent = running ? '⏸' : '▶';
+    toggle.textContent = wanted ? '⏸' : '▶';
     shuffle.style.borderColor = settings.shuffle ? '#dfc057' : '#796b91';
   }
   function setTrack() {
@@ -80,6 +81,7 @@
     setTrack();
   }
   async function play() {
+    if (!inBattle()) { audio.pause(); running = false; update(); return; }
     if (!TRACKS.length) { status.textContent = 'No music files configured'; return; }
     if (!audio.src) setTrack();
     try {
@@ -92,18 +94,19 @@
     }
   }
   toggle.addEventListener('click', () => {
-    if (running) { running = false; audio.pause(); update(); }
+    wanted = !wanted;
+    if (!wanted) { running = false; audio.pause(); update(); }
     else play();
   });
-  next.addEventListener('click', () => { pickNext(); play(); });
+  next.addEventListener('click', () => { pickNext(); if (wanted) play(); });
   shuffle.addEventListener('click', () => { settings.shuffle = !settings.shuffle; save(); update(); });
   volume.addEventListener('input', () => { settings.volume = Number(volume.value); audio.volume = settings.volume; save(); });
-  audio.addEventListener('ended', () => { if (running) { pickNext(); play(); } });
+  audio.addEventListener('ended', () => { if (wanted && inBattle()) { pickNext(); play(); } });
   audio.addEventListener('error', () => {
     status.textContent = 'Missing music file: ' + (TRACKS[settings.index]?.file || 'unknown');
     console.warn('[PS Playlist]', status.textContent);
     // Don't endlessly skip missing files; request player correction.
-    running = false; update();
+    running = false; wanted = false; update();
   });
   panel.append(label, toggle, next, shuffle, volume, status);
   function mount() {
@@ -112,8 +115,17 @@
     if (sound?.parentElement) sound.insertAdjacentElement('afterend', panel);
     else document.body.append(panel);
   }
-  function init() { mount(); update(); setTrack(); }
+  function init() { mount(); update(); setTrack(); panel.style.display='none'; }
+  // Pause while browsing menus and automatically resume if battle returns.
+  let wasInBattle = false;
+  setInterval(() => {
+    const battle = inBattle();
+    panel.style.display = battle ? 'flex' : 'none';
+    if (!battle && !audio.paused) { audio.pause(); running = false; update(); }
+    if (battle && !wasInBattle && wanted) play();
+    wasInBattle = battle;
+  }, 300);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
-  window.PS_MUSIC = { play, pause() { running = false; audio.pause(); update(); }, next() { pickNext(); return play(); } };
+  window.PS_MUSIC = { play() { wanted = true; update(); return play(); }, pause() { wanted = false; running = false; audio.pause(); update(); }, next() { pickNext(); if (wanted) return play(); } };
 })();
