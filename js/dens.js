@@ -54,7 +54,7 @@
     let e = null;
     try { e = new N.Enemy(def, den.x, den.y, mul, true); } catch (err) { console.warn('[dens] could not create raid boss', err); return; }
     e.__maxRaid = true; e.legend = true;
-    try { const rate = Number(N.Spawner.SHINY_RATE) || 1 / 4096; if (N.Sprites.hasShiny(e.dex) && Math.random() < rate * CFG.shinyMul) { e.shiny = true; e.anim = new N.Sprites.Animator(e.dex, e.scale, true); } } catch (_) {}
+    try { const rate = Number(N.Spawner.SHINY_RATE) || 1 / 4096; if (N.Sprites.hasShiny(e.dex) && Math.random() < rate * CFG.shinyMul) { e.shiny = true; try { B().audio?.sfx?.('shiny'); } catch (_) {} e.anim = new N.Sprites.Animator(e.dex, e.scale, true); } } catch (_) {}
     try { e.anim.scale = (Number(e.anim.scale) || e.scale || 1) * CFG.grow; e.scale = (Number(e.scale) || 1) * CFG.grow; e.r = (Number(e.r) || 14) * 1.5; e.bodyH = (Number(e.bodyH) || 40) * CFG.grow; } catch (_) {}
     N.EnemyMgr.add(e);
     raid = { e, t: CFG.raidTime, player: p, name: e.name || def.name || 'Pokémon' };
@@ -120,7 +120,7 @@
     e.__maxRaid = true; e.__legendDen = true; if (legend) e.legend = true;
     try { e.anim.scale = (Number(e.anim.scale) || 1) * 1.4; e.scale = (Number(e.scale) || 1) * 1.4; e.r = (Number(e.r) || 14) * 1.3; e.bodyH = (Number(e.bodyH) || 40) * 1.4; } catch (_) {}
     const rate = mode ? (legend ? LCFG.modeLegendShiny : LCFG.modeBossShiny) : LCFG.battleShiny;
-    try { if (N.Sprites.hasShiny(dex) && Math.random() < rate * shinyMul(p)) { e.shiny = true; e.anim = new N.Sprites.Animator(dex, e.scale, true); } } catch (_) {}
+    try { if (N.Sprites.hasShiny(dex) && Math.random() < rate * shinyMul(p)) { e.shiny = true; try { B().audio?.sfx?.('shiny'); } catch (_) {} e.anim = new N.Sprites.Animator(dex, e.scale, true); } } catch (_) {}
     N.EnemyMgr.add(e); return e;
   }
   function startLegendDen(kind) {

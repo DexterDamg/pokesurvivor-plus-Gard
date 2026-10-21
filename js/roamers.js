@@ -20,6 +20,11 @@
   const live = [];   // {e, kind:'roam'|'rush', t, dex}
   let runP = null, nextRoll = CFG.every, nextRush = CFG.rushEvery;
 
+  // roamer cries (assets/cries/<dex>.mp3), played at the game's sound-effects volume
+  function cry(dex, vol) {
+    try { let v = 0.6; try { const A = E().Audio, st = A && A.settings; if (st && st.sfx != null) v = Math.max(0, Math.min(1, Number(st.sfx) > 1 ? Number(st.sfx) / 100 : Number(st.sfx))); } catch (_) {}
+      const a = new Audio('assets/cries/' + dex + '.mp3'); a.volume = Math.min(1, v * (vol || 0.8)); a.play().catch(() => {}); } catch (_) {}
+  }
   function template() {   // stats from the boss list entry closest to the current time
     const L = E()?.Enemies?.BOSSES || [], t = clock(); let best = L[0] || {}; for (const b of L) if (Math.abs(b.at - t) < Math.abs((best.at || 0) - t)) best = b; return best;
   }
@@ -37,8 +42,9 @@
     e.legend = true; e.__roamer = kind;
     try { const rate = (Number(N.Spawner.SHINY_RATE) || 1 / 4096) * (p.item === 'shinycharm' ? 3 : 1); if (N.Sprites.hasShiny(dex) && Math.random() < rate) { e.shiny = true; e.anim = new N.Sprites.Animator(dex, e.scale, true); } } catch (_) {}
     N.EnemyMgr.add(e); live.push({ e, kind, t: 0, dex });
+    if (e.shiny) { try { B().audio?.sfx?.('shiny'); B().fx.burst(x, y - 30, '#fff6c0', 30, 220); } catch (_) {} }
     try { B().fx.ring(x, y, 10, 160, roam ? '#9ae6ff' : '#ffd23f', 0.7, 6); B().audio?.sfx?.('legend'); } catch (_) {}
-    if (roam) { say('A wild ' + (e.shiny ? 'shiny ' : '') + d.name + ' has appeared!', 4); toast('A wild ' + d.name + ' appeared!', 'Defeat it before it flees to catch it', { dex, shiny: !!e.shiny, gold: true, ms: 6000 }); }
+    if (roam) { cry(dex); say('A wild ' + (e.shiny ? 'shiny ' : '') + d.name + ' has appeared!', 4); toast('A wild ' + d.name + ' appeared!', 'Defeat it before it flees to catch it', { dex, shiny: !!e.shiny, gold: true, ms: 6000 }); }
     else say('Legendary ' + d.name + ' joins the Boss Rush!', 3);
     return e;
   }
@@ -49,6 +55,7 @@
     try { if (typeof N.DB.grant === 'function') N.DB.grant(dex); else N.DB.save.owned[dex] = { at: Date.now(), from: 'roam' }; } catch (_) { try { N.DB.save.owned[dex] = { at: Date.now(), from: 'roam' }; } catch (__) {} }
     if (sh) { try { if (typeof N.DB.grantShiny === 'function') N.DB.grantShiny(dex); else N.DB.save.shiny[dex] = { at: Date.now(), from: 'roam' }; } catch (_) {} }
     try { N.DB.commit(); } catch (_) {}
+    cry(dex);
     toast((sh ? 'Shiny ' : '') + name + ' joined you!', 'You caught the roaming Legendary', { dex, shiny: sh, gold: true, ms: 7000 });
   }
   function tick(dt) {
@@ -62,7 +69,7 @@
     if (mode === 'bossrush' && t >= nextRush) { nextRush = t + CFG.rushEvery; const L = rushPool(); if (L.length) spawnLegend(L[Math.floor(Math.random() * L.length)], 'rush'); }
     for (let i = live.length - 1; i >= 0; i--) { const r = live[i]; r.t += dt;
       if (r.e.dead || r.e.hp <= 0) { live.splice(i, 1); if (r.kind === 'roam' && !r.e.__fled) caught(r); continue; }
-      if (r.kind === 'roam' && r.t >= CFG.flee) { r.e.__fled = true; say(r.e.name + ' fled!', 2.5); try { B().fx.ring(r.e.x, r.e.y, 10, 120, '#9ae6ff', 0.6, 5); } catch (_) {} remove(r.e); live.splice(i, 1); }
+      if (r.kind === 'roam' && r.t >= CFG.flee) { r.e.__fled = true; say(r.e.name + ' fled!', 2.5); cry(r.dex, 0.5); try { B().fx.ring(r.e.x, r.e.y, 10, 120, '#9ae6ff', 0.6, 5); } catch (_) {} remove(r.e); live.splice(i, 1); }
     }
   }
   function testBtn() {
