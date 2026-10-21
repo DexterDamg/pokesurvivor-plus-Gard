@@ -90,14 +90,16 @@
   // Boss 1 is easy and lifts you to level 20, the next ones +10 levels each (level 40 at the Legendary). Bosses always drop the Dynamax Band.
   const GACHA_ONLY = { 801: 3, 648: 3, 490: 1, 489: 1 };   // Magearna, Meloetta (x3 weight), Manaphy, Phione (rarer)
   const LCFG = { chance: 0.025, stages: 5, battleShiny: 1 / 25, modeBossShiny: 1 / 150, modeLegendShiny: 1 / 500, levels: [20, 30, 40, 40] };
-  function legendSet() { return Object.keys(window.PS_LEGEND_MOVES || {}).map(Number); }
+  const EXTRA_LEGENDS = [720, 1001, 1002, 1003, 1004, 1014, 1015, 1016, 1017, 1025];   // Hoopa (own file), Treasures of Ruin, Loyal Three, Ogerpon, Pecharunt
+  function legendSet() { return [...Object.keys(window.PS_LEGEND_MOVES || {}).map(Number), ...EXTRA_LEGENDS]; }
+  window.PS_LEGEND_DEX = () => new Set(legendSet());
   function legendPool() { const N = E(), L = new Set(legendSet()); return (N?.DEX || []).filter(d => L.has(d.dex) && !GACHA_ONLY[d.dex] && N.SPRITE_META[d.dex] && d.dex !== 493); }
   function bossPool() { const N = E(), L = new Set(legendSet()); return (N?.DEX || []).filter(d => d.rarity >= 1 && d.rarity <= 4 && !L.has(d.dex) && N.SPRITE_META[d.dex]); }
   // gacha: Legendaries are earned in dens now, except the gacha-only ones (Magearna & Meloetta common, Manaphy & Phione rarer)
   window.PS_GACHA_POOL = function (list, rarity) {
     if (rarity !== 5) return list; const L = new Set(legendSet()), out = [];
     for (const d of list) { if (!L.has(d.dex)) out.push(d); else if (GACHA_ONLY[d.dex]) for (let i = 0; i < GACHA_ONLY[d.dex]; i++) out.push(d); }
-    return out.length ? out : list;
+    return out;   // empty is fine: the pull falls back to the nearest rarity
   };
   let lden = null;   // {kind, stage, list, e, wait, legend}
   const ldens = [];  // golden dens on the map
