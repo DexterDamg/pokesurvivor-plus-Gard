@@ -23,7 +23,7 @@
      let s=0;for(const o of all)if(Math.hypot(o.x-c.x,o.y-c.y)<130)s++;s-=Math.hypot(c.x-p.x,c.y-p.y)/1000;if(s>bs){bs=s;best=c;}}
    return best;
  }
- function kick(v){try{B()?.camera?.kick?.(v);}catch(e){}}
+ function kick(v){try{window.__psFullKick=true;B()?.camera?.kick?.(v);}catch(e){}finally{window.__psFullKick=false;}}   // our effects always shake at full strength
  function typeColor(c){return c.fx.color||(c.fx.colors&&c.fx.colors[1])||'#ffffff';}
  // Where the move comes out of: the Pokemon's mouth / front, at head height, in its aim direction.
  function mouth(p,aim){
@@ -479,7 +479,7 @@
        for(const cr of c.cracks){if(t<cr.at)continue;const g2=Math.min(1,(t-cr.at)/0.12);ctx.strokeStyle='rgba(255,255,255,0.95)';ctx.lineWidth=2.4*k;ctx.shadowColor='#ff5ab4';ctx.shadowBlur=8*k;ctx.beginPath();
          cr.pts.forEach(([x,y],i)=>{const px=X+x*r*g2*1.3,py=CY+y*r*g2*1.3;i?ctx.lineTo(px,py):ctx.moveTo(px,py);});ctx.stroke();ctx.shadowBlur=0;}}
      // 3) shatter: flash + flying shards
-     if(t>=1.1&&t<1.45&&v.box&&!(window.PS_SETTINGS&&window.PS_SETTINGS.reduceFx)){const u=(t-1.1)/0.35;ctx.save();ctx.globalCompositeOperation='source-over';ctx.fillStyle='rgba(255,236,250,'+(0.75*(1-u)*(1-u))+')';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);ctx.restore();}   // full-screen flash
+     if(t>=1.1&&t<1.45&&v.box){const u=(t-1.1)/0.35;ctx.save();ctx.globalCompositeOperation='source-over';ctx.fillStyle='rgba(255,236,250,'+(0.75*(1-u)*(1-u))+')';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);ctx.restore();}   // full-screen flash
      if(t>=1.1){const u=t-1.1;if(u<0.3){ctx.globalCompositeOperation='lighter';glow(ctx,X,CY,R*(1.2+u*6),'rgba(255,255,255,'+(1-u/0.3)+')','rgba(255,140,220,0)');}
        ctx.globalCompositeOperation='source-over';for(const q of c.shards){const a=Math.max(0,1-u/1.1);if(!a)continue;ctx.save();ctx.globalAlpha=a;ctx.translate(X+q.x*k,CY+q.y*k);ctx.rotate(q.r);const sz=q.s*k;
          ctx.fillStyle=u<0.2?'#ffffff':'hsl('+(320+q.hue%40)+',100%,'+(85-q.hue%20)+'%)';ctx.beginPath();ctx.moveTo(-sz,-sz*0.6);ctx.lineTo(sz,-sz*0.3);ctx.lineTo(-sz*0.2,sz);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.9)';ctx.lineWidth=1.5;ctx.stroke();ctx.restore();}}
@@ -570,7 +570,7 @@
            ctx.globalCompositeOperation='source-over';const gg=ctx.createRadialGradient(ox-R*0.3,oy-R*0.3,R*0.1,ox,oy,R);gg.addColorStop(0,'#ffffff');gg.addColorStop(0.35,'#ffb8ec');gg.addColorStop(0.8,'#e040b8');gg.addColorStop(1,'#8a2cff');ctx.fillStyle=gg;ctx.beginPath();ctx.arc(ox,oy,R,0,TAU);ctx.fill();
            ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=2*k;ctx.beginPath();ctx.arc(ox,oy,R*1.15,c.t*6+i,c.t*6+i+2);ctx.stroke();});}}
      else{const u=Math.min(1,(c.t-c.dur)/1.1),R=(c.fx.boomR||420)*k;ctx.globalCompositeOperation='lighter';
-       if(u<0.25&&v.box&&!(window.PS_SETTINGS&&window.PS_SETTINGS.reduceFx)){ctx.fillStyle='rgba(255,220,245,'+(0.7*(1-u/0.25))+')';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);}
+       if(u<0.25&&v.box){ctx.fillStyle='rgba(255,220,245,'+(0.7*(1-u/0.25))+')';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);}
        glow(ctx,X,Y-20*k,R*(0.3+u),'rgba(255,255,255,'+(1-u)+')','rgba(255,80,200,0)');ctx.strokeStyle='rgba(255,140,230,'+(1-u)+')';ctx.lineWidth=12*k*(1-u)+1;ctx.beginPath();ctx.ellipse(X,Y,R*(0.2+u),R*(0.2+u)*0.8,0,0,TAU);ctx.stroke();}
      ctx.restore();}};
 

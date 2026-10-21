@@ -56,6 +56,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  const MEGA_STATS={atkFloor:1.25,hp:1.15};
  let kitMovesBuilt=false;
  const BOND_MOVES={}; // form -> bond move def (fires together with the signature move in the same slot)
+ function modKick(v){window.__psModKick=true;try{getBridge()?.camera?.kick?.(v);}catch(e){}finally{window.__psModKick=false;}}   // mod effects always shake at full strength
  function fromTemplate(m,mv){
    const tpl=m.BY_ID[mv.from];if(!tpl)return null;
    const def={};
@@ -243,7 +244,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(move.psCast==='blackhole'){castBlackhole(player,move,hit,ghost);return;}
    if(move.psCast!=='eruption'&&window.PS_FX&&window.PS_FX.has(move.psCast)){window.PS_FX.cast(move.psCast,player,move,hit,ghost);return;}
    eruptions.push({x:player.x,y:player.y,player,move,hit,ghost:!!ghost,t:0,next:0,waves});
-   try{getBridge()?.camera?.kick?.(0.06);}catch(e){}
+   try{modKick(0.06);}catch(e){}
  };
  const WAVE_R=[62,128,194,260],WAVE_GAP=0.13,BAND=36;
  function updateEruptions(dt){
@@ -327,7 +328,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      used.push({x:best.x,y:best.y});
      holes.push({x:best.x,y:best.y,R:Number(move.radius)||170,player,move,hit,ghost:!!ghost,t:0,tick:0,boom:false,seed:Math.random()*6.28,parts:[]});
    }
-   try{getBridge()?.camera?.kick?.(0.05);}catch(e){}
+   try{modKick(0.05);}catch(e){}
  }
  function updateHoles(dt){
    const E=getBridge()?.enemies;
@@ -362,7 +363,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
          if(d>h.R*0.8)continue;
          try{h.hit(h.player,en,h.move.dmg*atk*mult,'#b07cff',dx||1,dy,h.move.knock||160,h.move);}catch(e){console.warn('Blackhole hit:',e);}
        }
-       try{getBridge()?.camera?.kick?.(0.14);}catch(e){}
+       try{modKick(0.14);}catch(e){}
      }
      for(let k=h.parts.length-1;k>=0;k--){const q=h.parts[k];q.a+=q.w*dt*(1+40/(q.r+10));q.r-=(80+h.R*0.6)*dt;if(q.r<4)h.parts.splice(k,1);}
      if(h.t>HOLE_LIFE)holes.splice(i,1);
@@ -656,7 +657,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const hp=p.maxHp>0?p.hp/p.maxHp:1,bd=p.__echoBond;
    if(hp<B2.below&&!p.__echoLow&&(!bd||now-bd.at>B2.cooldown*1000)){
      p.__echoBond={at:now,regen:now+B2.regenDur*1000,deal:now+B2.dealDur*1000,spd:now+B2.spdDur*1000,take:now+B2.takeDur*1000};
-     try{const b=getBridge();b.fx.dmgText(p.x,p.y-(p.bodyH||40)-26,"J and Echo's Bond!",'#ff7ad0');b.fx.ring(p.x,p.y,8,110,'#ff9ad8',0.6,6);b.fx.burst(p.x,p.y-20,'#ffc8ec',26,200);b.camera.kick(0.3);}catch(e){}}
+     try{const b=getBridge();b.fx.dmgText(p.x,p.y-(p.bodyH||40)-26,"J and Echo's Bond!",'#ff7ad0');b.fx.ring(p.x,p.y,8,110,'#ff9ad8',0.6,6);b.fx.burst(p.x,p.y-20,'#ffc8ec',26,200);modKick(0.3);}catch(e){}}
    p.__echoLow=hp<B2.below;
    if(p.__echoBond&&now<p.__echoBond.regen&&p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+B2.regen*dt);
  }

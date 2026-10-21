@@ -1,6 +1,6 @@
 /* Quality-of-life + new features, inspired by the Android port of PokéSurvivor (github.com/JayElDragon/poke-survivor,
    MIT code by JPTER78 / JayElDragon). Rewritten for the web game:
-   - ⚙ settings button (next to ♫): Minimap, FPS counter, Reduce screen shake & flashes
+   - ⚙ settings button (next to ♫): Minimap, FPS counter, Reduce screen shake (base game only; the mod's effects always keep theirs)
    - Minimap: circular radar (foes, bosses, items, chests, rifts, allies, north marker)
    - Melee buff: melee moves +25% damage, +10% reach, short invincibility on each swing
    - DYNAMAX: from level 20, press G (or the red button) to go giant for 60s: +30% damage / defense / speed / HP,
@@ -14,11 +14,12 @@
   try { Object.assign(Q, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (_) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(Q)); } catch (_) {} };
   window.PS_SETTINGS = { get reduceFx() { return !!Q.calm; }, get minimap() { return !!Q.minimap; } };
+  const ownKick = v => { window.__psModKick = true; try { B()?.camera?.kick?.(v); } catch (_) {} finally { window.__psModKick = false; } };
   const playing = () => B()?.game?.state === 'playing';
   const inRun = () => { const st = B()?.game?.state; return !!(st && st !== 'ui' && st !== 'over'); };
 
   // ---------------- reduce screen shake: dampen every camera kick ----------------
-  function wrapCamera() { const C = B()?.camera; if (!C || C.__psCalm || typeof C.kick !== 'function') return; const k = C.kick; C.__psCalm = true; C.kick = function (v, ...a) { return k.call(this, Q.calm ? (Number(v) || 0) * 0.25 : v, ...a); }; }
+  function wrapCamera() { const C = B()?.camera; if (!C || C.__psCalm || typeof C.kick !== 'function') return; const k = C.kick; C.__psCalm = true; C.kick = function (v, ...a) { const own = window.__psFullKick || window.__psModKick; return k.call(this, Q.calm && !own ? (Number(v) || 0) * 0.25 : v, ...a); }; }
 
   // ---------------- melee buff ----------------
   let meleeDone = false;
@@ -57,7 +58,7 @@
     // grows in steps (grow, shrink a little, grow more), like the giant mushroom
     const st = [[1.22, 0.14], [1.04, 0.10], [1.42, 0.16], [1.16, 0.10], [DYN.grow * 1.12, 0.22], [DYN.grow, 0.18]];
     let at = 0; dyn.steps = st.map(([f, d]) => { at += d; return { f, at }; }); dyn.stepT = 0; dyn.from = 1;
-    try { const col = (b.types && b.types.color && b.types.color(dyn.type)) || '#ff2a6d'; b.fx.ring(p.x, p.y, 10, 360, col, 0.7, 6); b.fx.ring(p.x, p.y, 10, 240, '#ffffff', 0.5, 4); b.fx.burst(p.x, p.y, col, 28, 260); b.camera.kick(0.6); b.audio?.sfx?.('levelup'); b.fx.dmgText(p.x, p.y - (p.bodyH || 40) - 30, 'DYNAMAX!', '#ff3d6a'); } catch (_) {}
+    try { const col = (b.types && b.types.color && b.types.color(dyn.type)) || '#ff2a6d'; b.fx.ring(p.x, p.y, 10, 360, col, 0.7, 6); b.fx.ring(p.x, p.y, 10, 240, '#ffffff', 0.5, 4); b.fx.burst(p.x, p.y, col, 28, 260); ownKick(0.6); b.audio?.sfx?.('levelup'); b.fx.dmgText(p.x, p.y - (p.bodyH || 40) - 30, 'DYNAMAX!', '#ff3d6a'); } catch (_) {}
     try { window.PS_FX && window.PS_FX.cast('dynaura', p, { id: 'dynamax', type: dyn.type, dmg: 0, fx: { life: DYN.dur + 0.4, scale: () => dyn.f, done: () => !dyn.active } }, null, true); } catch (_) {}
     try { window.PS_MUSIC && window.PS_MUSIC.event && window.PS_MUSIC.event('trainer'); } catch (_) {}
     render(); return true;
@@ -80,7 +81,7 @@
       if (dyn.stepT < dyn.steps[dyn.steps.length - 1].at) { dyn.stepT += dt; let prev = { f: 1, at: 0 };
         for (const s of dyn.steps) { if (dyn.stepT <= s.at) { const q = Math.min(1, (dyn.stepT - prev.at) / Math.max(0.01, s.at - prev.at)); dyn.f = prev.f + (s.f - prev.f) * Math.sin(q * Math.PI / 2); break; } prev = s; }
         if (dyn.stepT >= dyn.steps[dyn.steps.length - 1].at) dyn.f = DYN.grow;
-        for (const [i, s] of [[0, 0.14], [2, 0.40], [4, 0.72]]) if (!dyn['g' + i] && dyn.stepT >= s) { dyn['g' + i] = 1; try { const b = B(); b.camera.kick(0.25 + 0.15 * i); b.audio?.sfx?.('levelup'); b.fx.ring(p.x, p.y, 8, 90 + 55 * i, '#ff8aa6', 0.45, 4); } catch (_) {} }
+        for (const [i, s] of [[0, 0.14], [2, 0.40], [4, 0.72]]) if (!dyn['g' + i] && dyn.stepT >= s) { dyn['g' + i] = 1; try { const b = B(); ownKick(0.25 + 0.15 * i); b.audio?.sfx?.('levelup'); b.fx.ring(p.x, p.y, 8, 90 + 55 * i, '#ff8aa6', 0.45, 4); } catch (_) {} }
       }
       applyScale();
       dyn.t -= dt; dyn.pulse -= dt;
@@ -114,7 +115,7 @@
   panel.innerHTML = '<h4>Game settings</h4>' +
     '<label>Minimap<input type="checkbox" data-k="minimap"></label>' +
     '<label>FPS counter<input type="checkbox" data-k="fps"></label>' +
-    '<label>Reduce screen shake &amp; flashes<input type="checkbox" data-k="calm"></label>' +
+    '<label>Reduce screen shake (base game only)<input type="checkbox" data-k="calm"></label>' +
     '<small>DYNAMAX: from level 20 press <b>G</b> (or the red button) to go giant for 60 s. 4 min cooldown.</small>';
   const mm = document.createElement('canvas'); mm.id = 'ps-minimap'; mm.width = 248; mm.height = 248;
   const fpsEl = document.createElement('div'); fpsEl.id = 'ps-fps';
