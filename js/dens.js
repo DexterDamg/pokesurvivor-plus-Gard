@@ -93,7 +93,7 @@
   const EXTRA_LEGENDS = [720, 1001, 1002, 1003, 1004, 1014, 1015, 1016, 1017, 1025];   // Hoopa (own file), Treasures of Ruin, Loyal Three, Ogerpon, Pecharunt
   function legendSet() { return [...Object.keys(window.PS_LEGEND_MOVES || {}).map(Number), ...EXTRA_LEGENDS]; }
   window.PS_LEGEND_DEX = () => new Set(legendSet());
-  function legendPool() { const N = E(), L = new Set(legendSet()); return (N?.DEX || []).filter(d => L.has(d.dex) && !GACHA_ONLY[d.dex] && N.SPRITE_META[d.dex] && d.dex !== 493); }
+  function legendPool() { const N = E(), L = new Set(legendSet()); return (N?.DEX || []).filter(d => L.has(d.dex) && !GACHA_ONLY[d.dex] && N.SPRITE_META[d.dex] && d.dex !== 493 && d.dex !== 386); }   // Deoxys: Birth Island only
   function bossPool() { const N = E(), L = new Set(legendSet()); return (N?.DEX || []).filter(d => d.rarity >= 1 && d.rarity <= 4 && !L.has(d.dex) && N.SPRITE_META[d.dex]); }
   // gacha: Legendaries are earned in dens now, except the gacha-only ones (Magearna & Meloetta common, Manaphy & Phione rarer)
   window.PS_GACHA_POOL = function (list, rarity) {
