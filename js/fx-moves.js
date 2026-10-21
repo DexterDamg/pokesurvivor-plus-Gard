@@ -39,8 +39,15 @@
    if((opts.burn||c.fx.burn)&&typeof e.applyBurn==='function')e.applyBurn(1);
    if((opts.poison||c.fx.poison)&&typeof e.applyPoison==='function')e.applyPoison(1);
  }
+ // break chests / rocks / grass like the game's own attacks do (big:true also bursts big chests open)
+ function hitProps(c,x,y,r,dmg,big){const Wd=B()?.world;if(c.ghost||!Wd||typeof Wd.propsInCircle!=='function')return;
+   try{const list=Wd.propsInCircle(x,y,r+16);if(big&&typeof Wd.specialsNear==='function')for(const q of Wd.specialsNear(x,y,r+16))if(q&&q.type==='bigchest')list.push(q);
+     for(const q of list){if(!q||Math.hypot(q.x-x,q.y-y)>r+(q.r||12))continue;
+     if(q.type==='bigchest'){if(big&&!q.hoopaOpened&&typeof Wd.breakProp==='function'){q.hoopaOpened=true;Wd.breakProp(q);}continue;}
+     if(q.destructible&&q.hp>0&&typeof Wd.damageProp==='function')Wd.damageProp(q,Math.max(1,dmg),c.fx.color||'#ffffff');}}catch(e){}}
  function hitCircle(c,x,y,r,opts={}){
    if(c.ghost||typeof c.hit!=='function')return 0;let n=0;const dmg=baseDmg(c,opts.mult);
+   if(!opts.noProps)hitProps(c,x,y,r,dmg,opts.bigProps||c.fx.bigProps);
    for(const e of enemies()){const dx=e.x-x,dy=e.y-y;if(dx*dx+dy*dy>(r+(e.r||10))**2)continue;if(opts.skip&&opts.skip.has(e))continue;opts.skip&&opts.skip.add(e);applyHit(c,e,dmg,opts,dx,dy);n++;}
    return n;
  }
@@ -492,18 +499,18 @@
      ring(p.x,p.y,10,90,'#ffffff',0.35,5);return c;},
    update(c,dt){c.t+=dt;
      if(c.phase==='roll'){const st=Math.min(c.speed*dt,c.range-c.dist);c.dist+=st;c.x+=Math.cos(c.aim)*st;c.y+=Math.sin(c.aim)*st;
-       hitCircle(c,c.x,c.y,c.R,{skip:c.skip,mult:1.4,knock:160});
+       hitCircle(c,c.x,c.y,c.R,{skip:c.skip,mult:1.4,knock:160,bigProps:true});
        c.gStep+=st;while(c.gStep>=36){c.gStep-=36;c.glit.push({x:c.x+rnd(-c.R*0.5,c.R*0.5),y:c.y+rnd(-c.R*0.4,c.R*0.4),t:0,life:2.6,tick:0,seed:Math.random()*99});}
        if(c.parts.length<40)for(let i=0;i<3;i++)c.parts.push({a:rnd(0,TAU),r:rnd(c.R*0.9,c.R*1.5),t:0,s:rnd(2,5)});
        if(c.dist>=c.range-0.5){c.phase='pop';c.pt=0;c.fx0=c.x;c.fy0=c.y;c.wskip=new Set();   // the ball bursts
-         hitCircle(c,c.x,c.y,c.R*1.8,{mult:c.fx.popMult||1.8,knock:200});kick(0.5);burst(c.x,c.y-20,'#ffffff',30,280);burst(c.x,c.y-20,'#ffb8ec',20,220);ring(c.x,c.y,c.R,c.R*2.2,'#ffffff',0.4,7);}}
+         hitCircle(c,c.x,c.y,c.R*1.8,{mult:c.fx.popMult||1.8,knock:200,bigProps:true});kick(0.5);burst(c.x,c.y-20,'#ffffff',30,280);burst(c.x,c.y-20,'#ffb8ec',20,220);ring(c.x,c.y,c.R,c.R*2.2,'#ffffff',0.4,7);}}
      else if(c.phase==='pop'){c.pt+=dt;const wr=c.R+(c.fx.wave||300)*Math.min(1,c.pt/0.5);   // shockwave rolls outward, hitting what it passes
        for(const e of enemies()){if(c.wskip.has(e))continue;const d=Math.hypot(e.x-c.fx0,e.y-c.fy0);if(d<=wr+(e.r||10)){c.wskip.add(e);if(!c.ghost)applyHit(c,e,baseDmg(c,c.fx.waveMult||1.1),{knock:220},e.x-c.fx0,e.y-c.fy0);}}
        if(c.pt>=0.55){c.phase='fall';c.ft=0;}}
-     else if(c.phase==='fall'){c.ft+=dt;if(c.ft>=0.55){c.phase='boom';c.bt=0;hitCircle(c,c.fx0,c.fy0,c.fx.boom||175,{mult:c.fx.boomMult||2.6,knock:240});kick(0.75);
+     else if(c.phase==='fall'){c.ft+=dt;if(c.ft>=0.55){c.phase='boom';c.bt=0;hitCircle(c,c.fx0,c.fy0,c.fx.boom||175,{mult:c.fx.boomMult||2.6,knock:240,bigProps:true});kick(0.75);
          ring(c.fx0,c.fy0,10,(c.fx.boom||175)*1.2,'#ffffff',0.6,8);ring(c.fx0,c.fy0,10,(c.fx.boom||175)*0.8,'#ff9ad8',0.5,6);burst(c.fx0,c.fy0,'#ffe6f6',34,300);burst(c.fx0,c.fy0,'#b8d8ff',20,240);}}
      else c.bt+=dt;
-     for(const g of c.glit){g.t+=dt;g.tick-=dt;if(g.tick<=0&&g.t<g.life){g.tick=0.4;hitCircle(c,g.x,g.y,30,{mult:0.22,knock:0});}}
+     for(const g of c.glit){g.t+=dt;g.tick-=dt;if(g.tick<=0&&g.t<g.life){g.tick=0.4;hitCircle(c,g.x,g.y,30,{mult:0.22,knock:0,noProps:true});}}
      for(const q of c.parts){q.t+=dt;q.a+=dt*4;}c.parts=c.parts.filter(q=>q.t<0.6);
      return c.phase!=='boom'||c.bt<0.9||c.glit.some(g=>g.t<g.life);},
    draw(c,ctx,v){const k=v.k;ctx.save();
