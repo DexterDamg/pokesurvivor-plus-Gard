@@ -587,17 +587,39 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  // ---- QUEEN'S GAZE: a private passive for the LoverGare account's Pheromosa only.
  //      Nobody else's game ever applies or shows it.
  const QUEEN={user:'lovergare',dex:795,spd:1.25,perKill:0.0001,killCap:1000,regen:20,
-   summonEvery:12,summonCount:2,maxAllies:6,allyLife:15,
-   allies:[{dex:10,shot:'pin-missile',slow:0.35},{dex:13,shot:'poison-sting',poison:1},{dex:265,shot:'poison-sting',poison:1},
-           {dex:540,shot:'pin-missile'},{dex:664,shot:'pin-missile',slow:0.25},{dex:736,shot:'pin-missile'}]};
+   summonEvery:12,summonCount:2,maxAllies:5,allyLife:20,allyDmg:20,
+   // share = how much of Pheromosa's own stats (damage, speed) the ally gets
+   // Every Bug-type Pokemon in the game (except Pheromosa), [dex, its other type]. Rolled by rarity:
+   tiers:[ // chance, share of Pheromosa's stats, seconds between shots, size, heart color
+     {id:'common',  name:'Common',  chance:0.70,share:0.5,rate:0.95,scale:1.0, col:'#ff9ad8'},
+     {id:'uncommon',name:'Uncommon',chance:0.15,share:0.5,rate:0.85,scale:1.0, col:'#6fb8ff'},
+     {id:'rare',    name:'Rare',    chance:0.10,share:1.0,rate:0.75,scale:1.05,col:'#b77bff'},
+     {id:'epic',    name:'Epic',    chance:0.05,share:1.0,rate:0.55,scale:1.15,col:'#ffd23f',pierce:1}],
+   pool:{
+    common:[[10,"bug"],[11,"bug"],[13,"poison"],[14,"poison"],[46,"grass"],[48,"poison"],[165,"flying"],[167,"poison"],[204,"bug"],[265,"bug"],[266,"bug"],[268,"bug"],[283,"water"],[290,"ground"],[292,"ghost"],[401,"bug"],[412,"bug"],[415,"flying"],[540,"grass"],[543,"poison"],[588,"bug"],[595,"electric"],[664,"bug"],[665,"bug"],[736,"bug"],[742,"fairy"],[751,"water"],[767,"water"],[824,"bug"],[850,"fire"],[872,"ice"],[917,"bug"],[919,"bug"],[953,"bug"]],
+    uncommon:[[12,"flying"],[15,"poison"],[47,"grass"],[166,"flying"],[168,"poison"],[193,"flying"],[267,"flying"],[269,"poison"],[347,"rock"],[402,"bug"],[451,"poison"],[541,"grass"],[544,"poison"],[557,"rock"],[636,"fire"],[737,"electric"],[825,"psychic"],[918,"bug"]],
+    rare:[[49,"poison"],[205,"steel"],[284,"flying"],[291,"flying"],[313,"bug"],[314,"bug"],[413,"grass"],[414,"flying"],[416,"flying"],[545,"poison"],[596,"electric"],[632,"steel"],[666,"flying"],[743,"fairy"],[752,"water"],[873,"ice"],[920,"dark"]],
+    epic:[[123,"flying"],[127,"bug"],[212,"steel"],[213,"rock"],[214,"fighting"],[348,"rock"],[469,"flying"],[542,"grass"],[589,"steel"],[617,"bug"],[637,"fire"],[649,"steel"],[738,"electric"],[768,"water"],[794,"fighting"],[826,"psychic"],[851,"fire"],[900,"rock"],[988,"fighting"]]
+   },
+   // which of the game's projectile moves each ally fires, by its other type (Bug-only ones use Bug moves)
+   shots:{fire:'ember',water:'water-gun',electric:'thunder-shock',psychic:'confusion',poison:'poison-sting',flying:'wing-attack',rock:'rock-throw',
+          fighting:'aura-sphere',ghost:'shadow-ball',fairy:'moonblast',steel:'bullet-punch',normal:'tackle',dark:'pin-barrage',grass:'pin-missile',
+          ground:'rock-throw',ice:'pin-barrage',bug:'pin-missile'},
+   epicShots:{fire:'mystical-fire',fighting:'aura-sphere-prime',bug:'fell-stinger',grass:'fell-stinger',rock:'rock-throw',steel:'bullet-punch'}};
+ function queenAlly(){let r=Math.random(),T=QUEEN.tiers[0];for(const t of QUEEN.tiers){if(r<t.chance){T=t;break;}r-=t.chance;}
+   const list=QUEEN.pool[T.id],pick=list[(Math.random()*list.length)|0],dex=pick[0],ty=pick[1];
+   const shot=(T.id==='epic'&&QUEEN.epicShots[ty])||QUEEN.shots[ty]||'pin-missile';
+   return {tier:T,dex,type:ty,fx:{dex,shot,life:QUEEN.allyLife,scale:T.scale,rate:T.rate,heart:T.col,tier:T.id,pierce:T.pierce||0,mult:T.share,share:T.share,chests:true,onScreen:true,
+     poison:ty==='poison'?1:0,burn:ty==='fire'?1:0,slow:ty==='ice'?0.4:(dex===10||dex===664?0.3:0),colors:['#ffffff',T.col,T.col]}};}
  function queenOn(p){const b=getBridge();return !!(p&&b&&String(b.user||'').trim().toLowerCase()===QUEEN.user&&Number(p.dex)===QUEEN.dex&&!p.megaForm);}
  function queenKills(p){let k=0;try{k=typeof p.myKills==='function'?Number(p.myKills())||0:0;}catch(e){}return Math.min(QUEEN.killCap,k);}
  function queenTick(p,dt,now){
    if(p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+QUEEN.regen*dt);
    if(!window.PS_FX)return;if(!p.__qAt)p.__qAt=now-(QUEEN.summonEvery-3)*1000;
    if(now-p.__qAt>=QUEEN.summonEvery*1000){p.__qAt=now;const alive=window.PS_FX.count?window.PS_FX.count('minion'):0;
-     for(let i=0;i<Math.min(QUEEN.summonCount,QUEEN.maxAllies-alive);i++){const a=QUEEN.allies[(Math.random()*QUEEN.allies.length)|0];
-       window.PS_FX.cast('minion',p,{id:'pin-missile',type:'bug',dmg:9,knock:20,fx:Object.assign({life:QUEEN.allyLife,colors:['#ffffff','#c8ff9a','#5fcb6a']},a)},null,false);}}
+     for(let i=0;i<Math.min(QUEEN.summonCount,QUEEN.maxAllies-alive);i++){const A=queenAlly();
+       window.PS_FX.cast('minion',p,{id:A.fx.shot,type:'bug',dmg:QUEEN.allyDmg,knock:20,fx:A.fx},null,false);
+       if(A.tier.id!=='common'){try{const b=getBridge(),nm=(b.spriteMeta&&window.PS_DEX_NAMES&&window.PS_DEX_NAMES[A.dex])||'';b.fx.dmgText(p.x,p.y-90,A.tier.name+' ally!',A.tier.col);}catch(e){}}}}
  }
  // Beast Boost (Ultra Beasts): each KO stacks a boost to one stat for a few seconds
  function bbMult(p,stat){const P=passiveFor(p),A=P&&P.ability,bb=A&&A.beastBoost;if(!bb||bb.stat!==stat||!p.__bb||performance.now()>p.__bb.until||p.__bb.ab!==P.abilityId)return 1;
@@ -775,7 +797,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const UB=(window.PS_ULTRA_BEASTS||[]).includes(Number(p.dex));
    const lines=P.src==='legend'?passiveLines(UB?'Ultra Beast ability':'Legendary ability',P.abilityId,P.types,P.deal,true):[describeDamage(P.types,{},true)];
    if(P.src==='legend'&&TRAITS[Number(p.dex)])for(const t of TRAITS[Number(p.dex)])lines.push('Trait \u2013 '+describeTrait(t));
-   if(queenOn(p))lines.push('\u{1F451} Queen\'s Gaze (only you can see this): Speed \u00d71.25 \u00b7 +0.01% damage per KO (now +'+(queenKills(p)*QUEEN.perKill*100).toFixed(2)+'%, max +10% at 1000) \u00b7 heals 20 HP/s \u00b7 summons bug Pok\u00e9mon to fight for her');
+   if(queenOn(p))lines.push('\u{1F451} Queen\'s Gaze (only you can see this): Speed \u00d71.25 \u00b7 +0.01% damage per KO (now +'+(queenKills(p)*QUEEN.perKill*100).toFixed(2)+'%, max +10% at 1000) \u00b7 heals 20 HP/s \u00b7 summons Bug Pok\u00e9mon to fight for her, up to 5 at a time, 20s each (70% Common \u00b7 15% Uncommon at 50% of her stats; 10% Rare \u00b7 5% Epic at 100%). They open chests and stay on screen');
    if(P.src==='legend'&&window.PS_LEGEND_MOVES&&window.PS_LEGEND_MOVES[Number(p.dex)])lines.push('Signature move (from level-up rewards): '+window.PS_LEGEND_MOVES[Number(p.dex)].map(m=>m.name).join(', '));
    return '\n\n'+lines.filter(Boolean).join('\n');
  }

@@ -387,22 +387,34 @@
  // ---------------------------------------------------------------- SUMMONED ALLIES (little Pokemon that follow you and shoot)
  //  move.fx = {dex, life, shot:'poison-sting', rate, poison, slow}
  S.minion={cast(c){const p=c.player,a=rnd(0,TAU);c.off=a;c.x=p.x+Math.cos(a)*60;c.y=p.y+Math.sin(a)*45;c.life=c.fx.life||15;c.cd=rnd(0.3,0.9);c.face=0;c.walk=0;
-     ring(c.x,c.y,4,40,'#9cff7a',0.35,3);burst(c.x,c.y-10,'#c8ff9a',10,110);return c;},
+     const hc=c.fx.heart||'#9cff7a';ring(c.x,c.y,4,c.fx.tier==='epic'?90:40,hc,0.45,c.fx.tier==='epic'?6:3);burst(c.x,c.y-10,hc,c.fx.tier==='epic'?30:10,c.fx.tier==='epic'?200:110);if(c.fx.tier==='epic')kick(0.1);return c;},
    update(c,dt){c.t+=dt;const p=c.player;if(!p||p.dead)return false;const P=B()?.projectiles;
-     const t=nearest(c.x,c.y,420);let gx,gy;
+     // stay inside the screen around the Pokemon that summoned it
+     const cam=B()?.camera;let vw=null;if(c.fx.onScreen&&cam&&typeof cam.left==='function'&&cam.scale){const L=cam.left(),T=cam.top(),W=(cam._cw||800)/cam.scale,H=(cam._ch||600)/cam.scale;vw={l:L+24,t:T+40,r:L+W-24,b:T+H-24};}
+     const inView=e=>!vw||(e.x>vw.l-10&&e.x<vw.r+10&&e.y>vw.t-10&&e.y<vw.b+10);
+     const t=nearest(c.x,c.y,520,enemies().filter(inView));let gx,gy;
      if(t&&Math.hypot(t.x-p.x,t.y-p.y)<650){const d=Math.hypot(t.x-c.x,t.y-c.y)||1;c.face=Math.atan2(t.y-c.y,t.x-c.x);const sx2=t.x+Math.cos(c.off)*120,sy2=t.y+Math.sin(c.off)*85;if(Math.hypot(sx2-c.x,sy2-c.y)>14){gx=sx2;gy=sy2;}
        c.cd-=dt;if(c.cd<=0&&P&&typeof P.spawn==='function'&&!c.ghost){c.cd=c.fx.rate||0.9;const sp2=330,ang=Math.atan2(t.y-(c.y-8),t.x-c.x);
-         try{const mid=c.fx.shot||'poison-sting',md=B()?.moves?.BY_ID?.[mid],vis=VFX()&&md?VFX().forMove(md):null;P.spawn({owner:p,mid,x:c.x,y:c.y-10,vx:Math.cos(ang)*sp2,vy:Math.sin(ang)*sp2,dmg:baseDmg(c),r:6,life:1.3,friendly:true,pierce:0,color:md?(B()?.types?.color?.(md.type)||typeColor(c)):typeColor(c),poison:c.fx.poison||0,slow:c.fx.slow||0,knock:20,hits:new Set(),vis,homing:0});}catch(e){}}}
-     else{gx=p.x+Math.cos(c.off+c.t*0.6)*70;gy=p.y+Math.sin(c.off+c.t*0.6)*50;}
-     c.walk=0;if(gx!=null){const dx=gx-c.x,dy=gy-c.y,d=Math.hypot(dx,dy);if(d>8){const spd=Math.min(d,(c.fx.speed||165))*dt;c.x+=dx/d*spd;c.y+=dy/d*spd;c.walk=1;if(!t)c.face=Math.atan2(dy,dx);}}
+         try{const mid=c.fx.shot||'poison-sting',md=B()?.moves?.BY_ID?.[mid],vis=VFX()&&md?VFX().forMove(md):null;P.spawn({owner:p,mid,x:c.x,y:c.y-10,vx:Math.cos(ang)*sp2,vy:Math.sin(ang)*sp2,dmg:baseDmg(c),r:c.fx.tier==='epic'?9:6,life:1.3,friendly:true,pierce:c.fx.pierce||0,burn:c.fx.burn||0,color:md?(B()?.types?.color?.(md.type)||typeColor(c)):typeColor(c),poison:c.fx.poison||0,slow:c.fx.slow||0,knock:20,hits:new Set(),vis,homing:0});}catch(e){}}}
+     else{ // no foe on screen: go open a chest if there is one, otherwise stay by her side
+       let chest=null;const Wd=B()?.world;
+       if(c.fx.chests&&Wd&&typeof Wd.propsInCircle==='function'){let bd=1e9;try{for(const q of Wd.propsInCircle(c.x,c.y,520))if(q&&q.type==='chest'&&q.hp>0&&!q.used&&inView(q)){const d=Math.hypot(q.x-c.x,q.y-c.y);if(d<bd){bd=d;chest=q;}}}catch(e){}}
+       if(chest){gx=chest.x+Math.cos(c.off)*22;gy=chest.y+Math.sin(c.off)*16;c.face=Math.atan2(chest.y-c.y,chest.x-c.x);
+         c.cd-=dt;if(Math.hypot(chest.x-c.x,chest.y-c.y)<46&&c.cd<=0&&!c.ghost){c.cd=0.45;try{Wd.damageProp(chest,Math.max(4,baseDmg(c)),c.fx.heart||'#ffd23f');}catch(e){}burst(chest.x,chest.y-10,'#ffe27a',4,90);}}
+       else{gx=p.x+Math.cos(c.off+c.t*0.6)*70;gy=p.y+Math.sin(c.off+c.t*0.6)*50;}}
+     c.walk=0;if(gx!=null){const dx=gx-c.x,dy=gy-c.y,d=Math.hypot(dx,dy);if(d>8){const spd=Math.min(d,(c.fx.speed||Math.max(95,(Number(p.spd)||120)*1.5*(c.fx.share||1))))*dt;c.x+=dx/d*spd;c.y+=dy/d*spd;c.walk=1;if(!t)c.face=Math.atan2(dy,dx);}}
      for(const o of live)if(o!==c&&o.style===S.minion){const dx=c.x-o.x,dy=c.y-o.y,d=Math.hypot(dx,dy);if(d>0.1&&d<34){c.x+=dx/d*(34-d)*0.5;c.y+=dy/d*(34-d)*0.5;}}
-     if(Math.hypot(p.x-c.x,p.y-c.y)>700){c.x=p.x;c.y=p.y;}
+     if(vw){c.x=Math.max(vw.l,Math.min(vw.r,c.x));c.y=Math.max(vw.t,Math.min(vw.b,c.y));}
+     if(Math.hypot(p.x-c.x,p.y-c.y)>900){c.x=p.x;c.y=p.y;}
      if(c.t>=c.life&&!c.gone){c.gone=1;burst(c.x,c.y-10,'#e8ffd0',10,110);}
      return c.t<c.life;},
    draw(c,ctx,v){const X=v.sx(c.x),Y=v.sy(c.y),k=v.k,al=Math.min(1,c.t/0.3,(c.life-c.t)/0.4);
      ctx.save();ctx.globalAlpha=0.3*al;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(X,Y,11*k,4.5*k,0,0,TAU);ctx.fill();ctx.restore();
+     if(c.fx.tier==='epic'||c.fx.tier==='rare'){const ep=c.fx.tier==='epic';ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=al*(0.55+0.25*Math.sin(c.t*4));glow(ctx,X,Y-14*k,(ep?40:26)*k,rgba(c.fx.heart,ep?0.55:0.35),rgba(c.fx.heart,0));
+       ctx.strokeStyle=rgba(c.fx.heart,0.8);ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(X,Y,(ep?22:16)*k,(ep?8:6)*k,0,0,TAU);ctx.stroke();
+       if(ep)for(let i=0;i<4;i++){const a2=c.t*2+i*Math.PI/2;sprite(ctx,'star','electric',X+Math.cos(a2)*24*k,Y-20*k+Math.sin(a2)*10*k,0.6*k,0,0,al);}ctx.restore();}
      if(!pokeSprite(ctx,c.fx.dex||10,c.walk?'Walk':'Idle',c.face,c.t,X,Y,2*(c.fx.scale||1)*k,al))glow(ctx,X,Y-10*k,10*k,'rgba(160,255,120,0.9)','rgba(0,0,0,0)');
-     ctx.save();ctx.globalAlpha=al*(0.6+0.4*Math.sin(c.t*5));ctx.fillStyle='#ff7ad0';const hx=X,hy=Y-34*k,hs=3.2*k;ctx.beginPath();ctx.moveTo(hx,hy+hs);ctx.bezierCurveTo(hx-hs*2,hy-hs*0.5,hx-hs*0.6,hy-hs*2,hx,hy-hs*0.6);ctx.bezierCurveTo(hx+hs*0.6,hy-hs*2,hx+hs*2,hy-hs*0.5,hx,hy+hs);ctx.fill();ctx.restore();}};
+     const top=(()=>{const M=B()?.spriteMeta?.[String(c.fx.dex)]?.a?.Idle;return M?M.ay*2*(c.fx.scale||1)*k:30*k;})();ctx.save();ctx.globalAlpha=al*(0.6+0.4*Math.sin(c.t*5));ctx.fillStyle=c.fx.heart||'#ff7ad0';const hx=X,hy=Y-top-6*k,hs=3.2*k;ctx.beginPath();ctx.moveTo(hx,hy+hs);ctx.bezierCurveTo(hx-hs*2,hy-hs*0.5,hx-hs*0.6,hy-hs*2,hx,hy-hs*0.6);ctx.bezierCurveTo(hx+hs*0.6,hy-hs*2,hx+hs*2,hy-hs*0.5,hx,hy+hs);ctx.fill();ctx.restore();}};
 
  // ---------------------------------------------------------------- manager
  window.PS_FX={
