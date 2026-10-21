@@ -1,0 +1,77 @@
+/* ROAMING LEGENDARIES + BOSS RUSH LEGENDARIES
+   - Every 5 minutes of a run there's a 2% chance a wild Mew appears somewhere near you, and another 2% chance
+     for one of the roaming Legendaries (Raikou, Entei, Suicune, Latias, Latios, the legendary birds, Cresselia,
+     the Forces of Nature...). "A wild Mew has appeared!" — defeat it before it flees (90 s) and it joins your
+     collection (shiny if it was). Normal shiny odds apply (Shiny Charm triples them).
+   - Boss Rush mode: on top of the faster bosses, a Legendary boss joins the fight every 75 seconds.
+   Solo only. LoverGare's test panel gets a "Roaming Legendary" button. */
+(() => {
+  'use strict';
+  if (window.PS_ROAMERS_INSTALLED) return; window.PS_ROAMERS_INSTALLED = true;
+  const B = () => window.PS_MEGA_BRIDGE_V5, E = () => window.PS_HOOPA_ENGINE;
+  const TAU = Math.PI * 2;
+  const CFG = { every: 300, mewChance: 0.02, roamChance: 0.02, flee: 90, rushEvery: 75 };
+  const MEW = 151, ROAMERS = [243, 244, 245, 380, 381, 144, 145, 146, 488, 641, 642, 645, 905];
+  const GACHA_ONLY = new Set([801, 648, 490, 489]);
+  const clock = () => { try { const t = E().Game.time; return Number(typeof t === 'function' ? t() : t) || 0; } catch (_) { return 0; } };
+  const coop = () => !!(E()?.Coop?.active);
+  const say = (t, d) => { try { E().Spawner.say(t, d || 3); } catch (_) {} };
+  const toast = (t, s, o) => { try { window.PS_TOAST && window.PS_TOAST(t, s, o); } catch (_) {} };
+  const live = [];   // {e, kind:'roam'|'rush', t, dex}
+  let runP = null, nextRoll = CFG.every, nextRush = CFG.rushEvery;
+
+  function template() {   // stats from the boss list entry closest to the current time
+    const L = E()?.Enemies?.BOSSES || [], t = clock(); let best = L[0] || {}; for (const b of L) if (Math.abs(b.at - t) < Math.abs((best.at || 0) - t)) best = b; return best;
+  }
+  function spot(p, dmin, dmax) {
+    const W = B()?.world; for (let i = 0; i < 60; i++) { const a = Math.random() * TAU, d = dmin + Math.random() * (dmax - dmin), x = p.x + Math.cos(a) * d, y = p.y + Math.sin(a) * d * 0.8;
+      try { if (W && W.isFree && !W.isFree(x, y, 24)) continue; } catch (_) {} return [x, y]; } return [p.x + dmax, p.y];
+  }
+  function spawnLegend(dex, kind) {
+    const N = E(), p = B()?.game?.player; if (!N || !p || !N.DEX_BY[dex] || !N.SPRITE_META[dex]) return null;
+    const T = template(), sc = N.Enemies.scale ? N.Enemies.scale(clock()) : { hp: 1, dmg: 1, spd: 1 }, d = N.DEX_BY[dex], roam = kind === 'roam';
+    const def = { dex, name: d.name, hp: Math.round((Number(T.hp) || 1500) * (roam ? 1.2 : 1.6)), spd: Math.round((Number(T.spd) || 85) * (roam ? 1.25 : 1)), dmg: Math.round((Number(T.dmg) || 30) * 1.15), xp: Math.round((Number(T.xp) || 200) * 1.5),
+      behavior: T.behavior || 'charger', shotDmg: Math.round((Number(T.shotDmg) || 15) * 1.1), shotCd: T.shotCd || 1.2, range: T.range || 260 };
+    const [x, y] = spot(p, roam ? 380 : 260, roam ? 620 : 420);
+    let e; try { e = new N.Enemy(def, x, y, { hp: sc.hp || 1, dmg: sc.dmg || 1, spd: Math.min(1.2, sc.spd || 1) }, true); } catch (err) { console.warn('[roamers]', err); return null; }
+    e.legend = true; e.__roamer = kind;
+    try { const rate = (Number(N.Spawner.SHINY_RATE) || 1 / 4096) * (p.item === 'shinycharm' ? 3 : 1); if (N.Sprites.hasShiny(dex) && Math.random() < rate) { e.shiny = true; e.anim = new N.Sprites.Animator(dex, e.scale, true); } } catch (_) {}
+    N.EnemyMgr.add(e); live.push({ e, kind, t: 0, dex });
+    try { B().fx.ring(x, y, 10, 160, roam ? '#9ae6ff' : '#ffd23f', 0.7, 6); B().audio?.sfx?.('legend'); } catch (_) {}
+    if (roam) { say('A wild ' + (e.shiny ? 'shiny ' : '') + d.name + ' has appeared!', 4); toast('A wild ' + d.name + ' appeared!', 'Defeat it before it flees to catch it', { dex, shiny: !!e.shiny, gold: true, ms: 6000 }); }
+    else say('Legendary ' + d.name + ' joins the Boss Rush!', 3);
+    return e;
+  }
+  function rushPool() { const L = Object.keys(window.PS_LEGEND_MOVES || {}).map(Number).filter(d => !GACHA_ONLY.has(d) && d !== 493 && E()?.SPRITE_META?.[d]); return L; }
+  function remove(e) { try { e.dead = true; const L = E().EnemyMgr.all(), i = L.indexOf(e); if (i >= 0) L.splice(i, 1); } catch (_) {} }
+  function caught(r) {
+    const N = E(), dex = r.dex, sh = !!r.e.shiny, name = (N.DEX_BY[dex] || {}).name || 'Pokémon';
+    try { if (typeof N.DB.grant === 'function') N.DB.grant(dex); else N.DB.save.owned[dex] = { at: Date.now(), from: 'roam' }; } catch (_) { try { N.DB.save.owned[dex] = { at: Date.now(), from: 'roam' }; } catch (__) {} }
+    if (sh) { try { if (typeof N.DB.grantShiny === 'function') N.DB.grantShiny(dex); else N.DB.save.shiny[dex] = { at: Date.now(), from: 'roam' }; } catch (_) {} }
+    try { N.DB.commit(); } catch (_) {}
+    toast((sh ? 'Shiny ' : '') + name + ' joined you!', 'You caught the roaming Legendary', { dex, shiny: sh, gold: true, ms: 7000 });
+  }
+  function tick(dt) {
+    const g = B()?.game, p = g?.player;
+    if (!p || g.state === 'ui' || g.state === 'over') { live.length = 0; runP = null; return; }
+    if (p !== runP) { runP = p; live.length = 0; nextRoll = CFG.every; nextRush = CFG.rushEvery; }
+    if (g.state !== 'playing' || coop() || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) return;
+    const t = clock(), mode = window.PS_MODES?.run?.mode;
+    if (mode !== 'legend' && t >= nextRoll) { nextRoll += CFG.every;
+      if (Math.random() < CFG.mewChance) spawnLegend(MEW, 'roam'); else if (Math.random() < CFG.roamChance) spawnLegend(ROAMERS[Math.floor(Math.random() * ROAMERS.length)], 'roam'); }
+    if (mode === 'bossrush' && t >= nextRush) { nextRush = t + CFG.rushEvery; const L = rushPool(); if (L.length) spawnLegend(L[Math.floor(Math.random() * L.length)], 'rush'); }
+    for (let i = live.length - 1; i >= 0; i--) { const r = live[i]; r.t += dt;
+      if (r.e.dead || r.e.hp <= 0) { live.splice(i, 1); if (r.kind === 'roam' && !r.e.__fled) caught(r); continue; }
+      if (r.kind === 'roam' && r.t >= CFG.flee) { r.e.__fled = true; say(r.e.name + ' fled!', 2.5); try { B().fx.ring(r.e.x, r.e.y, 10, 120, '#9ae6ff', 0.6, 5); } catch (_) {} remove(r.e); live.splice(i, 1); }
+    }
+  }
+  function testBtn() {
+    const t = document.getElementById('ps-sz-test'); if (!t || t.querySelector('[data-roam]')) return;
+    const b = document.createElement('button'); b.dataset.roam = '1'; b.textContent = 'Roaming Legendary';
+    b.addEventListener('click', e => { e.stopPropagation(); spawnLegend(Math.random() < 0.5 ? MEW : ROAMERS[Math.floor(Math.random() * ROAMERS.length)], 'roam'); }); t.appendChild(b);
+  }
+  let last = performance.now(), ui = 0;
+  function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.1, (now - last) / 1000); last = now; try { tick(dt); ui += dt; if (ui > 0.5) { ui = 0; testBtn(); } } catch (e) { console.warn('[roamers]', e); } }
+  requestAnimationFrame(loop);
+  window.PS_ROAMERS = { spawn: spawnLegend, cfg: CFG, get live() { return live.map(r => ({ dex: r.dex, kind: r.kind, t: r.t, shiny: !!r.e.shiny })); } };
+})();

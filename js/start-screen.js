@@ -17,7 +17,7 @@
   #ps-start .sp{position:absolute;width:6px;height:6px;background:#fff;box-shadow:0 0 8px #9ae6ff;animation:psSp 3s linear infinite;opacity:0}
   @keyframes psSp{10%{opacity:1}100%{transform:translateY(-140px);opacity:0}}`;
   const el = document.createElement('div'); el.id = 'ps-start';
-  el.innerHTML = '<img src="assets/ui/logo-intox4.webp" alt="PokéSurvivor" onerror="this.style.display=\'none\'"><div class="press">PRESS ANY KEY OR CLICK TO START</div><div class="small">♫ music starts when you press</div>';
+  el.innerHTML = '<img src="assets/ui/logo-intox4.webp" alt="PokéSurvivor" onerror="this.style.display=\'none\'"><div class="press">PRESS ANY KEY OR CLICK TO START</div>';
   for (let i = 0; i < 18; i++) { const s = document.createElement('i'); s.className = 'sp'; s.style.left = (5 + Math.random() * 90) + '%'; s.style.top = (40 + Math.random() * 55) + '%'; s.style.animationDelay = (Math.random() * 3) + 's'; el.appendChild(s); }
   let done = false;
   function start() {

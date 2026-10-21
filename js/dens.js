@@ -19,10 +19,22 @@
   const clock = () => { try { const t = E().Game.time; return Number(typeof t === 'function' ? t() : t) || 0; } catch (_) { return 0; } };
   const say = (t, d) => { try { E().Spawner.say(t, d || 3); } catch (_) {} };
 
+  // a den needs open, dry, flat ground: no walls, water, trees, rocks, chests, crystals or altars under or right next to it
+  function clearSpot(x, y) {
+    try { const W = B().world, N = E(); if (!W) return true; const R = 64;
+      if (W.isFree && !W.isFree(x, y, R)) return false;
+      for (let i = 0; i < 12; i++) { const a = i / 12 * TAU, px = x + Math.cos(a) * R, py = y + Math.sin(a) * R * 0.6; if (W.isWall(px, py) || (W.isLiquid && W.isLiquid(px, py))) return false; }
+      if ((W.propsInCircle(x, y, R + 24) || []).some(q => q && q.type !== 'grass')) return false;
+      if (W.specialsNear && (W.specialsNear(x, y, R + 30) || []).length) return false;
+      try { const C = N.Crystal; const L = C && (C.all ? C.all() : C.list); if (Array.isArray(L) && L.some(c => c && Math.hypot(c.x - x, c.y - y) < R + 40)) return false; } catch (_) {}
+      for (const o of [...dens, ...ldens]) if (Math.hypot(o.x - x, o.y - y) < 200) return false;
+      return true; } catch (_) { return true; }
+  }
   function spawnDen(near) {
     const p = B()?.game?.player; if (!p || coop()) return null; let x = p.x, y = p.y;
-    for (let i = 0; i < 40; i++) { const a = Math.random() * TAU, d = near ? 170 : 300 + Math.random() * 160, nx = p.x + Math.cos(a) * d, ny = p.y + Math.sin(a) * d * 0.8;
-      try { const W = B().world; if (W && (W.isWall(nx, ny) || (W.isLiquid && W.isLiquid(nx, ny)))) continue; } catch (_) {} x = nx; y = ny; break; }
+    let found = false;
+    for (let i = 0; i < 160 && !found; i++) { const a = Math.random() * TAU, d = (near ? 170 : 300 + Math.random() * 160) + Math.floor(i / 40) * 120, nx = p.x + Math.cos(a) * d, ny = p.y + Math.sin(a) * d * 0.8;
+      if (clearSpot(nx, ny)) { x = nx; y = ny; found = true; } }
     const d = { x, y, t: 0, life: CFG.life }; dens.push(d);
     say('A Pokémon Den is overflowing with Dynamax energy!', 3);
     try { B().fx.ring(x, y, 10, 120, '#ff2a55', 0.7, 6); B().audio?.sfx?.('legend'); } catch (_) {}
@@ -184,7 +196,7 @@
     const w = 150 * k, h = 150 * k, pad = Math.ceil(h * 0.55), dpr = ctx.getTransform().a || 1, W = Math.ceil(w * dpr), H = Math.ceil((h + pad) * dpr);
     if (dc.width < W || dc.height < H) { dc.width = Math.max(dc.width, W); dc.height = Math.max(dc.height, H); }
     const c = dc.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, dc.width, dc.height); c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const lx = w / 2, ly = pad + h * 0.80;   // den position on the scratch canvas
+    const lx = w / 2, ly = pad + h * 0.84;   // den position on the scratch canvas
     paintDen(c, lx, ly, k, legendary, t, opening);
     // fade the top of the pillar so it never looks cropped
     c.globalCompositeOperation = 'destination-out';
@@ -210,10 +222,12 @@
     ctx.drawImage(dc, 0, 0, W, H, X - lx, Y - ly, w, h + pad);
   }
   function paintDen(ctx, X, Y, k, legendary, t, opening) {
-    const c = legendary ? 'orange' : 'pink', img = DEN[c], beam = DEN['b' + c], w = 150 * k, h = 150 * k, dx = X - w / 2, dy = Y - h * 0.80;
+    const c = legendary ? 'orange' : 'pink', img = DEN[c], beam = DEN['b' + c], w = 150 * k, h = 150 * k, dx = X - w / 2, dy = Y - h * 0.84;
     if (!img.complete || !img.naturalWidth) { ctx.save(); ctx.fillStyle = '#523843'; ctx.beginPath(); ctx.ellipse(X, Y, 48 * k, 21 * k, 0, 0, TAU); ctx.fill(); ctx.strokeStyle = legendary ? '#ff9a2e' : '#ee449c'; ctx.lineWidth = 7 * k; ctx.stroke(); ctx.restore(); return; }
     const col = legendary ? [255, 110, 20] : [255, 70, 170], LK = legendary ? 0.55 : 1;   // additive light turns orange into yellow fast, so it's gentler
     ctx.save(); ctx.imageSmoothingEnabled = false; ctx.globalAlpha = opening;
+    // contact shadow so the stones sit on the ground
+    { const sg = ctx.createRadialGradient(X, Y + h * 0.04, 2, X, Y + h * 0.04, w * 0.5); sg.addColorStop(0, 'rgba(0,0,0,.45)'); sg.addColorStop(0.7, 'rgba(0,0,0,.25)'); sg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = sg; ctx.beginPath(); ctx.ellipse(X, Y + h * 0.04, w * 0.5, h * 0.15, 0, 0, TAU); ctx.fill(); }
     // soft light on the ground that breathes
     ctx.globalCompositeOperation = 'lighter';
     const pu = 0.5 + 0.5 * Math.sin(t * 3.1), gr = ctx.createRadialGradient(X, Y, 4 * k, X, Y, 85 * k);
