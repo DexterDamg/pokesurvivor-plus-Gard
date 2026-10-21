@@ -695,12 +695,19 @@ G.Layouts = G.Layouts || (() => {
     };
     window.PS_TERRAIN_REGION = function (x, y) { try { const b = G.Maps && G.Maps.cur ? G.Maps.cur.biome : 0, pool = POOLS[b] || POOLS[0], seed = window.PS_TERRAIN_SEED; if (seed == null) return null; const id = region(Math.floor(x / 32), Math.floor(y / 32), seed, pool).id; return (b === 2 && NAMES_HOT[id]) || NAMES[id] || id; } catch (_) { return null; } };
   }
+  // each area gets its own color mood (a soft tint that fades in when you cross into it; your starting area looks normal)
+  const TINT = { 'Archipelago': '#2f9cff', 'Marshlands': '#5f8a2a', 'River Valley': '#ffb060', 'Rocky Maze': '#7b7b9a', 'Hollow Caverns': '#7a5cff', 'Island Bridges': '#2fd0c0', 'Lava Rivers': '#ff5a2a', 'Open Fields': '#ffe08a' };
+  const tint = document.createElement('div'); tint.id = 'ps-region-tint'; tint.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:14;mix-blend-mode:soft-light;opacity:0;transition:opacity 2.5s ease,background-color 2.5s ease';
+  const addTint = () => { if (document.body && !tint.isConnected) document.body.append(tint); };
+  let homeName = null;
+  function setTint(name, show) { addTint(); if (!show || !name || name === homeName || !TINT[name]) { tint.style.opacity = '0'; return; } tint.style.backgroundColor = TINT[name]; tint.style.opacity = '0.35'; }
   // the region name pops up when you walk into a new area
   (function regionWatch() {
     let last = null, runP = null;
     setInterval(() => { try { const B = window.PS_MEGA_BRIDGE_V5, N = window.PS_HOOPA_ENGINE, p = B?.game?.player; if (!p || B.game.state !== 'playing' || (N.Coop && N.Coop.active) || (N.Rift && N.Rift.inArena)) return;
-      if (p !== runP) { runP = p; last = null; }
-      const n = window.PS_TERRAIN_REGION && window.PS_TERRAIN_REGION(p.x, p.y); if (!n) return; if (last && n !== last) { try { N.Spawner.say('— ' + n + ' —', 2.5); } catch (_) {} } last = n; } catch (_) {} }, 500);
+      if (p !== runP) { runP = p; last = null; homeName = window.PS_TERRAIN_REGION && window.PS_TERRAIN_REGION(0, 0); }
+      const n = window.PS_TERRAIN_REGION && window.PS_TERRAIN_REGION(p.x, p.y); if (!n) return; if (last && n !== last) { try { N.Spawner.say('— ' + n + ' —', 2.5); } catch (_) {} } last = n; setTint(n, true); } catch (_) {} }, 500);
+    setInterval(() => { try { const B = window.PS_MEGA_BRIDGE_V5, N = window.PS_HOOPA_ENGINE, st = B?.game?.state; if (!B?.game?.player || st === 'ui' || st === 'over' || (N.Rift && N.Rift.inArena) || (N.Coop && N.Coop.active) || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) setTint(null, false); } catch (_) {} }, 400);
   })();
   const t = setInterval(() => { const G = window.PS_HOOPA_ENGINE; if (G && G.U && G.U.hash) { clearInterval(t); install(G); } }, 20);
 })();
