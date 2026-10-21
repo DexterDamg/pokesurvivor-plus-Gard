@@ -621,6 +621,26 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
        window.PS_FX.cast('minion',p,{id:A.fx.shot,type:'bug',dmg:QUEEN.allyDmg,knock:20,fx:A.fx},null,false);
        if(A.tier.id!=='common'){try{const b=getBridge(),nm=(b.spriteMeta&&window.PS_DEX_NAMES&&window.PS_DEX_NAMES[A.dex])||'';b.fx.dmgText(p.x,p.y-90,A.tier.name+' ally!',A.tier.col);}catch(e){}}}}
  }
+ // ---- ECHO: a private passive for the LoverGare account's Gardevoir only (base and Mega). Nobody else sees or gets it.
+ const ECHO={user:'lovergare',dex:282,xp:1.6,deal:1.3,spd:1.15,lives:2,
+   // Mega Gardevoir only: "J and Echo's Bond" - when HP drops below 50%:
+   bond:{form:'282-mega',below:0.5,cooldown:30,regen:20,regenDur:10,deal:2.2,dealDur:10,spd:1.5,spdDur:5,take:0.8,takeDur:30}};
+ function echoOn(p){const b=getBridge();return !!(p&&b&&String(b.user||'').trim().toLowerCase()===ECHO.user&&Number(p.dex)===ECHO.dex);}
+ function echoMul(p,stat){if(!echoOn(p))return 1;const now=performance.now(),bd=p.__echoBond;let m=stat==='deal'?ECHO.deal:stat==='spd'?ECHO.spd:1;
+   if(bd){if(stat==='deal'&&now<bd.deal)m*=ECHO.bond.deal;if(stat==='spd'&&now<bd.spd)m*=ECHO.bond.spd;if(stat==='take'&&now<bd.take)m*=ECHO.bond.take;}return m;}
+ function echoTick(p,dt,now){
+   if(!p.__echoXp){p.__echoXp=true;p.xpMul=(Number(p.xpMul)||1)*ECHO.xp;}                       // EXP +60%
+   if(!p.__echoLives){p.__echoLives=true;p.lives=(Number(p.lives)||0)+ECHO.lives;               // Echo's Resolve For J: +2 second chances
+     try{getBridge().fx.dmgText(p.x,p.y-(p.bodyH||40)-24,"Echo's Resolve For J: +2 ♥",'#ff9ad8');}catch(e){}}
+   const B2=ECHO.bond;if(p.megaForm!==B2.form)return;
+   const hp=p.maxHp>0?p.hp/p.maxHp:1,bd=p.__echoBond;
+   if(hp<B2.below&&!p.__echoLow&&(!bd||now-bd.at>B2.cooldown*1000)){
+     p.__echoBond={at:now,regen:now+B2.regenDur*1000,deal:now+B2.dealDur*1000,spd:now+B2.spdDur*1000,take:now+B2.takeDur*1000};
+     try{const b=getBridge();b.fx.dmgText(p.x,p.y-(p.bodyH||40)-26,"J and Echo's Bond!",'#ff7ad0');b.fx.ring(p.x,p.y,8,110,'#ff9ad8',0.6,6);b.fx.burst(p.x,p.y-20,'#ffc8ec',26,200);b.camera.kick(0.3);}catch(e){}}
+   p.__echoLow=hp<B2.below;
+   if(p.__echoBond&&now<p.__echoBond.regen&&p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+B2.regen*dt);
+ }
+ function echoUndo(p){if(p&&p.__echoXp&&!echoOn(p)){p.xpMul=(Number(p.xpMul)||ECHO.xp)/ECHO.xp;p.__echoXp=false;}}
  // Beast Boost (Ultra Beasts): each KO stacks a boost to one stat for a few seconds
  function bbMult(p,stat){const P=passiveFor(p),A=P&&P.ability,bb=A&&A.beastBoost;if(!bb||bb.stat!==stat||!p.__bb||performance.now()>p.__bb.until||p.__bb.ab!==P.abilityId)return 1;
    const n=p.__bb.n;return stat==='take'?Math.max(0.5,1-n*bb.per):1+n*bb.per;}
@@ -629,9 +649,9 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(bb.stat==='heal'){p.hp=Math.min(p.maxHp,p.hp+p.maxHp*bb.per*Math.min(nk,5));return;}
    const act=p.__bb&&p.__bb.ab===abId&&now<p.__bb.until?p.__bb.n:0;p.__bb={ab:abId,n:Math.min(bb.max||15,act+nk),until:now+(bb.dur||8)*1000};}
  window.PS_HOOKS={
-   spd(pl){const p=getPlayer();if(!p||pl!==p)return 1;let m=bbMult(p,'spd')*(queenOn(p)?QUEEN.spd:1);const TR=traitsFor(p);if(!TR)return m;for(const tr of TR)if(tr.spd&&condOK(tr.when,p,null))m*=tr.spd;return m;},
+   spd(pl){const p=getPlayer();if(!p||pl!==p)return 1;let m=bbMult(p,'spd')*(queenOn(p)?QUEEN.spd:1)*echoMul(p,'spd');const TR=traitsFor(p);if(!TR)return m;for(const tr of TR)if(tr.spd&&condOK(tr.when,p,null))m*=tr.spd;return m;},
    deal(type,target,src){
-     const p=getPlayer(),P=passiveFor(p);if(!P)return 1;
+     const p=getPlayer(),P=passiveFor(p);if(!P)return echoMul(p,'deal');
      let m=1;const D=P.deal||{};
      // damage passive / monotype bonus
      if(P.mono){const own=P.types[0];m*=type===own?Math.max(MONO.own,D[own]||1):MONO.other*(D[type]||1);}
@@ -665,10 +685,11 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      }
      m*=traitDeal(p,target);
      if(queenOn(p))m*=1+queenKills(p)*QUEEN.perKill;
+     m*=echoMul(p,'deal');
      return m;
    },
    take(type,pl,dmg){
-     const p=getPlayer();if(!p||pl!==p)return 1;const P=passiveFor(p);if(!P)return 1;
+     const p=getPlayer();if(!p||pl!==p)return 1;const P=passiveFor(p);if(!P)return echoMul(p,'take');
      const A=P.ability||{},now=performance.now();let m=1;
      const who=window.PS_ATTACKER,fromEnemy=!!who,contact=fromEnemy&&!!window.PS_CONTACT;
      const att=who===true?nearestEnemy(p,160):(who||null);   // true = enemy shot whose shooter wasn't recorded
@@ -678,6 +699,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      if(A.lowHp&&A.lowHp.take&&p.maxHp>0&&p.hp/p.maxHp<A.lowHp.below)m*=A.lowHp.take;
      if(A.superTake&&type&&TY()){if(TY().mult(type,P.types)>1)m*=A.superTake;}
      if(A.beastBoost)m*=bbMult(p,'take');
+     m*=echoMul(p,'take');
      if(p.__buff&&p.__buff.ab===P.abilityId&&now<p.__buff.until&&p.__buff.take)m*=p.__buff.take;
      if(A.absorb&&type&&A.absorb.includes(type)){
        m=0;
@@ -727,6 +749,7 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(b.game.state!=='playing'||p.dead)return;
    traitTick(p,dt,now);
    if(queenOn(p))queenTick(p,dt,now);
+   if(echoOn(p))echoTick(p,dt,now);else echoUndo(p);
    if(!A)return;
    if(A.regen&&p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+p.maxHp*A.regen*dt);
    if(A.beastBoost)bbTick(p,A,P.abilityId,now);
@@ -801,6 +824,12 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    if(P.src==='legend'&&window.PS_LEGEND_MOVES&&window.PS_LEGEND_MOVES[Number(p.dex)])lines.push('Signature move (from level-up rewards): '+window.PS_LEGEND_MOVES[Number(p.dex)].map(m=>m.name).join(', '));
    return '\n\n'+lines.filter(Boolean).join('\n');
  }
+ function echoText(p){
+   if(!echoOn(p))return '';const B2=ECHO.bond,bd=p.__echoBond,now=performance.now();
+   const l=['\u{1F496} Echo (only you can see this): EXP ×1.6 · damage ×1.3 · speed ×1.15',
+     "\u{1F496} Echo's Resolve For J: +2 second chances (extra hearts) each run",
+     "\u{1F496} J and Echo's Bond (Mega Gardevoir): when HP drops below 50% → heals 20 HP/s for 10s, attack ×2.2 for 10s, speed ×1.5 for 5s, 20% less damage taken for 30s (every 30s at most)"+(bd&&now<bd.take?' — ACTIVE':'')];
+   return '\n\n'+l.join('\n');}
  function passiveLines(title,abilityId,types,deal,inScope){
    const A=ABIL[abilityId],out=[];
    if(A)out.push(title+' – '+A.name+':',describeAbility(A));
@@ -875,7 +904,7 @@ function start(){
  const visible=isRunScreen();
  mini.style.display=visible?'block':'none';
  if(!visible)panel.style.display='none';
- setLines(status,(!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(f0?'\nForm: '+(f0.en||f0.name)+(f0.spr?'':' (no sprite yet: keeps the normal look)'):'')+(f0&&MEGA_KITS[f0.key]?'\n\n'+passiveLines('Mega ability',MEGA_KITS[f0.key].passive.ability,f0.types||[],MEGA_KITS[f0.key].passive.deal,true).join('\n')+(TRAITS[f0.key]?'\n'+TRAITS[f0.key].map(t=>'Trait \u2013 '+describeTrait(t)).join('\n'):'')+'\nSignature move: '+MEGA_KITS[f0.key].move.name+' (max level)\n'+(MEGA_KITS[f0.key].move.desc||'')+(MEGA_KITS[f0.key].bond?'\nBond move: '+MEGA_KITS[f0.key].bond.name+' (fires together with '+MEGA_KITS[f0.key].move.name+')\n'+(MEGA_KITS[f0.key].bond.desc||''):''):'')+currentPassiveText(p)).split('\n'));
+ setLines(status,(!b?'Waiting for game bridge…':!p?'Start a run to see Mega forms.':`Pokémon: #${p.dex}\nLevel: ${p.level||1}\nMega: ${used?'ACTIVE / already used':list.length?'available':'no Mega for this Pokémon'}`+(f0?'\nForm: '+(f0.en||f0.name)+(f0.spr?'':' (no sprite yet: keeps the normal look)'):'')+(f0&&MEGA_KITS[f0.key]?'\n\n'+passiveLines('Mega ability',MEGA_KITS[f0.key].passive.ability,f0.types||[],MEGA_KITS[f0.key].passive.deal,true).join('\n')+(TRAITS[f0.key]?'\n'+TRAITS[f0.key].map(t=>'Trait \u2013 '+describeTrait(t)).join('\n'):'')+'\nSignature move: '+MEGA_KITS[f0.key].move.name+' (max level)\n'+(MEGA_KITS[f0.key].move.desc||'')+(MEGA_KITS[f0.key].bond?'\nBond move: '+MEGA_KITS[f0.key].bond.name+' (fires together with '+MEGA_KITS[f0.key].move.name+')\n'+(MEGA_KITS[f0.key].bond.desc||''):''):'')+currentPassiveText(p)+echoText(p)).split('\n'));
 
  // Species is fixed to the current player; no clickable Pokémon/form selector.
 
@@ -950,6 +979,7 @@ function start(){
      try{const newAnim=p.anim;if(newAnim!==baseline.anim){p.anim=baseline.anim;}p.invuln=Math.max(Number(p.invuln)||0,1.4);
        const cry=MEGA_CRIES[String(Number(p.dex))]||null;
        window.PS_FX.cast('megaevo',p,{id:'mega-evolution',type:'normal',dmg:0,fx:{newAnim,form:f.key,cry}},null,true);}catch(e){console.warn('mega fx',e);}
+     try{const nm=String(f.en||f.name||'').replace(/^Mega[- ]?/i,'').replace(/\s+[XYZ]$/,'').trim()||'partner';setTimeout(()=>trainerLine(nm),1150);}catch(e){}
    }
    restore=()=>{if(undoSignature)undoSignature();delete p.megaKit;clearPrimal();p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa;p.maxHp=baseline.maxHp;p.hp=Math.min(p.hp,baseline.maxHp);p.r=baseline.r;p.bodyH=baseline.bodyH;delete p.megaForm;};
    hint.textContent=WEATHER[f.key]?'Primal Reversion! '+WEATHER[f.key].name+' is active.'+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':''):'Mega Evolution activated!'+(kit&&ABIL[kit.passive.ability]?' Ability: '+ABIL[kit.passive.ability].name+'.':'')+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':'');
@@ -957,6 +987,23 @@ function start(){
  refresh();
  };
 
+ // What the trainer shouts when the orb breaks. {n} = the Pokemon's name. Add or change lines freely.
+ const TRAINER_LINES=[
+   "Show them what we're made of, {n}!","You've got this, {n}!","Hang in there, {n}!","Let's go all out, {n}!",
+   "This is our moment, {n}!","Together we're unstoppable, {n}!","I believe in you, {n}!","Let's turn this around, {n}!",
+   "Unleash your true power, {n}!","Our bond is our strength, {n}!","Time to shine, {n}!","No holding back now, {n}!"];
+ function trainerLine(name){
+   if(!document.getElementById('ps-trainer-css')){const st=document.createElement('style');st.id='ps-trainer-css';st.textContent=
+     '#ps-trainer{position:fixed;left:50%;top:18%;transform:translateX(-50%) scale(.6);z-index:65;pointer-events:none;opacity:0;transition:opacity .25s,transform .25s cubic-bezier(.2,1.6,.4,1);'+
+     'padding:10px 22px;border-radius:14px;border:3px solid #fff;background:linear-gradient(135deg,rgba(255,110,190,.95),rgba(150,90,255,.95));color:#fff;'+
+     'font:800 22px Pixelify,Fredoka,system-ui,sans-serif;text-shadow:0 2px 0 rgba(80,0,60,.6);box-shadow:0 0 0 3px rgba(255,120,200,.4),0 8px 28px rgba(0,0,0,.45);white-space:nowrap}'+
+     '#ps-trainer.show{opacity:1;transform:translateX(-50%) scale(1)}#ps-trainer small{display:block;font-size:11px;letter-spacing:2px;opacity:.85;text-transform:uppercase}'+
+     '@media (max-width:700px){#ps-trainer{font-size:16px;padding:8px 14px}}';document.head.append(st);}
+   let el=document.getElementById('ps-trainer');if(!el){el=document.createElement('div');el.id='ps-trainer';document.body.append(el);}
+   const line=TRAINER_LINES[Math.floor(Math.random()*TRAINER_LINES.length)].replace('{n}',name);
+   el.innerHTML='<small>Trainer</small>'+line.replace(/[<>&]/g,'');el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
+   clearTimeout(el.__t);el.__t=setTimeout(()=>el.classList.remove('show'),2800);
+ }
  // Pokemon cries played when the orb breaks during Mega Evolution. Add more: dex number -> file in assets/cries/
  const MEGA_CRIES={
    '282':'assets/cries/282.mp3'   // Gardevoir
