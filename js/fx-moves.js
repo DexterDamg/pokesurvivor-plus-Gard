@@ -484,6 +484,23 @@
        ctx.globalCompositeOperation='source-over';ctx.drawImage(megaSym,X-sw/2,hy-sh/2,sw,sh);}
      ctx.restore();}};
 
+ // ---------------------------------------------------------------- SHINY FLAIR
+ //  shiny Pokemon (you, and shiny wild ones) get twinkling stars above their head and leave sparkles when they move
+ const shinySp=[];let shinyLast=0;
+ function star4(ctx,x,y,r,a,col){ctx.save();ctx.globalAlpha=a;ctx.fillStyle=col;ctx.beginPath();for(let i=0;i<8;i++){const rr=i%2?r*0.32:r,an=i/8*TAU-Math.PI/2;ctx.lineTo(x+Math.cos(an)*rr,y+Math.sin(an)*rr);}ctx.closePath();ctx.fill();ctx.restore();}
+ function shinyOf(o){return !!(o&&!o.dead&&((o.anim&&o.anim.shiny)||o.shiny===true||o.isShiny===true||(o.__skin&&o.__skin.prev&&o.__skin.prev.shiny)));}
+ function drawShiny(ctx,v){const now=performance.now()/1000,dt=Math.min(0.05,shinyLast?now-shinyLast:0);shinyLast=now;
+   const list=[];const p=B()?.game?.player;if(shinyOf(p))list.push(p);for(const e of enemies())if(shinyOf(e))list.push(e);
+   for(const o of list){
+     const mv=Math.hypot(o.x-(o.__shx??o.x),o.y-(o.__shy??o.y));o.__shx=o.x;o.__shy=o.y;
+     if(mv>0.6){o.__shT=(o.__shT||0)-dt;if(o.__shT<=0){o.__shT=0.035;const h=Number(o.bodyH)||36;shinySp.push({x:o.x+rnd(-14,14),y:o.y-rnd(2,h*0.9),vy:-rnd(20,45),t:0,life:rnd(0.5,0.9),r:rnd(3.5,6.5),c:Math.random()<0.5?'#fff6c0':'#ffffff'});}}
+     const h=Number(o.bodyH)||36,X=v.sx(o.x),Y=v.sy(o.y-h-30),k=v.k;
+     for(let i=0;i<3;i++){const a=now*1.6+i*TAU/3,tw=0.55+0.45*Math.sin(now*6+i*2.1);
+       star4(ctx,X+Math.cos(a)*14*k,Y+Math.sin(a)*4.5*k-(i===1?3*k:0),(4.6+2.2*tw)*k,0.65+0.35*tw,i===1?'#ffe36a':'#ffffff');}}
+   for(let i=shinySp.length-1;i>=0;i--){const q=shinySp[i];q.t+=dt;q.y+=q.vy*dt;if(q.t>=q.life){shinySp.splice(i,1);continue;}
+     const f=q.t/q.life;star4(ctx,v.sx(q.x),v.sy(q.y),q.r*v.k*(1-f*0.5)*(f<0.2?f/0.2:1),1-f,q.c);}
+   if(shinySp.length>220)shinySp.splice(0,shinySp.length-220);}
+
  // ---------------------------------------------------------------- manager
  window.PS_FX={
    styles:S,
@@ -494,9 +511,9 @@
    cast(name,player,move,hit,ghost){const st=S[name];if(!st)return false;
      const c={style:st,player,move,hit,ghost:!!ghost,fx:Object.assign({},move.fx||{}),t:0};
      try{const r=st.cast(c);if(r)live.push(r);}catch(e){console.warn('fx cast',name,e);}return true;},
-   active(){return live.length>0;},
+   active(){if(live.length||shinySp.length)return true;const p=B()?.game?.player;if(shinyOf(p))return true;for(const e of enemies())if(e.shiny===true)return true;return false;},
    update(dt){for(let i=live.length-1;i>=0;i--){let keep=false;try{keep=live[i].style.update(live[i],dt);}catch(e){console.warn('fx update',e);}if(!keep)live.splice(i,1);}},
-   draw(ctx,view){for(const c of live){try{ctx.save();c.style.draw(c,ctx,view);ctx.restore();}catch(e){console.warn('fx draw',e);}}},
+   draw(ctx,view){try{ctx.save();drawShiny(ctx,view);ctx.restore();}catch(e){}for(const c of live){try{ctx.save();c.style.draw(c,ctx,view);ctx.restore();}catch(e){console.warn('fx draw',e);}}},
    clear(){live.length=0;}
  };
 })();
