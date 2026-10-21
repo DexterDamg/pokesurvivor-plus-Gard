@@ -622,16 +622,17 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
        if(A.tier.id!=='common'){try{const b=getBridge(),nm=(b.spriteMeta&&window.PS_DEX_NAMES&&window.PS_DEX_NAMES[A.dex])||'';b.fx.dmgText(p.x,p.y-90,A.tier.name+' ally!',A.tier.col);}catch(e){}}}}
  }
  // ---- ECHO: a private passive for the LoverGare account's Gardevoir only (base and Mega). Nobody else sees or gets it.
- const ECHO={user:'lovergare',dex:282,xp:1.6,deal:1.3,spd:1.15,lives:2,
+ const ECHO={user:'lovergare',dex:282,xp:1.6,deal:1.3,spd:1.15,lives:2,crit:0.25,take:0.85,   // take 0.85 = Echo's Love: 15% defense
    // Mega Gardevoir only: "J and Echo's Bond" - when HP drops below 50%:
-   bond:{form:'282-mega',below:0.5,cooldown:30,regen:20,regenDur:10,deal:2.2,dealDur:10,spd:1.5,spdDur:5,take:0.8,takeDur:30}};
+   bond:{form:'282-mega',below:0.5,cooldown:30,regen:20,regenDur:10,deal:10,dealDur:10,spd:1.5,spdDur:5,take:0.8,takeDur:30}};
  function echoOn(p){const b=getBridge();return !!(p&&b&&String(b.user||'').trim().toLowerCase()===ECHO.user&&Number(p.dex)===ECHO.dex);}
- function echoMul(p,stat){if(!echoOn(p))return 1;const now=performance.now(),bd=p.__echoBond;let m=stat==='deal'?ECHO.deal:stat==='spd'?ECHO.spd:1;
+ function echoMul(p,stat){if(!echoOn(p))return 1;const now=performance.now(),bd=p.__echoBond;let m=stat==='deal'?ECHO.deal:stat==='spd'?ECHO.spd:stat==='take'?ECHO.take:1;
    if(bd){if(stat==='deal'&&now<bd.deal)m*=ECHO.bond.deal;if(stat==='spd'&&now<bd.spd)m*=ECHO.bond.spd;if(stat==='take'&&now<bd.take)m*=ECHO.bond.take;}return m;}
  function echoTick(p,dt,now){
    if(!p.__echoXp){p.__echoXp=true;p.xpMul=(Number(p.xpMul)||1)*ECHO.xp;}                       // EXP +60%
    if(!p.__echoLives){p.__echoLives=true;p.lives=(Number(p.lives)||0)+ECHO.lives;               // Echo's Resolve For J: +2 second chances
      try{getBridge().fx.dmgText(p.x,p.y-(p.bodyH||40)-24,"Echo's Resolve For J: +2 ♥",'#ff9ad8');}catch(e){}}
+   if(!p.__echoCrit){p.__echoCrit=true;p.critChance=(Number(p.critChance)||0)+ECHO.crit;}   // Echo's Love: +25% crit chance
    if(!p.__jInt){p.__jInt=true;p.rerollBonus=(Number(p.rerollBonus)||0)*2+1;}   // J's Intuition: double rerolls (6 -> 12)
    const B2=ECHO.bond;if(p.megaForm!==B2.form)return;
    const hp=p.maxHp>0?p.hp/p.maxHp:1,bd=p.__echoBond;
@@ -830,7 +831,8 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
    const l=['\u{1F496} Echo (only you can see this): EXP ×1.6 · damage ×1.3 · speed ×1.15',
      "\u{1F496} Echo's Resolve For J: +2 second chances (extra hearts) each run",
      "\u{1F496} J's Intuition: twice the rerolls (e.g. 6 \u2192 12)",
-     "\u{1F496} J and Echo's Bond (Mega Gardevoir): when HP drops below 50% → heals 20 HP/s for 10s, attack ×2.2 for 10s, speed ×1.5 for 5s, 20% less damage taken for 30s (every 30s at most)"+(bd&&now<bd.take?' — ACTIVE':'')];
+     "\u{1F496} Echo's Love: +25% critical-hit chance \u00b7 15% less damage taken",
+     "\u{1F496} J and Echo's Bond (Mega Gardevoir): when HP drops below 50% → heals 20 HP/s for 10s, attack ×10 for 10s, speed ×1.5 for 5s, 20% less damage taken for 30s (every 30s at most)"+(bd&&now<bd.take?' — ACTIVE':'')];
    return '\n\n'+l.join('\n');}
  function passiveLines(title,abilityId,types,deal,inScope){
    const A=ABIL[abilityId],out=[];
