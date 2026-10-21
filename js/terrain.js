@@ -656,16 +656,51 @@ G.Layouts = G.Layouts || (() => {
   };
 })();
 
-    const BY_MAP = { 0: null, 1: 'cave', 2: 'lava', 22: 'bog', 23: 'bog', 24: 'bog' };
-    let lay = null, layFor = undefined;
+    // ---- regions: the world is split into big areas (about 130 tiles across), each with its own terrain ----
+    // Your starting area is the map's own terrain; walk far enough and you cross a strip of open ground into another
+    // area (open fields, an archipelago, marshland, a river valley, a rocky maze...). The open strip between areas keeps
+    // everything connected. Which terrains appear depends on the map (no wading islands where the liquid burns).
+    const POOLS = {
+      0: { home: 'plains', list: ['plains', 'islands', 'marsh', 'lava', 'cave', 'plains'] },
+      1: { home: 'cave', list: ['cave', 'plant', 'plains', 'bog', 'cave'] },
+      2: { home: 'lava', list: ['lava', 'cave', 'plains', 'lava'] },
+      22: { home: 'bog', list: ['bog', 'cave', 'plains', 'plant'] }, 23: { home: 'bog', list: ['bog', 'cave', 'plains', 'plant'] }, 24: { home: 'bog', list: ['bog', 'cave', 'plains', 'plant'] },
+    };
+    const NAMES = { plains: 'Open Fields', islands: 'Archipelago', marsh: 'Marshlands', lava: 'River Valley', cave: 'Rocky Maze', plant: 'Hollow Caverns', bog: 'Island Bridges' };
+    const NAMES_HOT = { lava: 'Lava Rivers' };
+    const CELL = 130, BAND = 7, JIT = 0.35;
+    const lays = {}; const L = id => lays[id] || (lays[id] = G.Layouts.make(id));
+    const seedPt = new Map();
+    function pt(i, j, seed) { const key = i * 100003 + j + seed * 7; let v = seedPt.get(key); if (!v) { if (seedPt.size > 20000) seedPt.clear();
+      v = [(i + 0.5 + (G.U.hash(i, j, seed + 811) - 0.5) * 2 * JIT) * CELL, (j + 0.5 + (G.U.hash(i, j, seed + 812) - 0.5) * 2 * JIT) * CELL]; seedPt.set(key, v); } return v; }
+    const homes = new Map();
+    function homeCell(seed) { let h = homes.get(seed); if (h) return h; let best = 1e18; for (let j = -1; j <= 0; j++) for (let i = -1; i <= 0; i++) { const q = pt(i, j, seed), d = q[0] * q[0] + q[1] * q[1]; if (d < best) { best = d; h = [i, j]; } } homes.set(seed, h); return h; }
+    function region(tx, ty, seed, pool) {
+      const ci = Math.floor(tx / CELL), cj = Math.floor(ty / CELL); let d1 = 1e18, d2 = 1e18, bi = 0, bj = 0;
+      for (let j = cj - 1; j <= cj + 1; j++) for (let i = ci - 1; i <= ci + 1; i++) { const q = pt(i, j, seed), d = (q[0] - tx) ** 2 + (q[1] - ty) ** 2; if (d < d1) { d2 = d1; d1 = d; bi = i; bj = j; } else if (d < d2) d2 = d; }
+      const hc = homeCell(seed), isHome = bi === hc[0] && bj === hc[1];
+      const id = isHome ? pool.home : pool.list[Math.floor(G.U.hash(bi, bj, seed + 813) * pool.list.length)];
+      return { id, edge: Math.sqrt(d2) - Math.sqrt(d1) };   // edge: how far from the border with the next area (tiles, x2)
+    }
     window.PS_TERRAIN = function (tx, ty, seed) {
       try {
         if (G.Coop && G.Coop.active) return null;
-        const b = G.Maps && G.Maps.cur ? G.Maps.cur.biome : 0, id = BY_MAP[b] || null;
-        if (id !== layFor) { layFor = id; lay = id ? G.Layouts.make(id) : null; }
-        return lay ? lay.terrain(tx, ty, seed) : null;
+        window.PS_TERRAIN_SEED = seed;
+        const b = G.Maps && G.Maps.cur ? G.Maps.cur.biome : 0, pool = POOLS[b] || POOLS[0];
+        const r = region(tx, ty, seed, pool);
+        if (r.edge < BAND && tx * tx + ty * ty > 400) {   // the open strip between two areas (a little noise so it isn't a straight line)
+          const n = G.Layouts.fbm(tx / 6, ty / 6, seed + 815); return n < 0.18 ? 2 : 0; }
+        return L(r.id).terrain(tx, ty, seed);
       } catch (e) { return null; }
     };
+    window.PS_TERRAIN_REGION = function (x, y) { try { const b = G.Maps && G.Maps.cur ? G.Maps.cur.biome : 0, pool = POOLS[b] || POOLS[0], seed = window.PS_TERRAIN_SEED; if (seed == null) return null; const id = region(Math.floor(x / 32), Math.floor(y / 32), seed, pool).id; return (b === 2 && NAMES_HOT[id]) || NAMES[id] || id; } catch (_) { return null; } };
   }
+  // the region name pops up when you walk into a new area
+  (function regionWatch() {
+    let last = null, runP = null;
+    setInterval(() => { try { const B = window.PS_MEGA_BRIDGE_V5, N = window.PS_HOOPA_ENGINE, p = B?.game?.player; if (!p || B.game.state !== 'playing' || (N.Coop && N.Coop.active) || (N.Rift && N.Rift.inArena)) return;
+      if (p !== runP) { runP = p; last = null; }
+      const n = window.PS_TERRAIN_REGION && window.PS_TERRAIN_REGION(p.x, p.y); if (!n) return; if (last && n !== last) { try { N.Spawner.say('— ' + n + ' —', 2.5); } catch (_) {} } last = n; } catch (_) {} }, 500);
+  })();
   const t = setInterval(() => { const G = window.PS_HOOPA_ENGINE; if (G && G.U && G.U.hash) { clearInterval(t); install(G); } }, 20);
 })();
