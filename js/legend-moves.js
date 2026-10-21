@@ -119,7 +119,7 @@
   // ---- Ultra Beasts
   793:[geyser('acid-downpour','Acid Downpour','poison','Nihilego bursts toxic pillars that leave a poison bog behind.',C.poison,{dmg:30,count:5,fx:{poison:1,shape:'bubble',pal:'poison',patch:{bog:true,life:3,mult:0.25}}})],
   794:[comet('muscle-meteor','Muscle Meteor','fighting','Buzzwole leaps into the sky and crashes down fist-first.',C.red,{dmg:78,radius:160,fx:{shape:'impact',pal:'fighting',big:true,stun:{chance:0.3,dur:0.8}}})],
-  795:[M('aerial-ace','high-jump-kick-ub','High Jump Kick','fighting','hjk','Pheromosa leaps high into the air and drives a kick into the ground: a shockwave, then an aftershock that slows foes.',{dmg:50,radius:340,width:60,cd:1.4,knock:200},{colors:['#ffffff','#fff1c8','#ff9ad8'],burst:135,burstMult:1.7,stun:{chance:0.35,dur:0.8}})],
+  795:[M('aerial-ace','high-jump-kick-ub','High Jump Kick','fighting','hjk','Pheromosa leaps high into the air and drives a kick into the ground: a shockwave, then an aftershock that slows foes.',{dmg:50,radius:290,width:60,cd:1.4,knock:200},{colors:['#ffffff','#fff1c8','#ff9ad8'],burst:135,burstMult:1.7,stun:{chance:0.35,dur:0.8}})],
   796:[lances('electro-overload','Electro Overload','electric','Xurkitree overloads, raining bolts on every nearby foe.',C.elec,'bolt',{dmg:24,count:10,radius:320,fx:{gap:0.05,stun:{chance:0.2,dur:0.7}}})],
   797:[comet('meteor-launch','Meteor Launch','steel','Celesteela fires a volley of steel rockets that fall from the sky.',['#ffffff','#ffd0a0','#ff6a2a'],{dmg:52,count:3,radius:130,fx:{rocket:true,burn:1,debris:'rock',pal:'steel'}})],
   798:[rift('origami-slash','Origami Slash','grass','Kartana slices space with paper-thin blades.',['#ffffff','#f4fff0','#7fd27a'],{dmg:34,count:4,fx:{delay:0.06,len:380,width:40,paper:true}})],

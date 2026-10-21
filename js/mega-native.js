@@ -948,7 +948,8 @@ function start(){
    if(WEATHER[f.key])startPrimalWeather(p,WEATHER[f.key]);
    else if(window.PS_FX&&window.PS_FX.has('megaevo')){ // Mega Evolution cutscene: orb -> shatter -> Mega symbol (the new sprite appears when the orb breaks)
      try{const newAnim=p.anim;if(newAnim!==baseline.anim){p.anim=baseline.anim;}p.invuln=Math.max(Number(p.invuln)||0,1.4);
-       window.PS_FX.cast('megaevo',p,{id:'mega-evolution',type:'normal',dmg:0,fx:{newAnim,form:f.key}},null,true);}catch(e){console.warn('mega fx',e);}
+       const cry=MEGA_CRIES[String(Number(p.dex))]||null;
+       window.PS_FX.cast('megaevo',p,{id:'mega-evolution',type:'normal',dmg:0,fx:{newAnim,form:f.key,cry}},null,true);}catch(e){console.warn('mega fx',e);}
    }
    restore=()=>{if(undoSignature)undoSignature();delete p.megaKit;clearPrimal();p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa;p.maxHp=baseline.maxHp;p.hp=Math.min(p.hp,baseline.maxHp);p.r=baseline.r;p.bodyH=baseline.bodyH;delete p.megaForm;};
    hint.textContent=WEATHER[f.key]?'Primal Reversion! '+WEATHER[f.key].name+' is active.'+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':''):'Mega Evolution activated!'+(kit&&ABIL[kit.passive.ability]?' Ability: '+ABIL[kit.passive.ability].name+'.':'')+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':'');
@@ -956,6 +957,10 @@ function start(){
  refresh();
  };
 
+ // Pokemon cries played when the orb breaks during Mega Evolution. Add more: dex number -> file in assets/cries/
+ const MEGA_CRIES={
+   '282':'assets/cries/282.mp3'   // Gardevoir
+ };
  function orbIcon(red,size){
    // Pixel-art Red Orb (Groudon) / Blue Orb (Kyogre), drawn inline so no image files are needed.
    const c=red?['#7a1414','#d42a2a','#ff7a5a']:['#123a7a','#2a6ad4','#7ac8ff'];

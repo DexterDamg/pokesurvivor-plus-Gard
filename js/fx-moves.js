@@ -340,21 +340,25 @@
  S.hjk={cast(c){const p=c.player,R=(c.move.radius||340);const t=densest(p,R+60)||nearest(p.x,p.y,R+80);if(!t)return null;
      const a=Math.atan2(t.y-p.y,t.x-p.x),D=Math.min(Math.hypot(t.x-p.x,t.y-p.y),R),L=wallClip(p.x,p.y,a,D);
      c.ax=p.x;c.ay=p.y;c.bx=p.x+Math.cos(a)*L;c.by=p.y+Math.sin(a)*L;c.ang=a;c.dur=c.fx.leap||0.26;c.skip=new Set();c.R=c.fx.burst||135;c.ghosts=[];c.cracks=[];
+     if(B()?.game?.state&&B().game.state!=='playing')return null;c.lx=p.x;c.ly=p.y;
      c.dex=Number(p.dex)||795;c.sc=(Number(p.anim?.scale)||1)*2;try{p.invuln=Math.max(Number(p.invuln)||0,c.dur+0.15);}catch(e){}
      for(let i=0;i<9;i++){const ca=i/9*TAU+rnd(-0.2,0.2),pts=[[0,0]];let r=0;for(let j=0;j<4;j++){r+=rnd(0.18,0.32);pts.push([Math.cos(ca+rnd(-0.25,0.25))*r,Math.sin(ca+rnd(-0.25,0.25))*r]);}c.cracks.push(pts);}
      return c;},
    update(c,dt){c.t+=dt;const p=c.player,q=Math.min(1,c.t/c.dur),e=q<1?1-Math.pow(1-q,2):1;
-     if(q<1||!c.land){const x=c.ax+(c.bx-c.ax)*e,y=c.ay+(c.by-c.ay)*e;if(!c.land){p.x=x;p.y=y;}
+     // she got teleported mid-jump (entering a Rift, a door...): stop steering her and let the game place her
+     if(!c.land&&!c.cancel&&Math.hypot(p.x-c.lx,p.y-c.ly)>90)c.cancel=true;
+     if(c.cancel)return c.t<c.dur+0.3;
+     if(q<1||!c.land){const x=c.ax+(c.bx-c.ax)*e,y=c.ay+(c.by-c.ay)*e;if(!c.land){p.x=x;p.y=y;c.lx=x;c.ly=y;}
        if(c.ghosts.length<8&&c.t>c.ghosts.length*c.dur/7)c.ghosts.push({x,y,q,t:c.t});
        hitLine(c,c.ax,c.ay,x,y,46,{skip:c.skip,knock:60,mult:0.45});}
-     if(q>=1&&!c.land){c.land=c.t;p.x=c.bx;p.y=c.by;
+     if(q>=1&&!c.land){c.land=c.t;p.x=c.bx;p.y=c.by;c.lx=c.bx;c.ly=c.by;
        hitCircle(c,c.bx,c.by,c.R,{mult:c.fx.burstMult||1.6,knock:230});kick(0.22);
        ring(c.bx,c.by,10,c.R*1.15,'#ffffff',0.45,7);ring(c.bx,c.by,6,c.R*0.8,typeColor(c),0.35,4);burst(c.bx,c.by-8,typeColor(c),24,260);
        try{FX().slash(c.bx,c.by-30,c.ang+Math.PI/2,c.R*0.75,2.2,'#ffffff',{pal:'fighting'});}catch(err){}
        for(let j=0;j<10;j++)sp(j%3?'rock':'impact',j%3?'ground':'fighting',c.bx,c.by,{vx:rnd(-200,200),vy:-rnd(80,260),life:0.7,grav:520});}
      if(c.land&&!c.after&&c.t-c.land>0.28){c.after=1;hitCircle(c,c.bx,c.by,c.R*1.5,{mult:0.7,knock:140,slow:0.5,slowDur:1.6,stun:c.fx.stun});ring(c.bx,c.by,c.R*0.6,c.R*1.6,typeColor(c),0.5,5);kick(0.1);}
      return !c.land||c.t-c.land<0.95;},
-   draw(c,ctx,v){const col=c.fx.colors||['#ffffff','#fff1c8','#ff9ad8'],k=v.k;
+   draw(c,ctx,v){if(c.cancel)return;const col=c.fx.colors||['#ffffff','#fff1c8','#ff9ad8'],k=v.k;
      // leap: a glowing arc + Pheromosa afterimages up in the air
      const fadeL=c.land?Math.max(0,1-(c.t-c.land)/0.35):1;
      if(fadeL>0){ctx.save();ctx.globalAlpha=fadeL;ctx.globalCompositeOperation='lighter';ctx.lineCap='round';
@@ -386,7 +390,14 @@
 
  // ---------------------------------------------------------------- SUMMONED ALLIES (little Pokemon that follow you and shoot)
  //  move.fx = {dex, life, shot:'poison-sting', rate, poison, slow}
- S.minion={cast(c){const p=c.player,a=rnd(0,TAU);c.off=a;c.x=p.x+Math.cos(a)*60;c.y=p.y+Math.sin(a)*45;c.life=c.fx.life||15;c.cd=rnd(0.3,0.9);c.face=0;c.walk=0;
+ // move with real collision: walls, trees/rocks (solid props) and liquids (lava/water) block like for enemies
+ function minionMove(c,dx,dy){const Wd=B()?.world;if(!Wd){c.x+=dx;c.y+=dy;return;}
+   const ok=(x,y)=>{try{if(typeof Wd.isFree==='function'&&!Wd.isFree(x,y,9,true))return false;if(typeof Wd.isLiquid==='function'&&Wd.isLiquid(x,y))return false;if(typeof Wd.propsInCircle==='function'){for(const q of Wd.propsInCircle(x,y,22))if(q&&q.solid&&q.hp>0&&Math.hypot(q.x-x,q.y-y)<(q.r||12)+9)return false;}}catch(e){}return true;};
+   if(ok(c.x+dx,c.y+dy)){c.x+=dx;c.y+=dy;}else if(ok(c.x+dx,c.y)){c.x+=dx;}else if(ok(c.x,c.y+dy)){c.y+=dy;}
+   else{const a=Math.atan2(dy,dx)+(c.side||1)*Math.PI/2,L=Math.hypot(dx,dy);if(ok(c.x+Math.cos(a)*L,c.y+Math.sin(a)*L)){c.x+=Math.cos(a)*L;c.y+=Math.sin(a)*L;}else c.side=-(c.side||1);}}
+ S.minion={cast(c){const p=c.player,a=rnd(0,TAU);c.off=a;c.maxHp=Math.max(1,(Number(p.maxHp)||100)*(c.fx.share||1));c.hp=c.maxHp;c.hitT=0;c.touch=new Map();
+     // pop in on free ground near her
+     for(let i=0;i<8;i++){const a2=a+i*0.8,x=p.x+Math.cos(a2)*60,y=p.y+Math.sin(a2)*45;const Wd=B()?.world;let free=true;try{free=!Wd||((!Wd.isFree||Wd.isFree(x,y,9,true))&&!(Wd.isLiquid&&Wd.isLiquid(x,y)));}catch(e){}if(free){c.sx0=x;c.sy0=y;break;}}c.x=c.sx0??p.x;c.y=c.sy0??p.y;c.life=c.fx.life||15;c.cd=rnd(0.3,0.9);c.face=0;c.walk=0;
      const hc=c.fx.heart||'#9cff7a';ring(c.x,c.y,4,c.fx.tier==='epic'?90:40,hc,0.45,c.fx.tier==='epic'?6:3);burst(c.x,c.y-10,hc,c.fx.tier==='epic'?30:10,c.fx.tier==='epic'?200:110);if(c.fx.tier==='epic')kick(0.1);return c;},
    update(c,dt){c.t+=dt;const p=c.player;if(!p||p.dead)return false;const P=B()?.projectiles;
      // stay inside the screen around the Pokemon that summoned it
@@ -394,7 +405,7 @@
      const inView=e=>!vw||(e.x>vw.l-10&&e.x<vw.r+10&&e.y>vw.t-10&&e.y<vw.b+10);
      const t=nearest(c.x,c.y,520,enemies().filter(inView));let gx,gy;
      if(t&&Math.hypot(t.x-p.x,t.y-p.y)<650){const d=Math.hypot(t.x-c.x,t.y-c.y)||1;c.face=Math.atan2(t.y-c.y,t.x-c.x);const sx2=t.x+Math.cos(c.off)*120,sy2=t.y+Math.sin(c.off)*85;if(Math.hypot(sx2-c.x,sy2-c.y)>14){gx=sx2;gy=sy2;}
-       c.cd-=dt;if(c.cd<=0&&P&&typeof P.spawn==='function'&&!c.ghost){c.cd=c.fx.rate||0.9;const sp2=330,ang=Math.atan2(t.y-(c.y-8),t.x-c.x);
+       c.cd-=dt;if(c.cd<=0&&P&&typeof P.spawn==='function'&&!c.ghost&&!c.dead){c.cd=c.fx.rate||0.9;const sp2=330,ang=Math.atan2(t.y-(c.y-8),t.x-c.x);
          try{const mid=c.fx.shot||'poison-sting',md=B()?.moves?.BY_ID?.[mid],vis=VFX()&&md?VFX().forMove(md):null;P.spawn({owner:p,mid,x:c.x,y:c.y-10,vx:Math.cos(ang)*sp2,vy:Math.sin(ang)*sp2,dmg:baseDmg(c),r:c.fx.tier==='epic'?9:6,life:1.3,friendly:true,pierce:c.fx.pierce||0,burn:c.fx.burn||0,color:md?(B()?.types?.color?.(md.type)||typeColor(c)):typeColor(c),poison:c.fx.poison||0,slow:c.fx.slow||0,knock:20,hits:new Set(),vis,homing:0});}catch(e){}}}
      else{ // no foe on screen: go open a chest if there is one, otherwise stay by her side
        let chest=null;const Wd=B()?.world;
@@ -402,19 +413,27 @@
        if(chest){gx=chest.x+Math.cos(c.off)*22;gy=chest.y+Math.sin(c.off)*16;c.face=Math.atan2(chest.y-c.y,chest.x-c.x);
          c.cd-=dt;if(Math.hypot(chest.x-c.x,chest.y-c.y)<46&&c.cd<=0&&!c.ghost){c.cd=0.45;try{Wd.damageProp(chest,Math.max(4,baseDmg(c)),c.fx.heart||'#ffd23f');}catch(e){}burst(chest.x,chest.y-10,'#ffe27a',4,90);}}
        else{gx=p.x+Math.cos(c.off+c.t*0.6)*70;gy=p.y+Math.sin(c.off+c.t*0.6)*50;}}
-     c.walk=0;if(gx!=null){const dx=gx-c.x,dy=gy-c.y,d=Math.hypot(dx,dy);if(d>8){const spd=Math.min(d,(c.fx.speed||Math.max(95,(Number(p.spd)||120)*1.5*(c.fx.share||1))))*dt;c.x+=dx/d*spd;c.y+=dy/d*spd;c.walk=1;if(!t)c.face=Math.atan2(dy,dx);}}
+     c.walk=0;if(gx!=null){const dx=gx-c.x,dy=gy-c.y,d=Math.hypot(dx,dy);if(d>8){const spd=Math.min(d,(c.fx.speed||Math.max(95,(Number(p.spd)||120)*1.5*(c.fx.share||1))))*dt;minionMove(c,dx/d*spd,dy/d*spd);c.walk=1;if(!t)c.face=Math.atan2(dy,dx);}}
+     // enemies go after it and hurt it on contact, like they do with you
+     if(!c.dead){const now2=c.t;for(const e of enemies()){const d=Math.hypot(e.x-c.x,e.y-c.y);
+         if(d<170&&d<Math.hypot(e.x-p.x,e.y-p.y)&&!e.boss){const sp3=(Number(e.spd)||60)*0.85*dt*(e.slowT>0?1-(e.slow||0):1);if(d>(e.r||12)+8){const nx=e.x+(c.x-e.x)/d*sp3,ny=e.y+(c.y-e.y)/d*sp3;let ok=true;try{const Wd=B()?.world;ok=!Wd||!Wd.isFree||Wd.isFree(nx,ny,(e.r||12)*0.6);}catch(er){}if(ok){e.x=nx;e.y=ny;}}}
+         if(d<(e.r||12)+11){const last=c.touch.get(e)||-9;if(now2-last>=0.6){c.touch.set(e,now2);const dmg=Math.max(1,Number(e._dmg)||Number(e.dmg)||8);c.hp-=dmg;c.hitT=0.15;try{FX().dmgText(c.x,c.y-28,String(Math.round(dmg)),'#ff6a6a');}catch(er){}}}}
+       if(c.hp<=0){c.dead=true;c.gone=1;c.life=Math.min(c.life,c.t+0.5);burst(c.x,c.y-10,'#ffffff',14,140);try{FX().dmgText(c.x,c.y-40,'fainted','#c8c8ff');}catch(er){}}}
+     if(c.hitT>0)c.hitT-=dt;
      for(const o of live)if(o!==c&&o.style===S.minion){const dx=c.x-o.x,dy=c.y-o.y,d=Math.hypot(dx,dy);if(d>0.1&&d<34){c.x+=dx/d*(34-d)*0.5;c.y+=dy/d*(34-d)*0.5;}}
      if(vw){c.x=Math.max(vw.l,Math.min(vw.r,c.x));c.y=Math.max(vw.t,Math.min(vw.b,c.y));}
-     if(Math.hypot(p.x-c.x,p.y-c.y)>900){c.x=p.x;c.y=p.y;}
+     if(Math.hypot(p.x-c.x,p.y-c.y)>900){c.x=p.x;c.y=p.y;}   // she teleported (Rift etc.): come along
      if(c.t>=c.life&&!c.gone){c.gone=1;burst(c.x,c.y-10,'#e8ffd0',10,110);}
      return c.t<c.life;},
-   draw(c,ctx,v){const X=v.sx(c.x),Y=v.sy(c.y),k=v.k,al=Math.min(1,c.t/0.3,(c.life-c.t)/0.4);
+   draw(c,ctx,v){const X=v.sx(c.x),Y=v.sy(c.y),k=v.k;let al=Math.min(1,c.t/0.3,(c.life-c.t)/0.4);
      ctx.save();ctx.globalAlpha=0.3*al;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(X,Y,11*k,4.5*k,0,0,TAU);ctx.fill();ctx.restore();
      if(c.fx.tier==='epic'||c.fx.tier==='rare'){const ep=c.fx.tier==='epic';ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=al*(0.55+0.25*Math.sin(c.t*4));glow(ctx,X,Y-14*k,(ep?40:26)*k,rgba(c.fx.heart,ep?0.55:0.35),rgba(c.fx.heart,0));
        ctx.strokeStyle=rgba(c.fx.heart,0.8);ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(X,Y,(ep?22:16)*k,(ep?8:6)*k,0,0,TAU);ctx.stroke();
        if(ep)for(let i=0;i<4;i++){const a2=c.t*2+i*Math.PI/2;sprite(ctx,'star','electric',X+Math.cos(a2)*24*k,Y-20*k+Math.sin(a2)*10*k,0.6*k,0,0,al);}ctx.restore();}
+     if(c.hitT>0)al*=0.55+0.45*Math.sin(c.t*60);
      if(!pokeSprite(ctx,c.fx.dex||10,c.walk?'Walk':'Idle',c.face,c.t,X,Y,2*(c.fx.scale||1)*k,al))glow(ctx,X,Y-10*k,10*k,'rgba(160,255,120,0.9)','rgba(0,0,0,0)');
-     const top=(()=>{const M=B()?.spriteMeta?.[String(c.fx.dex)]?.a?.Idle;return M?M.ay*2*(c.fx.scale||1)*k:30*k;})();ctx.save();ctx.globalAlpha=al*(0.6+0.4*Math.sin(c.t*5));ctx.fillStyle=c.fx.heart||'#ff7ad0';const hx=X,hy=Y-top-6*k,hs=3.2*k;ctx.beginPath();ctx.moveTo(hx,hy+hs);ctx.bezierCurveTo(hx-hs*2,hy-hs*0.5,hx-hs*0.6,hy-hs*2,hx,hy-hs*0.6);ctx.bezierCurveTo(hx+hs*0.6,hy-hs*2,hx+hs*2,hy-hs*0.5,hx,hy+hs);ctx.fill();ctx.restore();}};
+     const top=(()=>{const M=B()?.spriteMeta?.[String(c.fx.dex)]?.a?.Idle;return M?M.ay*2*(c.fx.scale||1)*k:30*k;})();
+     {const bw=26*k,bh=Math.max(3,3.5*k),bx=X-bw/2,by=Y-top-16*k,f=Math.max(0,c.hp/c.maxHp);ctx.save();ctx.globalAlpha=Math.min(1,al+0.2);ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(bx-1,by-1,bw+2,bh+2);ctx.fillStyle=f>0.5?'#5fe08a':f>0.25?'#ffd23f':'#ff5f5f';ctx.fillRect(bx,by,bw*f,bh);ctx.restore();}ctx.save();ctx.globalAlpha=al*(0.6+0.4*Math.sin(c.t*5));ctx.fillStyle=c.fx.heart||'#ff7ad0';const hx=X,hy=Y-top-24*k,hs=3.2*k;ctx.beginPath();ctx.moveTo(hx,hy+hs);ctx.bezierCurveTo(hx-hs*2,hy-hs*0.5,hx-hs*0.6,hy-hs*2,hx,hy-hs*0.6);ctx.bezierCurveTo(hx+hs*0.6,hy-hs*2,hx+hs*2,hy-hs*0.5,hx,hy+hs);ctx.fill();ctx.restore();}};
 
  // ---------------------------------------------------------------- MEGA EVOLUTION cutscene
  //  rainbow energy gathers -> a white/pink orb wraps the Pokemon -> it cracks and shatters ->
@@ -423,9 +442,14 @@
  S.megaevo={cast(c){const p=c.player;c.R=Math.max(40,(Number(p.bodyH)||40)*0.8);c.H=Number(p.bodyH)||40;c.streaks=[];c.shards=[];c.cracks=[];c.sparks=[];
      for(let i=0;i<14;i++)c.streaks.push({a:i/14*TAU+rnd(-0.1,0.1),d:rnd(180,280),h:i*25});
      for(let i=0;i<7;i++){const a0=rnd(0,TAU),pts=[[0,0]];let r=0,a=a0;for(let j=0;j<5;j++){r+=rnd(0.15,0.26);a+=rnd(-0.5,0.5);pts.push([Math.cos(a)*r,Math.sin(a)*r]);}c.cracks.push({pts,at:0.72+i*0.05});}
-     try{B()?.audio?.sfx?.('shinyGet');}catch(e){}return c;},
+     try{B()?.audio?.sfx?.('shinyGet');}catch(e){}kick(0.35);
+     if(c.fx.cry){try{c.cry=new Audio(c.fx.cry);c.cry.preload='auto';const sv=Number(B()?.audio?.settings?.sfx);c.cry.volume=Math.max(0.15,Math.min(1,(Number.isFinite(sv)?sv:0.7)*1.2));}catch(e){}}
+     return c;},
    update(c,dt){c.t+=dt;const p=c.player;if(!p)return false;c.x=p.x;c.y=p.y;
-     if(c.t>=1.1&&!c.broke){c.broke=1;if(c.fx.newAnim&&p.megaForm===c.fx.form)p.anim=c.fx.newAnim;kick(0.25);
+     // rumble: the screen shakes harder and harder while the orb cracks
+     if(c.t>0.45&&c.t<1.1){c.rum=(c.rum||0)-dt;if(c.rum<=0){c.rum=0.07;kick(0.06+0.22*Math.max(0,(c.t-0.45)/0.65));}}
+     if(c.t>=1.1&&!c.broke){c.broke=1;if(c.fx.newAnim&&p.megaForm===c.fx.form)p.anim=c.fx.newAnim;kick(1.15);
+       if(c.cry){try{c.cry.currentTime=0;c.cry.play().catch(()=>{});}catch(e){}}
        const cy=c.y-c.H*0.5;ring(c.x,cy,c.R*0.6,c.R*3,'#ffffff',0.55,7);ring(c.x,cy,c.R*0.4,c.R*2.2,'#ff8ad8',0.5,5);burst(c.x,cy,'#ffb8e8',30,260);burst(c.x,cy,'#ffffff',20,200);
        for(let i=0;i<22;i++){const a=i/22*TAU+rnd(-0.15,0.15),sp2=rnd(160,330);c.shards.push({x:Math.cos(a)*c.R*0.8,y:Math.sin(a)*c.R*0.8,vx:Math.cos(a)*sp2,vy:Math.sin(a)*sp2-60,r:rnd(0,TAU),vr:rnd(-10,10),s:rnd(7,15),hue:(i*37)%360});}
        try{B()?.audio?.sfx?.('chest');}catch(e){}}
@@ -448,6 +472,7 @@
        for(const cr of c.cracks){if(t<cr.at)continue;const g2=Math.min(1,(t-cr.at)/0.12);ctx.strokeStyle='rgba(255,255,255,0.95)';ctx.lineWidth=2.4*k;ctx.shadowColor='#ff5ab4';ctx.shadowBlur=8*k;ctx.beginPath();
          cr.pts.forEach(([x,y],i)=>{const px=X+x*r*g2*1.3,py=CY+y*r*g2*1.3;i?ctx.lineTo(px,py):ctx.moveTo(px,py);});ctx.stroke();ctx.shadowBlur=0;}}
      // 3) shatter: flash + flying shards
+     if(t>=1.1&&t<1.45&&v.box){const u=(t-1.1)/0.35;ctx.save();ctx.globalCompositeOperation='source-over';ctx.fillStyle='rgba(255,236,250,'+(0.75*(1-u)*(1-u))+')';ctx.fillRect(v.box.left,v.box.top,v.box.width,v.box.height);ctx.restore();}   // full-screen flash
      if(t>=1.1){const u=t-1.1;if(u<0.3){ctx.globalCompositeOperation='lighter';glow(ctx,X,CY,R*(1.2+u*6),'rgba(255,255,255,'+(1-u/0.3)+')','rgba(255,140,220,0)');}
        ctx.globalCompositeOperation='source-over';for(const q of c.shards){const a=Math.max(0,1-u/1.1);if(!a)continue;ctx.save();ctx.globalAlpha=a;ctx.translate(X+q.x*k,CY+q.y*k);ctx.rotate(q.r);const sz=q.s*k;
          ctx.fillStyle=u<0.2?'#ffffff':'hsl('+(320+q.hue%40)+',100%,'+(85-q.hue%20)+'%)';ctx.beginPath();ctx.moveTo(-sz,-sz*0.6);ctx.lineTo(sz,-sz*0.3);ctx.lineTo(-sz*0.2,sz);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.9)';ctx.lineWidth=1.5;ctx.stroke();ctx.restore();}}
@@ -464,6 +489,7 @@
    styles:S,
    sprite:pokeSprite,
    count(name){return live.filter(c=>c.style===S[name]).length;},
+   list(name){return live.filter(c=>c.style===S[name]);},
    has(name){return !!S[name];},
    cast(name,player,move,hit,ghost){const st=S[name];if(!st)return false;
      const c={style:st,player,move,hit,ghost:!!ghost,fx:Object.assign({},move.fx||{}),t:0};
