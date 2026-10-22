@@ -14,7 +14,8 @@
   'use strict';
   if (window.PS_LAKE_TALK_INSTALLED) return; window.PS_LAKE_TALK_INSTALLED = true;
   const E = () => window.PS_HOOPA_ENGINE, TAU = Math.PI * 2;
-  const NAME = { 480: 'Uxie', 481: 'Mesprit', 482: 'Azelf' }, COLOR = { 480: '#ffd84a', 481: '#ff8ad0', 482: '#5ab0ff' };
+  const NAME = { 480: 'Uxie', 481: 'Mesprit', 482: 'Azelf', 483: 'Dialga', 484: 'Palkia' }, COLOR = { 480: '#ffd84a', 481: '#ff8ad0', 482: '#5ab0ff', 483: '#8fd8ff', 484: '#ff9ad8' };
+  const TRIO = [480, 481, 482];   // Dialga and Palkia only speak as guests (js/creation-rift.js)
   const FACE = { normal: 0, happy: 1, pain: 2, angry: 3, worried: 4, sad: 5, crying: 6, shouting: 7, teary: 8, determined: 9, joyous: 10, inspired: 11, surprised: 12, dizzy: 13, sigh: 16, stunned: 17 };
   const CFG = { gap: 5, aloneEvery: [45, 75], chatEvery: [55, 90] };   // seconds between low-priority lines, lonely lines, banter
 
@@ -140,7 +141,7 @@
     queue.push(item); return true;
   }
   const clock = () => performance.now() / 1000;
-  function show(it) { cur = { it, t: 0, dur: Math.max(2.8, Math.min(6, 1.6 + it.text.length * 0.045)) }; nm.textContent = NAME[it.dex]; nm.style.color = COLOR[it.dex]; face(it.dex, it.face); ln.textContent = ''; box.classList.add('on'); if (it.emote) emote(it.dex, it.emote); }
+  function show(it) { cur = { it, t: 0, dur: it.dur || Math.max(2.8, Math.min(6, 1.6 + it.text.length * 0.045)) }; nm.textContent = NAME[it.dex]; nm.style.color = COLOR[it.dex]; face(it.dex, it.face); ln.textContent = ''; box.classList.add('on'); if (it.emote) emote(it.dex, it.emote); }
   function tickBox(dt) {
     if (!cur) { const nx = queue[0]; if (nx) { nx.delay -= dt; if (nx.delay <= 0) show(queue.shift()); } return; }
     cur.t += dt; const n = Math.min(cur.it.text.length, Math.floor(cur.t * 45)); if (ln.textContent.length !== n) ln.textContent = cur.it.text.slice(0, n);
@@ -149,7 +150,8 @@
 
   // ================= emote bubbles (world space) =================
   const emotes = [];
-  function where(dex) { const p = E()?.Game?.player; if (p && Number(p.dex) === Number(dex)) return p; const s = window.PS_LAKE?._ally?.(dex); return s && !s.dead && s.spawnT >= 1.4 ? s : null; }
+  const places = {};   // guests (Dialga, Palkia): where their emotes pop up
+  function where(dex) { if (places[dex]) return places[dex]; const p = E()?.Game?.player; if (p && Number(p.dex) === Number(dex)) return p; const s = window.PS_LAKE?._ally?.(dex); return s && !s.dead && s.spawnT >= 1.4 ? s : null; }
   function emote(dex, kind) { for (let i = emotes.length - 1; i >= 0; i--) if (emotes[i].dex === dex) emotes.splice(i, 1); emotes.push({ dex, kind, t: 0, life: 2.4, hearts: kind === 'heart' ? [0, 1, 2].map(i => ({ dx: (i - 1) * 9, d: i * 0.25 })) : null }); }
   function heartPath(ctx, x, y, s) { ctx.beginPath(); ctx.moveTo(x, y + s * 0.35); ctx.bezierCurveTo(x - s * 1.1, y - s * 0.35, x - s * 0.45, y - s * 1.05, x, y - s * 0.4); ctx.bezierCurveTo(x + s * 0.45, y - s * 1.05, x + s * 1.1, y - s * 0.35, x, y + s * 0.35); }
   function drop(ctx, x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y - s); ctx.quadraticCurveTo(x + s * 0.8, y, x, y + s * 0.55); ctx.quadraticCurveTo(x - s * 0.8, y, x, y - s); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(x - s * 0.25, y - s * 0.2, s * 0.2, s * 0.35); }
@@ -174,7 +176,7 @@
   let runP = null, aloneT = 0, chatT = 0, lastHp = 0, low = false, bigCd = 0, bossCd = 0, lvl = 0, lostLastCd = 0;
   const seenBoss = new WeakSet();
   // only ever YOUR screen: the box, emotes and lines follow your own player and your own sisters, and nothing is sent over co-op
-  const me = () => { const p = E()?.Game?.player; return p && !p.remote && NAME[Number(p.dex)] ? p : null; };
+  const me = () => { const p = E()?.Game?.player; return p && !p.remote && TRIO.includes(Number(p.dex)) ? p : null; };
   const live = () => (window.PS_LAKE?.allies || []).filter(a => !a.dead && !a.spawning).map(a => a.dex);
   const party = () => { const p = me(); return p ? [Number(p.dex), ...live()] : []; };
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -230,7 +232,9 @@
   function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.1, (now - last) / 1000); last = now; try { watch(dt); tickBox(dt); for (let i = emotes.length - 1; i >= 0; i--) if ((emotes[i].t += dt) > emotes[i].life) emotes.splice(i, 1); } catch (e) { console.warn('[lake-talk]', e); } }
   let hooked = false;
   function hook() { const N = E(); if (hooked || !N || !N.Ult || !N.Ult.drawUnits) return; hooked = true; const du = N.Ult.drawUnits; N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { if (me()) drawEmotes(ctx); } catch (e) { console.warn('[lake-talk]', e); } }; }
-  function init() { document.head.append(css); document.body.append(box); for (const d of [480, 481, 482]) { const i = new Image(); i.src = 'assets/portraits/' + d + '.png'; } (function h() { hook(); if (!hooked) setTimeout(h, 200); })(); requestAnimationFrame(loop); }
+  function init() { document.head.append(css); document.body.append(box); for (const d of [480, 481, 482, 483, 484]) { const i = new Image(); i.src = 'assets/portraits/' + d + '.png'; } (function h() { hook(); if (!hooked) setTimeout(h, 200); })(); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
-  window.PS_LAKE_TALK = { lines: L, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, cfg: CFG };
+  // a cutscene line: shown right away for a fixed time (clears whatever was waiting)
+  function cut(dex, f, text, em, dur) { queue.length = 0; show({ dex, face: f, text, emote: em, dur }); }
+  window.PS_LAKE_TALK = { cut, place: (dex, obj) => { if (obj) places[dex] = obj; else delete places[dex]; }, hide: () => { cur = null; queue.length = 0; box.classList.remove('on'); }, lines: L, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, cfg: CFG };
 })();
