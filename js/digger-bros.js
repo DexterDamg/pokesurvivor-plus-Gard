@@ -8,10 +8,11 @@
      you), opens chests, waits at a big chest until it opens and activates the power-up crystals. Only when he is
      truly cornered (an enemy right on him and nowhere left to run) does he scratch back.
    - The two of them talk (shy little bro, loud big bro) about what happens.
-   - ONCE PER RUN, the hit that would knock Excadrill out (with Drilbur around) doesn't. Drilbur breaks down... and
-     Kamina tells him not to believe in him — believe in the you who believes in yourself! Drilbur awakens his
-     Spiral power: GIGA DRILL BREAK hits every enemy, Excadrill gets back up with half his HP, and for the rest of
-     the run Drilbur fights (Spiral Drilbur: 3x Attack, no more running away).
+   - ONCE PER RUN, the hit that would knock Excadrill out (with Drilbur around) starts a scene instead. Drilbur
+     breaks down... and Kamina tells him not to believe in him — believe in the you who believes in yourself!
+     Then Excadrill falls for good. Drilbur awakens his Spiral power (GIGA DRILL BREAK hits every enemy) and from
+     then on YOU play as Drilbur for the rest of the run: same level, moves and items, full HP, +50% Attack and a
+     Spiral aura. Excadrill's grave (a mound with his shades) stays where he fell.
    Solo: the battle freezes during the scene (click / Enter / Space skips to the drill). Co-op: nothing freezes.
    Needs js/lake-trio.js (movement helpers) and js/lake-talk.js (talk box). */
 (() => {
@@ -20,7 +21,7 @@
   const E = () => window.PS_HOOPA_ENGINE, B = () => window.PS_MEGA_BRIDGE_V5, TAU = Math.PI * 2;
   const DRIL = 529, EXCA = 530;
   const CFG = { first: 2, resummon: 25, emerge: 1.3, hp: 0.9, atk: 0.7, spd: 1.15, panic: 170, leash: 300, jobRange: 320, jobSafe: 150,
-    corner: 55, scratchCd: 1.1, spiralAtk: 3, gigaMult: 25, reviveHp: 0.5, gap: 9 };
+    corner: 55, scratchCd: 1.1, spiralAtk: 3, gigaMult: 25, simonAtk: 1.5, gap: 9 };
   const K = () => window.PS_LAKE?.kit, T = () => window.PS_LAKE_TALK;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const sfx = n => { try { E().Audio.sfx(n); } catch (_) {} };
@@ -39,7 +40,10 @@
     cornered: [['worried', 'S-stay back! I\'ll... I\'ll fight if I have to!', 'anger'], ['worried', 'Nowhere left to dig... okay... okay, here goes!', 'anger']],
     faint: [['worried', 'Sorry, Aniki... I\'ll dig back up soon...', 'tear']],
     idle: [['normal', 'Aniki... do you really think we can dig all the way to the sky?', 'dots'], ['worried', 'I\'m just a digger... but I\'ll dig for you.', 'dots'], ['normal', 'Everyone back in the village laughed at me... not you, though.', 'heart']],
-    spiral: [['normal', 'I won\'t run anymore!', 'exclaim'], ['normal', 'My drill will pierce right through!', 'spark'], ['normal', 'I believe in the me who believes in myself!', 'spark']] };
+    spiral: [['normal', 'I won\'t run anymore!', 'exclaim'], ['normal', 'My drill will pierce right through!', 'spark'], ['normal', 'I believe in the me who believes in myself!', 'spark']],
+    alone: [['normal', 'Aniki... are you watching? I\'m still digging.', 'dots'], ['worried', 'I\'m scared... but I\'m not running. Not anymore.', 'sweat'], ['normal', 'Who the hell do you think I am?! ...That\'s what you\'d say, right, Aniki?', 'spark'],
+      ['normal', 'My drill is the drill that\'ll pierce the heavens!', 'spark'], ['worried', '...I miss you, Aniki.', 'tear'], ['normal', 'Kick reason to the curb... and do the impossible!', 'exclaim']],
+    boss: [['normal', 'That one\'s huge... doesn\'t matter. I\'ll drill right through it!', 'anger']] };
   const X = {   // Excadrill — Kamina: loud, fearless, the best big bro
     arrive: [['joyous', 'That\'s my bro! Stick close and watch your big bro work!', 'heart'], ['determined', 'Simon! Grab anything shiny — I\'ll handle the punching!', 'exclaim']],
     back: [['happy', 'There he is! Knew you\'d dig your way back!', 'heart']],
@@ -52,7 +56,7 @@
     spiral: [['joyous', 'THAT\'S my little bro! Pierce the heavens, Simon!', 'heart']] };
 
   // ================= the bro =================
-  let owner = null, bro = null, nextAt = 0, usedRun = null, spiral = false, lastLine = -1e9, idleT = 60, cs = null;
+  let owner = null, bro = null, nextAt = 0, usedRun = null, spiral = false, lastLine = -1e9, idleT = 60, cs = null, simon = null, grave = null;
   const clock = () => performance.now() / 1000;
   function talk(dex, list, o) { if (!list) return false; const l = pick(list); try { return T().line(dex, l[0], l[1], l[2], o); } catch (_) { return false; } }
   function both(first, a, b, chance) {   // a line, then (sometimes) the other brother answers
@@ -87,6 +91,8 @@
   // ---- AI: stay safe, scavenge, fight only when cornered (or with Spiral power) ----
   function update(dt) {
     const N = E(), p = N?.Game?.player, k = K();
+    if (simon && p !== simon) { simon = null; grave = null; }
+    if (simon) { if (N.Game.state === 'playing' && !cs) simonUpdate(p, dt); return; }
     if (!p || Number(p.dex) !== EXCA || !k) { if (owner) clear(); return; }
     if (p !== owner) { clear(); owner = p; nextAt = (N.Game.st?.time ?? 0) + CFG.first; idleT = 50 + Math.random() * 30; }
     if (N.Game.state !== 'playing' || cs) return;
@@ -164,15 +170,18 @@
   // ================= KAMINA'S WORDS (once per run) =================
   const SCRIPT = [
     [EXCA, 'stunned', 'Heh... looks like I... dug a little too deep this time, bro...', 'dots', 'fall'],
-    [DRIL, 'worried', 'A-Aniki?! No... no, no, no! Get up! You never stay down!', 'tear'],
+    [DRIL, 'worried', 'A-Aniki?! No... no, no, no! Get up! You never stay down!', 'tear', 'run'],
     [DRIL, 'worried', 'I can\'t do this without you... I\'m just a digger... I only got this far because I believed in YOU!', 'tear'],
     [EXCA, 'angry', 'Simon! Don\'t believe in me — that\'s STUPID!', 'anger'],
     [EXCA, 'shouting', 'Don\'t believe in the me who believes in you... Have faith in the YOU who believes in YOURSELF!', 'exclaim'],
-    [EXCA, 'happy', 'Your drill... is the drill that\'ll pierce the heavens. Now go SHOW \'em!', 'heart'],
-    [DRIL, 'normal', '...Aniki. ...Okay. I\'ll dig. I\'ll dig through ANYTHING!', 'spark', 'awaken'],
+    [EXCA, 'happy', 'Your drill... is the drill that\'ll pierce the heavens...', 'heart'],
+    [EXCA, 'sigh', 'Go on, Simon... who the hell... do you think... you are...', 'dots', 'gone'],
+    [DRIL, 'worried', '...Aniki? ...Aniki...? ...ANIKIIIIII!!!', 'tear'],
+    [DRIL, 'worried', '..........', 'dots'],
+    [DRIL, 'normal', '...I won\'t cry anymore. I\'ll dig. For you. Through ANYTHING!', 'spark', 'awaken'],
     'GIGA',
-    [EXCA, 'determined', '...Heh. Who the hell do you think we ARE?!', 'exclaim', 'up'],
-    [DRIL, 'normal', 'We\'re the Digger Brothers! ...Let\'s go, Aniki!', 'heart']];
+    [DRIL, 'normal', 'Who the hell do you think I am?! I\'m Simon — Aniki\'s little bro!', 'exclaim', 'swap'],
+    [DRIL, 'normal', '...Watch me, Aniki. My drill is gonna pierce the heavens.', 'heart']];
   function start(p) {
     const N = E(), solo = !(N.Coop && N.Coop.active); usedRun = p;
     cs = { p, i: -1, next: 0, solo, aura: 0, giga: null };
@@ -185,7 +194,9 @@
     if (st === 'GIGA') { c.giga = { t: 0, done: false }; try { T().cut(DRIL, 'normal', 'GIGAAA... DRILL... BREAAAK!!', 'spark', 2.0); } catch (_) {} sfx('judge'); c.next = 2.6; return; }
     const [who, face, text, em, act] = st;
     if (act === 'awaken') { c.aura = 0.01; sfx('legend'); }
-    if (act === 'up') { c.p.hp = Math.max(c.p.hp, Math.round(c.p.maxHp * CFG.reviveHp)); c.up = true; }
+    if (act === 'fall' || act === 'gone') { c.fallen = true; try { c.p.anim.play('Faint'); } catch (_) {} if (act === 'gone') { c.gone = true; sfx('faint'); } }
+    if (act === 'run') c.run = true;
+    if (act === 'swap') becomeSimon(c);
     const d = dur(text); try { T().cut(who, face, text, em, d); } catch (_) {} c.next = d;
   }
   function giga() {
@@ -194,8 +205,35 @@
     for (const e of N.EnemyMgr.all()) { if (!e || e.dead) continue; try { e.hurt(dmg, '#7dff6a', e.x - c.p.x, e.y - c.p.y, 260); N.Stats.dmg(c.p, 'drill-run', dmg); n++; } catch (_) {} }
     try { B().camera?.kick?.(1.5); } catch (_) {} sfx('boss'); setTimeout(() => sfx('quake'), 120); c.hits = n; c.flash = 1;
     if (s) { s.hp = s.maxHp; }
+    if (!SCRIPT.slice(c.i + 1).some(x => x[4] === 'swap')) becomeSimon(c);
   }
-  function finish() { const c = cs; if (!c) return; cs = null; window.PS_DIGGER.active = false; if (c.solo) { try { B().game.soloHold(false); } catch (_) {} } c.p.hp = Math.max(c.p.hp, Math.round(c.p.maxHp * CFG.reviveHp)); c.p.invuln = Math.max(Number(c.p.invuln) || 0, 2); }
+  // Excadrill is gone: the player now IS Drilbur (level, moves, items and run progress all carry over)
+  function becomeSimon(c) {
+    if (c.swapped) return; c.swapped = true; c.gone = true;
+    const N = E(), p = c.p, s = bro, old = { x: p.x, y: p.y, anim: null };
+    try { old.anim = new N.Sprites.Animator(EXCA, 1, !!p.shiny); old.anim.dir = p.anim && p.anim.dir; old.anim.play('Faint'); } catch (_) {}
+    grave = { x: p.x, y: p.y, t: 0, anim: old.anim };
+    let fresh = null, was = null; try { fresh = new N.Player(N.DEX_BY[DRIL], {}, !!(s && s.shiny)); was = new N.Player(N.DEX_BY[EXCA], {}, false); } catch (_) {}
+    const ratio = fresh && was ? fresh.maxHp / was.maxHp : 0.8;
+    p.mon = N.DEX_BY[DRIL]; p.dex = DRIL; p.shiny = !!(s && s.shiny); p.__skin = undefined;
+    if (fresh) { p.r = fresh.r; p.bodyH = fresh.bodyH; p.baseSpd = fresh.baseSpd; p.baseAtk = fresh.baseAtk; }
+    try { N.Sprites.preload([DRIL], 4000, p.shiny); p.anim = new N.Sprites.Animator(DRIL, 1, p.shiny); } catch (_) {}
+    p.maxHp = Math.max(1, Math.round(p.maxHp * ratio)); p.hp = p.maxHp; p.dead = false; c.up = true;
+    p.atkPerm = (Number(p.atkPerm) || 1) * CFG.simonAtk;
+    if (s) { p.x = s.x; p.y = s.y; if (s.ownItem && !p.item) { try { p.equip(s.ownItem); } catch (_) {} } }
+    bro = null; owner = null; spiral = true; simon = p; idleT = 40;
+    try { T().place(DRIL, p); T().place(EXCA, grave); } catch (_) {}
+    window.dispatchEvent(new CustomEvent('ps-digger', { detail: { type: 'simon' } }));
+  }
+  // playing as Simon: now and then he talks to his Aniki
+  function simonUpdate(p, dt) {
+    if (grave) grave.t += dt;
+    try { T().place(DRIL, p); } catch (_) {}
+    let boss = false; try { boss = E().EnemyMgr.all().some(e => e && !e.dead && e.boss && Math.hypot(e.x - p.x, e.y - p.y) < 420); } catch (_) {}
+    if (boss && !simon.__bossSaid) { simon.__bossSaid = true; talk(DRIL, D.boss, { prio: true }); } else if (!boss) simon.__bossSaid = false;
+    if ((idleT -= dt) <= 0) { idleT = 55 + Math.random() * 40; talk(DRIL, D.alone, { prio: true }); }
+  }
+  function finish() { const c = cs; if (!c) return; if (!c.swapped && c.p === E()?.Game?.player && !c.p.dead) becomeSimon(c); cs = null; window.PS_DIGGER.active = false; if (c.solo) { try { B().game.soloHold(false); } catch (_) {} } if (c.swapped) { c.p.dead = false; c.p.hp = Math.max(c.p.hp, 1); c.p.invuln = Math.max(Number(c.p.invuln) || 0, 2.5); } }
 
   // ================= engine hooks =================
   let hooked = false;
@@ -232,7 +270,7 @@
       return r; };
     // depth-sorted drawing (with trees, rocks, enemies, players)
     const td = N.Training && N.Training.drawables;
-    if (typeof td === 'function') N.Training.drawables = function () { let r = td.apply(this, arguments); if (!Array.isArray(r)) r = []; const s = bro; if (s && owner && owner === N.Game.player) r.push({ y: s.y, draw: g => drawBody(g, s) }); return r; };
+    if (typeof td === 'function') N.Training.drawables = function () { let r = td.apply(this, arguments); if (!Array.isArray(r)) r = []; const s = bro; if (s && owner && owner === N.Game.player) r.push({ y: s.y, draw: g => drawBody(g, s) }); const gv = grave; if (gv && simon && simon === N.Game.player) r.push({ y: gv.y - 1, draw: g => drawGrave(g, gv) }); return r; };
     const du = N.Ult.drawUnits;
     N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { drawTop(ctx); } catch (err) { console.warn('[digger]', err); } };
   }
@@ -247,7 +285,18 @@
     ctx.save(); ctx.strokeStyle = spiral ? '#7dff6a' : '#9ad8ff'; ctx.lineWidth = 2.2; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.ellipse(s.x, s.y, 17, 6.5, 0, 0, TAU); ctx.stroke(); ctx.restore();
     if (s.anim) s.anim.draw(ctx, s.x, s.y);
   }
+  // where Excadrill fell: his body sinks into a mound of earth, and his pointed shades stay on top of it
+  function drawGrave(ctx, g) {
+    const u = Math.min(1, g.t / 5);
+    ctx.save(); ctx.fillStyle = '#5a3a1c'; ctx.beginPath(); ctx.ellipse(g.x, g.y + 2, 26 * u + 4, 10 * u + 2, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#7a5530'; ctx.beginPath(); ctx.ellipse(g.x, g.y - 2 * u, 20 * u + 2, 7 * u + 1, 0, 0, TAU); ctx.fill(); ctx.restore();
+    if (g.anim && u < 1) { ctx.save(); ctx.globalAlpha = 1 - u; ctx.beginPath(); ctx.rect(g.x - 60, g.y - 100, 120, 103); ctx.clip(); try { g.anim.update(0.016); g.anim.draw(ctx, g.x, g.y + u * 20); } catch (_) {} ctx.restore(); }
+    if (u > 0.4) { ctx.save(); ctx.globalAlpha = Math.min(1, (u - 0.4) / 0.4); ctx.translate(g.x, g.y - 8 * u - 3); ctx.fillStyle = '#e8402a'; ctx.strokeStyle = '#2a0a0a'; ctx.lineWidth = 1.2;
+      for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sd * 2, -2); ctx.lineTo(sd * 15, -7); ctx.lineTo(sd * 11, 2); ctx.lineTo(sd * 3, 1); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+      ctx.fillStyle = '#2a0a0a'; ctx.fillRect(-3, -2, 6, 2); ctx.restore(); }
+  }
+  function drawSimonAura(ctx, p) { const now = clock(); ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(125,255,106,.55)'; ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < 44; i++) { const a = i * 0.5 + now * 6, r = 5 + i * 0.65; ctx.lineTo(p.x + Math.cos(a) * r, p.y - 14 + Math.sin(a) * r * 0.5); } ctx.stroke(); ctx.restore(); }
   function drawTop(ctx) {
+    if (simon && simon === E().Game.player && !simon.dead) { drawSimonAura(ctx, simon); return; }
     const s = bro; if (!s || !owner || owner !== E().Game.player || s.dead || s.emergeT < CFG.emerge) return;
     ctx.save(); ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030'; ctx.fillStyle = spiral ? '#7dff6a' : '#fff';
     const label = (s.shiny ? '★ ' : '') + 'Drilbur · ' + (spiral ? 'Spiral' : s.mode === 'escape' ? 'Hiding' : s.mode === 'cornered' ? 'Cornered!' : 'Digger') + (s.ownItem ? ' · ' + (K()?.itemName ? K().itemName(s.ownItem) : s.ownItem) : '');
@@ -281,7 +330,7 @@
     if (c.flash > 0) { ctx.fillStyle = 'rgba(220,255,210,' + c.flash * 0.8 + ')'; ctx.fillRect(0, 0, W, H); c.flash = Math.max(0, c.flash - dt * 1.5); }
     if (c.solo && !c.giga) { ctx.font = '13px Pixelify, system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillText('Click / Enter: skip', W - 14, H - 14); }
   }
-  function skip() { const c = cs; if (!c || c.giga) return; c.aura = c.aura || 0.5; c.i = SCRIPT.indexOf('GIGA') - 1; c.next = 0; }
+  function skip() { const c = cs; if (!c || c.giga) return; c.aura = c.aura || 0.5; c.fallen = c.gone = true; try { c.p.anim.play('Faint'); } catch (_) {} c.i = SCRIPT.indexOf('GIGA') - 1; c.next = 0; }
   addEventListener('keydown', e => { if (!cs || !cs.solo) return; const k = (e.key || '').toLowerCase(); if (k === 'enter' || k === ' ' || k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); skip(); } }, true);
   addEventListener('pointerdown', () => { if (cs && cs.solo) skip(); }, true);
 
@@ -289,10 +338,13 @@
   function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.1, (now - last) / 1000); last = now;
     try { hook(); const c = cs;
       if (c) { const g = B()?.game; if (!g || g.player !== c.p || g.state === 'over' || g.state === 'ui') finish();
-        else { c.p.invuln = Math.max(Number(c.p.invuln) || 0, 0.5); if (c.p.dead) c.p.dead = false; if (!c.up) c.p.hp = 1; else c.p.hp = Math.max(c.p.hp, 1); c.next -= dt; if (c.next <= 0) advance(); } }
+        else { c.p.invuln = Math.max(Number(c.p.invuln) || 0, 0.5); if (c.p.dead) c.p.dead = false; if (!c.up) c.p.hp = 1; else c.p.hp = Math.max(c.p.hp, 1);
+          if (c.fallen && !c.swapped && c.p.anim) { try { if (c.p.anim.cur !== 'Faint') c.p.anim.play('Faint'); c.p.anim.update(dt); } catch (_) {} }
+          const s = bro; if (c.run && s && !c.swapped) { const tx = c.p.x - 30, ty = c.p.y + 6, d = Math.hypot(tx - s.x, ty - s.y); if (d > 3) { const st = Math.min(d, 170 * dt); s.x += (tx - s.x) / d * st; s.y += (ty - s.y) / d * st; } if (s.anim) { s.anim.loop(d > 3 ? 'Walk' : 'Idle'); s.anim.dir = E().Sprites.dirFromAngle(Math.atan2(c.p.y - s.y, c.p.x - s.x)); s.anim.update(dt); } }
+          c.next -= dt; if (c.next <= 0) advance(); } }
       drawScene(dt); } catch (e) { console.warn('[digger]', e); } }
   function init() { document.body.append(ov); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
   window.PS_DIGGER = { active: false, cfg: CFG, get bro() { return bro && { hp: Math.round(bro.hp), maxHp: bro.maxHp, dead: bro.dead, emerging: bro.emergeT < CFG.emerge, mode: bro.mode, item: bro.ownItem || null, spiral, x: bro.x, y: bro.y }; },
-    _bro: () => bro, get used() { return usedRun === E()?.Game?.player; }, get scene() { return cs && { step: cs.i, giga: !!(cs.giga && cs.giga.done), hits: cs.hits }; } };
+    _bro: () => bro, get simon() { return !!simon && simon === E()?.Game?.player; }, get grave() { return grave && { x: grave.x, y: grave.y }; }, get used() { return usedRun === E()?.Game?.player; }, get scene() { return cs && { step: cs.i, giga: !!(cs.giga && cs.giga.done), hits: cs.hits }; } };
 })();
