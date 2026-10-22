@@ -41,7 +41,8 @@
     mespritEvery: 5, mespritStun: 3, mespritConfuse: 3, mespritDrain: 0.05, mespritHeal: 0.10,      // Mesprit
     buffStep: 0.10, buffMax: 5, buffTime: 10,   // every trio buff is a +10% stack (up to +50%) on the buffs all three share
     mysticCd: 6, mysticRadius: 260, stud: 32, pushStuds: 5, mespritExtra: 2, fearTime: 5,   // Mystical Power
-    coopFar: 600, jobRange: 320, jobSafe: 150 };   // co-op: follow another player past this distance · loot/chest/crystal search, and how clear it must be
+    coopFar: 600, jobRange: 320, jobSafe: 150,
+    tetherFar: 450, tetherNear: 260, tetherSpeed: 320 };   // stray this far from your sisters and they pull you back   // co-op: follow another player past this distance · loot/chest/crystal search, and how clear it must be
   const TRIO = {
     480: { key: 'uxie', name: 'Uxie', move: 'lake-uxie', role: 'Guardian', hp: 2.0, atk: 0.6, spd: 1.0, take: 0.8, leash: 260, dead: 90, ideal: 200,
       kit: ['confusion'], drop: ['#fff7c0', '#ffd84a', '#c8960c'], ring: '#ffd84a',
@@ -392,8 +393,22 @@
         s.kitI++; s.next = Math.max(0.3, (def.cd || 1) * (Number(s.caster.cdK) || 1) * (d === 482 ? 0.8 : 1)); } }
       for (const sk of SKILLS[d]) { const k = sk.lv + ''; s.cd[k] = (s.cd[k] || 0) - dt; if (s.lvl >= sk.lv && s.cd[k] <= 0) { let used = false; try { used = !!sk.use(s); } catch (err) { console.warn('[lake]', err); } s.cd[k] = used ? sk.cd * (Number(s.caster.cdK) || 1) / (s.lvl >= 5 ? 1.25 : 1) : 0.5; } }
     }
+    tether(p, dt);
   }
 
+  // ---- the tether: stray too far from your sisters and they psychically pull you back to them ----
+  let pull = null;   // {s} while pulling
+  function tether(p, dt) {
+    const N = E(); if (p.dead || window.PS_CREATION_RIFT?.active || window.PS_GIRATINA?.active) { pull = null; return; }
+    const live = sistersAlive().filter(s => !(s.standT > 0)); if (!live.length) { pull = null; return; }
+    const s = live.sort((a, b) => dist(a, p) - dist(b, p))[0], d = dist(s, p);
+    if (!pull && d > CFG.tetherFar) { pull = { s }; emit('tether', { dex: s.dex }); sfx('surge'); }
+    if (!pull) return; if (pull.s !== s) pull.s = s;
+    if (d < CFG.tetherNear) { pull = null; return; }
+    const a = Math.atan2(s.y - p.y, s.x - p.x), st = Math.min(d - CFG.tetherNear + 1, CFG.tetherSpeed * dt), ox = p.x, oy = p.y;
+    p.x += Math.cos(a) * st; p.y += Math.sin(a) * st; try { N.World.collide(p); } catch (_) {}
+    if (Math.hypot(p.x - ox, p.y - oy) < st * 0.2) { s.x += (p.x - s.x) * 0.02; s.y += (p.y - s.y) * 0.02; }   // blocked: she drifts your way too
+  }
   // ================= engine hooks =================
   let hooked = false;
   function hook() {
@@ -553,6 +568,9 @@
       ctx.globalAlpha = 0.12; ctx.fillStyle = '#fff6c0'; ctx.fill(); ctx.globalAlpha = 1; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030'; ctx.fillStyle = '#ffe27a';
       const tx = 'Untouchable ' + Math.ceil(t) + 's'; ctx.strokeText(tx, x, y + 24); ctx.fillText(tx, x, y + 24); ctx.restore(); };
     if (team.pStandT > 0 && owner) stand(owner.x, owner.y, team.pStandT);
+    if (pull && pull.s && owner) { const s = pull.s, n = 18, a = Math.atan2(owner.y - s.y, owner.x - s.x) + Math.PI / 2; ctx.save(); ctx.strokeStyle = s.t.ring; ctx.lineWidth = 3; ctx.shadowColor = s.t.ring; ctx.shadowBlur = 10; ctx.globalAlpha = 0.85; ctx.beginPath();
+      for (let i = 0; i <= n; i++) { const u = i / n, x = s.x + (owner.x - s.x) * u, y = s.y - 18 + (owner.y - s.y) * u, w = Math.sin(u * Math.PI * 4 - now * 14) * 6 * Math.sin(u * Math.PI); ctx.lineTo(x + Math.cos(a) * w, y + Math.sin(a) * w); }
+      ctx.stroke(); ctx.restore(); }
     for (const d of IDS) { const s = allies[d]; if (!s) continue;
       if (s.standT > 0 && !s.dead) stand(s.x, s.y, s.standT);
       if (!sorted) drawBody(ctx, s);   // normally her body is drawn in the world's depth-sorted pass (see drawBody)
@@ -564,7 +582,7 @@
 
   // ================= boot =================
   (function boot() { try { register(); hookPool(); hook(); } catch (err) { console.warn('[lake]', err); } if (!(registered && hooked)) setTimeout(boot, 200); else setInterval(() => { try { hookPool(); patchMystical(); } catch (_) {} }, 1000); })();
-  window.PS_LAKE = { cfg: CFG, trio: TRIO, team, get allies() { return IDS.map(d => allies[d]).filter(Boolean).map(s => ({ dex: s.dex, name: s.name, hp: Math.round(s.hp), maxHp: s.maxHp, lvl: s.lvl, dead: s.dead, spawning: s.spawnT < CFG.spawnTime, x: s.x, y: s.y })); },
+  window.PS_LAKE = { cfg: CFG, trio: TRIO, team, get pulling() { return !!pull; }, get allies() { return IDS.map(d => allies[d]).filter(Boolean).map(s => ({ dex: s.dex, name: s.name, hp: Math.round(s.hp), maxHp: s.maxHp, lvl: s.lvl, dead: s.dead, spawning: s.spawnT < CFG.spawnTime, x: s.x, y: s.y })); },
     _ally: dex => allies[Number(dex)] || null,
     _anchor: (dex, p) => { const s = allies[Number(dex)]; return s ? anchorFor(s, p || owner) : null; },
     summon: dex => { const p = player(); if (!p || !isTrio(p.dex) || Number(dex) === Number(p.dex)) return null; if (owner !== p) { clearAll(); owner = p; } delete allies[dex]; return !!summon(Number(dex)); } };
