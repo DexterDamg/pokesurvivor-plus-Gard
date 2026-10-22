@@ -114,7 +114,7 @@
     Object.defineProperty(a, 'item', { configurable: true, get: () => s.ownItem || s.owner.item, set: v => { s.ownItem = v; } });   // her own held item once she picks one up
     Object.defineProperty(a, 'baseAtk', { configurable: true, get: () => (Number(s.owner.baseAtk) || 1) * s.t.atk * lvlMul(s) });
     Object.defineProperty(a, 'baseSpd', { configurable: true, get: () => Number(s.owner.baseSpd) || 100 });
-    Object.defineProperty(a, 'floating', { configurable: true, get: () => true });
+    Object.defineProperty(a, 'floating', { configurable: true, get: () => false });   // they walk: no hovering over water or obstacles
     a.hurt = (amt, type) => hurt(s, amt, type); a.ultCd = Infinity; a.ultT = 0;
   }
   function hpFor(s) { return Math.max(30, Math.round((Number(s.owner.maxHp) || 100) * s.t.hp * lvlMul(s))); }
@@ -124,7 +124,7 @@
     const s = { dex, t, name: t.name, owner: o, side, shiny, x: o.x + side * 70, y: o.y + 8, r: 16, bodyH: 36, dead: false, spawnT: 0, age: 0, lvl: moveOf(o, dex)?.lvl || 1,
       next: 0.5, kitI: 0, cd: {}, hurtCd: 0, stunT: 0, slowT: 0, path: [], aim: 0, target: null, anim: null };
     try { N.Sprites.preload([dex], 4000, shiny); s.anim = new N.Sprites.Animator(dex, 1, shiny); } catch (_) {}
-    try { const H = window.PS_HOOPA; if (H && H.summonFree && !H.summonFree(s.x, s.y, s.r)) { s.x = o.x; s.y = o.y + 30; } } catch (_) {}
+    { const f = nearFree(s.x, s.y, s.r); s.x = f.x; s.y = f.y; }   // rises from open ground, never inside a rock or a wall
     makeActor(s); s.maxHp = hpFor(s); s.hp = s.maxHp; s.again = !!again; allies[dex] = s;
     sfx('surge'); emit('summon', { dex, again: !!again }); return s;
   }
@@ -255,7 +255,9 @@
   }
 
   // ---- AI ----
-  const freeAt = (x, y, r) => { try { return window.PS_HOOPA?.summonFree ? window.PS_HOOPA.summonFree(x, y, r) : true; } catch (_) { return true; } };
+  // solid ground for a body of radius r: the engine's own check (walls, rocks, trees' trunks, water...)
+  const freeAt = (x, y, r) => { try { return E().World.isFree(x, y, Math.max(6, (r || 16) * 0.6)); } catch (_) { return true; } };
+  function nearFree(x, y, r) { if (freeAt(x, y, r)) return { x, y }; for (let d = 8; d <= 240; d += 8) for (let i = 0; i < 16; i++) { const a = i * TAU / 16, nx = x + Math.cos(a) * d, ny = y + Math.sin(a) * d; if (freeAt(nx, ny, r)) return { x: nx, y: ny }; } return { x, y }; }
   function everyone() { try { const N = E(), ev = N.Game.everyone; const L = typeof ev === 'function' ? ev.call(N.Game) : ev; return Array.isArray(L) ? L : []; } catch (_) { return []; } }
   const coopOn = () => !!(E()?.Coop?.active);
   // co-op: while her sister-player is far away or down, she follows and fights for the nearest other player
@@ -319,7 +321,7 @@
     if (p !== owner) { clearAll(); owner = p; }
     if (N.Game.state !== 'playing') return;
     // came through a Rift or any teleport: bring the team along
-    if (!p.dead && ownerPos && Math.hypot(p.x - ownerPos.x, p.y - ownerPos.y) > 420) for (const d of IDS) { const s = allies[d]; if (s) { s.x = p.x + s.side * 70; s.y = p.y + 8; s.path = []; } }
+    if (!p.dead && ownerPos && Math.hypot(p.x - ownerPos.x, p.y - ownerPos.y) > 420) for (const d of IDS) { const s = allies[d]; if (s) { const f = nearFree(p.x + s.side * 70, p.y + 8, s.r); s.x = f.x; s.y = f.y; s.path = []; s.okX = f.x; s.okY = f.y; } }
     ownerPos = { x: p.x, y: p.y };
     if ((team.protectT -= dt) <= 0) team.protect = 0;
     for (let i = sights.length - 1; i >= 0; i--) { const f = sights[i]; f.t += dt; if (f.t >= f.dur) { blast(f.s, f.x, f.y, f.r, 4 * lvlMul(f.s), { knock: 140, color: '#9ad0ff' }); sfx('boss'); sights.splice(i, 1); } }
@@ -375,6 +377,9 @@
       // keep the trio from stacking on each other and on you
       for (const o of [p, ...IDS.map(x => allies[x]).filter(o => o && o !== s && !o.dead)]) { let dx = s.x - o.x, dy = s.y - o.y, dd = Math.hypot(dx, dy); if (dd < 40) { if (dd < 0.01) { dx = s.side; dy = 0; dd = 1; } const push = Math.min(40 - dd, 80 * dt); s.x += dx / dd * push; s.y += dy / dd * push; } }
       try { N.World.collide(s); } catch (_) {}
+      // never inside an obstacle: whatever moved her there (a path shortcut, a sidestep, a shove), she goes back to her last legal spot
+      if (!freeAt(s.x, s.y, s.r)) { if (s.okX != null && freeAt(s.okX, s.okY, s.r)) { s.x = s.okX; s.y = s.okY; } else { const f = nearFree(s.x, s.y, s.r); s.x = f.x; s.y = f.y; } s.path = []; }
+      s.okX = s.x; s.okY = s.y;
       if (s.anim) { s.anim.loop(moved ? 'Walk' : 'Idle'); if (target) s.anim.dir = N.Sprites.dirFromAngle(Math.atan2(target.y - s.y, target.x - s.x)); else if (!moved) s.anim.dir = N.Sprites.dirFromAngle(Math.atan2(A.y - s.y, A.x - s.x)); s.anim.update(dt); }
       if (s.stunT > 0) continue;
       if (d === 481) { s.pulseT = (s.pulseT ?? CFG.mespritEvery) - dt; if (s.pulseT <= 0) { s.pulseT = CFG.mespritEvery; try { mespritPulse(s); } catch (err) { console.warn('[lake]', err); } } }
@@ -493,6 +498,10 @@
     const ucast = N.Ult.cast, uupd = N.Ult.update;
     const zc = zWrap(ucast); N.Ult.cast = function (actor) { const r = zc.apply(this, arguments); if (r && actor && actor === N.Game.player && isTrio(actor.dex)) { actor.ultCd = (Number(N.Ult.CD) || 90) * CFG.zCd; emit('z', { dex: Number(actor.dex) }); } return r; };
     N.Ult.update = zWrap(uupd);
+    // the sisters join the engine's depth-sorted world drawables (the same way js/catching.js adds the trainer)
+    const td = N.Training && N.Training.drawables;
+    if (typeof td === 'function') { sorted = true; N.Training.drawables = function () { let r = td.apply(this, arguments); if (!Array.isArray(r)) r = [];
+      try { if (owner && owner === N.Game.player) for (const d of IDS) { const s = allies[d]; if (s) r.push({ y: s.y, draw: g => drawBody(g, s) }); } } catch (err) { console.warn('[lake]', err); } return r; }; }
     // drawing (world space, under the HUD)
     const du = N.Ult.drawUnits;
     N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { draw(ctx); } catch (err) { console.warn('[lake]', err); } };
@@ -519,6 +528,15 @@
     ctx.restore();
   }
   function tear(ctx, x, y, w, h, hi, mid, lo) { const g = ctx.createLinearGradient(x, y - h, x, y + w); g.addColorStop(0, hi); g.addColorStop(0.6, mid); g.addColorStop(1, lo); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, y - h); ctx.bezierCurveTo(x + w * 0.4, y - h * 0.4, x + w, y - w * 0.2, x + w, y + w * 0.2); ctx.arc(x, y + w * 0.2, w, 0, Math.PI); ctx.bezierCurveTo(x - w, y - w * 0.2, x - w * 0.4, y - h * 0.4, x, y - h); ctx.fill(); }
+  // her body: drawn in the engine's depth-sorted world pass (with trees, rocks, enemies and players), so a tree in
+  // front of her covers her like it covers you. Name, HP bar and effects stay on top (draw below).
+  let sorted = false;
+  function drawBody(ctx, s) {
+    if (s.dead) { const k = Math.min(1, s.melt / CFG.meltTime); if (k < 1) { if (s.anim) { ctx.save(); ctx.globalAlpha = 1 - k; s.anim.draw(ctx, s.x, s.y); ctx.restore(); } drop(ctx, s.x, s.y, s, 1.35 - k * 0.8); } return; }
+    if (s.spawnT < CFG.spawnTime) { drop(ctx, s.x, s.y, s, s.spawnT); if (s.anim && s.spawnT > 0.95) { ctx.save(); ctx.globalAlpha = Math.min(1, (s.spawnT - 0.95) / 0.4); s.anim.draw(ctx, s.x, s.y); ctx.restore(); } return; }
+    ctx.save(); ctx.strokeStyle = s.t.ring; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.ellipse(s.x, s.y, 20, 7.5, 0, 0, TAU); ctx.stroke(); ctx.restore();
+    if (s.anim) s.anim.draw(ctx, s.x, s.y);
+  }
   function draw(ctx) {
     if (!owner || owner !== E().Game.player) return; const now = performance.now() / 1000;
     // Future Sight markers
@@ -537,10 +555,8 @@
     if (team.pStandT > 0 && owner) stand(owner.x, owner.y, team.pStandT);
     for (const d of IDS) { const s = allies[d]; if (!s) continue;
       if (s.standT > 0 && !s.dead) stand(s.x, s.y, s.standT);
-      if (s.dead) { const k = Math.min(1, s.melt / CFG.meltTime); if (k < 1) { if (s.anim) { ctx.save(); ctx.globalAlpha = 1 - k; s.anim.draw(ctx, s.x, s.y); ctx.restore(); } drop(ctx, s.x, s.y, s, 1.35 - k * 0.8); } continue; }
-      if (s.spawnT < CFG.spawnTime) { drop(ctx, s.x, s.y, s, s.spawnT); if (s.anim && s.spawnT > 0.95) { ctx.save(); ctx.globalAlpha = Math.min(1, (s.spawnT - 0.95) / 0.4); s.anim.draw(ctx, s.x, s.y); ctx.restore(); } continue; }
-      ctx.save(); ctx.strokeStyle = s.t.ring; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.ellipse(s.x, s.y, 20, 7.5, 0, 0, TAU); ctx.stroke(); ctx.restore();
-      if (s.anim) s.anim.draw(ctx, s.x, s.y);
+      if (!sorted) drawBody(ctx, s);   // normally her body is drawn in the world's depth-sorted pass (see drawBody)
+      if (s.dead || s.spawnT < CFG.spawnTime) continue;
       ctx.save(); ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030'; ctx.fillStyle = '#fff';
       const label = (s.shiny ? '★ ' : '') + s.name + ' · ' + s.t.role + ' · Lv' + s.lvl + (s.ownItem ? ' · ' + ITEM_NAME(s.ownItem) : ''); ctx.strokeText(label, s.x, s.y - 50); ctx.fillText(label, s.x, s.y - 50);
       ctx.fillStyle = '#25152f'; ctx.fillRect(s.x - 22, s.y - 44, 44, 4); ctx.fillStyle = s.t.ring; ctx.fillRect(s.x - 22, s.y - 44, 44 * Math.max(0, s.hp / s.maxHp), 4); ctx.restore(); }
