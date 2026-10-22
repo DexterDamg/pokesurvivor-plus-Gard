@@ -17,7 +17,7 @@
                 Lv1 Psystrike / Psycho Cut · Lv2 Nasty Plot (shared Attack buff) · Lv3 Future Sight (delayed blast) ·
                 Lv4 Psycho Boost (huge single hit) · Lv5 all stronger.
    - Their Z-Move deals 3x the damage of a normal Z-Move, with twice the cooldown.
-   Solo (your own allies only). */
+   Solo (your own allies only). Their portraits and emotes (js/lake-talk.js) react to what happens here. */
 (() => {
   'use strict';
   if (window.PS_LAKE_INSTALLED) return; window.PS_LAKE_INSTALLED = true;
@@ -42,6 +42,8 @@
   const player = () => E()?.Game?.player;
   const say = (x, y, t, c) => { try { E().FX.dmgText(x, y, t, c || '#fff'); } catch (_) {} };
   const sfx = n => { try { E().Audio.sfx(n); } catch (_) {} };
+  // what the team is doing, for js/lake-talk.js (portraits + emotes): summon, arrive, hurt, faint, skill, z
+  const emit = (type, d) => { try { window.dispatchEvent(new CustomEvent('ps-lake', { detail: Object.assign({ type }, d) })); } catch (_) {} };
 
   // ================= moves =================
   function moveDef(dex) {
@@ -92,25 +94,26 @@
     a.hurt = (amt, type) => hurt(s, amt, type); a.ultCd = Infinity; a.ultT = 0;
   }
   function hpFor(s) { return Math.max(30, Math.round((Number(s.owner.maxHp) || 100) * s.t.hp * lvlMul(s))); }
-  function summon(dex) {
+  function summon(dex, again) {
     const N = E(), o = owner; if (!N || !o) return null; const t = TRIO[dex], side = sideFor(dex);
     let shiny = false; try { shiny = !!(N.DB.save && N.DB.save.shiny && N.DB.save.shiny[dex]) && N.Sprites.hasShiny(dex); } catch (_) {}
     const s = { dex, t, name: t.name, owner: o, side, shiny, x: o.x + side * 70, y: o.y + 8, r: 16, bodyH: 36, dead: false, spawnT: 0, age: 0, lvl: moveOf(o, dex)?.lvl || 1,
       next: 0.5, kitI: 0, cd: {}, hurtCd: 0, stunT: 0, slowT: 0, path: [], aim: 0, target: null, anim: null };
     try { N.Sprites.preload([dex], 4000, shiny); s.anim = new N.Sprites.Animator(dex, 1, shiny); } catch (_) {}
     try { const H = window.PS_HOOPA; if (H && H.summonFree && !H.summonFree(s.x, s.y, s.r)) { s.x = o.x; s.y = o.y + 30; } } catch (_) {}
-    makeActor(s); s.maxHp = hpFor(s); s.hp = s.maxHp; allies[dex] = s;
-    sfx('surge'); return s;
+    makeActor(s); s.maxHp = hpFor(s); s.hp = s.maxHp; s.again = !!again; allies[dex] = s;
+    sfx('surge'); emit('summon', { dex, again: !!again }); return s;
   }
   function faint(s) {
     if (s.dead && s.melt != null) return; s.dead = true; s.melt = 0; s.respawnAt = (E().Game.st?.time ?? 0) + CFG.respawn; s.deadAt = performance.now() / 1000;
-    say(s.x, s.y - 50, s.name + ' fainted!', s.t.ring); sfx('faint');
+    say(s.x, s.y - 50, s.name + ' fainted!', s.t.ring); sfx('faint'); emit('faint', { dex: s.dex });
   }
   function hurt(s, amt, type) {
     if (!s || s.dead || s.spawnT < CFG.spawnTime || s.hurtCd > 0 || !Number.isFinite(amt) || amt <= 0) return;
     s.hurtCd = 0.35;
     try { E().Player.prototype.hurt.call(s.caster, amt, type); } catch (_) { s.hp -= amt; }
-    if (s.hp <= 0 || s.dead) { s.hp = 0; s.dead = false; faint(s); }
+    if (s.hp <= 0 || s.dead) { s.hp = 0; s.dead = false; faint(s); return; }
+    if (!s.low && s.hp < s.maxHp * 0.5) { s.low = true; emit('hurt', { dex: s.dex, frac: s.hp / s.maxHp }); }
   }
   function clearAll() { for (const d of IDS) delete allies[d]; sights.length = 0; fx.length = 0; team.guard = team.guardT = team.protect = team.protectT = 0; owner = null; ownerPos = null; }
 
@@ -140,23 +143,23 @@
       { lv: 4, cd: 7, use: s => near(s, 160).length >= 2 && shove(s) }],
     481: [   // Mesprit
       { lv: 1, cd: 9, use: s => teamMembers().some(m => m.hp < m.maxHp * 0.7) && (healTeam(0.08 * lvlMul(s), s), say(s.x, s.y - 50, 'Heal Pulse', s.t.ring), true) },
-      { lv: 2, cd: 8, use: s => near(owner, 170).length >= 3 && (blast(s, owner.x, owner.y, 170, 0.3, { slow: 0.5, slowT: 3, stun: 0.9, stunChance: 0.6, color: '#ffb0e0' }), say(s.x, s.y - 50, 'Lullaby', s.t.ring), true) },
-      { lv: 3, cd: 14, use: s => owner.hp < owner.maxHp * 0.45 && (team.protect = 0.35, team.protectT = 4, say(owner.x, owner.y - 60, 'Protect!', s.t.ring), sfx('shield'), true) },
-      { lv: 4, cd: 22, use: s => teamMembers().some(m => m.hp < m.maxHp * 0.4) && (healTeam(0.3, s), say(s.x, s.y - 50, 'Healing Wish', s.t.ring), sfx('levelup'), true) }],
+      { lv: 2, cd: 8, use: s => near(owner, 170).length >= 3 && (blast(s, owner.x, owner.y, 170, 0.3, { slow: 0.5, slowT: 3, stun: 0.9, stunChance: 0.6, color: '#ffb0e0' }), say(s.x, s.y - 50, 'Lullaby', s.t.ring), emit('skill', { dex: 481, skill: 'lullaby' }), true) },
+      { lv: 3, cd: 14, use: s => owner.hp < owner.maxHp * 0.45 && (team.protect = 0.35, team.protectT = 4, say(owner.x, owner.y - 60, 'Protect!', s.t.ring), sfx('shield'), emit('skill', { dex: 481, skill: 'protect' }), true) },
+      { lv: 4, cd: 22, use: s => teamMembers().some(m => m.hp < m.maxHp * 0.4) && (healTeam(0.3, s), say(s.x, s.y - 50, 'Healing Wish', s.t.ring), sfx('levelup'), emit('skill', { dex: 481, skill: 'wish' }), true) }],
     482: [   // Azelf
-      { lv: 2, cd: 12, use: s => near(s, 300).length > 0 && (owner.addBuff('atk', 0.12, 6, 3), say(s.x, s.y - 50, 'Nasty Plot! ATK ↑', s.t.ring), true) },
+      { lv: 2, cd: 12, use: s => near(s, 300).length > 0 && (owner.addBuff('atk', 0.12, 6, 3), say(s.x, s.y - 50, 'Nasty Plot! ATK ↑', s.t.ring), emit('skill', { dex: 482, skill: 'plot' }), true) },
       { lv: 3, cd: 9, use: s => futureSight(s) },
       { lv: 4, cd: 12, use: s => { const tg = foes().filter(e => dist(e, s) < 320).sort((a, b) => (b.maxHp || 0) - (a.maxHp || 0))[0]; if (!tg) return false;
-        blast(s, tg.x, tg.y, 40, 6 * lvlMul(s), { knock: 120, color: '#9ad0ff' }); say(tg.x, tg.y - 50, 'Psycho Boost!', s.t.ring); sfx('boss'); return true; } }] };
-  function cosmic(s) { team.guard = Math.min(guardCap(s), team.guard + 0.1); team.guardT = 8; say(s.x, s.y - 50, 'Cosmic Power! DEF ↑ ' + Math.round(team.guard * 100) + '%', s.t.ring); sfx('shield'); for (const m of teamMembers()) try { E().FX.ring(m.x, m.y, 6, 50, '#ffe27a', 0.5, 4); } catch (_) {} return true; }
-  function recover(s) { s.hp = Math.min(s.maxHp, s.hp + s.maxHp * 0.3); try { owner.heal(owner.maxHp * 0.08); } catch (_) {} owner.addBuff('regen', Math.max(1, owner.maxHp * 0.01), 6, 3); say(s.x, s.y - 50, 'Recover', '#5fe08a'); return true; }
-  function shove(s) { blast(s, s.x, s.y, 160, 1.2 * lvlMul(s), { knock: 260, stun: 1.2 }); say(s.x, s.y - 50, 'Psychic Shove!', s.t.ring); sfx('quake'); return true; }
-  function futureSight(s) { const tg = densest(s, 360); if (!tg) return false; sights.push({ s, x: tg.x, y: tg.y, t: 0, dur: 1.2, r: 120 }); say(s.x, s.y - 50, 'Future Sight', s.t.ring); return true; }
+        blast(s, tg.x, tg.y, 40, 6 * lvlMul(s), { knock: 120, color: '#9ad0ff' }); say(tg.x, tg.y - 50, 'Psycho Boost!', s.t.ring); sfx('boss'); emit('skill', { dex: 482, skill: 'boost' }); return true; } }] };
+  function cosmic(s) { emit('skill', { dex: 480, skill: 'cosmic' }); team.guard = Math.min(guardCap(s), team.guard + 0.1); team.guardT = 8; say(s.x, s.y - 50, 'Cosmic Power! DEF ↑ ' + Math.round(team.guard * 100) + '%', s.t.ring); sfx('shield'); for (const m of teamMembers()) try { E().FX.ring(m.x, m.y, 6, 50, '#ffe27a', 0.5, 4); } catch (_) {} return true; }
+  function recover(s) { emit('skill', { dex: 480, skill: 'recover' }); s.hp = Math.min(s.maxHp, s.hp + s.maxHp * 0.3); try { owner.heal(owner.maxHp * 0.08); } catch (_) {} owner.addBuff('regen', Math.max(1, owner.maxHp * 0.01), 6, 3); say(s.x, s.y - 50, 'Recover', '#5fe08a'); return true; }
+  function shove(s) { emit('skill', { dex: 480, skill: 'shove' }); blast(s, s.x, s.y, 160, 1.2 * lvlMul(s), { knock: 260, stun: 1.2 }); say(s.x, s.y - 50, 'Psychic Shove!', s.t.ring); sfx('quake'); return true; }
+  function futureSight(s) { const tg = densest(s, 360); if (!tg) return false; emit('skill', { dex: 482, skill: 'future' }); sights.push({ s, x: tg.x, y: tg.y, t: 0, dur: 1.2, r: 120 }); say(s.x, s.y - 50, 'Future Sight', s.t.ring); return true; }
   // the move's cooldown: call the ally, or use its signature command
   function command(dex) {
     const s = allies[dex];
     if (!s) { summon(dex); return; }
-    if (s.dead) { if ((E().Game.st?.time ?? 0) >= s.respawnAt) { delete allies[dex]; summon(dex); } return; }
+    if (s.dead) { if ((E().Game.st?.time ?? 0) >= s.respawnAt) { delete allies[dex]; summon(dex, true); } return; }
     if (s.spawnT < CFG.spawnTime) return;
     if (dex === 480) { cosmic(s); if (s.lvl >= 4) shove(s); }
     else if (dex === 481) { healTeam(0.1 * lvlMul(s), s); say(s.x, s.y - 50, 'Heal Pulse', s.t.ring); }
@@ -179,9 +182,10 @@
     for (const d of IDS) {
       const s = allies[d]; if (!s) continue; s.age += dt;
       if (s.dead) { s.melt += dt; continue; }
-      if (s.spawnT < CFG.spawnTime) { s.spawnT += dt; if (s.anim) { s.anim.loop('Idle'); s.anim.update(dt); } if (s.spawnT >= CFG.spawnTime) { say(s.x, s.y - 50, s.name + '!', s.t.ring); try { N.FX.burst(s.x, s.y - 20, s.t.drop[1], 24, 200); } catch (_) {} } continue; }
+      if (s.spawnT < CFG.spawnTime) { s.spawnT += dt; if (s.anim) { s.anim.loop('Idle'); s.anim.update(dt); } if (s.spawnT >= CFG.spawnTime) { say(s.x, s.y - 50, s.name + '!', s.t.ring); try { N.FX.burst(s.x, s.y - 20, s.t.drop[1], 24, 200); } catch (_) {} emit('arrive', { dex: d, again: s.again }); } continue; }
       const m = moveOf(p, d); s.lvl = m?.lvl || s.lvl || 1;
       const mh = hpFor(s); if (mh !== s.maxHp) { s.hp = s.hp / s.maxHp * mh; s.maxHp = mh; }
+      if (s.low && s.hp > s.maxHp * 0.8) s.low = false;
       let regen = 0; try { regen = Number(s.caster.regen) || 0; } catch (_) {} s.hp = Math.min(s.maxHp, s.hp + regen * dt);
       for (const k of ['invuln', 'reviveShield', 'shadeInv', 'balloonCd']) s.caster[k] = Math.max(0, (Number(s.caster[k]) || 0) - dt);   // the engine's hit i-frames wear off
       s.hurtCd = Math.max(0, s.hurtCd - dt); s.stunT = Math.max(0, s.stunT - dt); s.slowT = Math.max(0, s.slowT - dt);
@@ -264,7 +268,7 @@
       try { r = fn.apply(this, arguments); } finally { zScope = false; for (const q of P.all()) if (!before.has(q) && q.friendly && !q.__lakeZ) { q.__lakeZ = true; if (Number.isFinite(q.dmg)) q.dmg *= CFG.zDmg; } }
       return r; };
     const ucast = N.Ult.cast, uupd = N.Ult.update;
-    const zc = zWrap(ucast); N.Ult.cast = function (actor) { const r = zc.apply(this, arguments); if (r && actor && actor === N.Game.player && isTrio(actor.dex)) actor.ultCd = (Number(N.Ult.CD) || 90) * CFG.zCd; return r; };
+    const zc = zWrap(ucast); N.Ult.cast = function (actor) { const r = zc.apply(this, arguments); if (r && actor && actor === N.Game.player && isTrio(actor.dex)) { actor.ultCd = (Number(N.Ult.CD) || 90) * CFG.zCd; emit('z', { dex: Number(actor.dex) }); } return r; };
     N.Ult.update = zWrap(uupd);
     // drawing (world space, under the HUD)
     const du = N.Ult.drawUnits;

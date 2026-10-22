@@ -1,0 +1,187 @@
+/* LAKE GUARDIANS TALK — Uxie, Mesprit and Azelf speak to each other (portraits from assets/portraits/<dex>.png,
+   PMD SpriteCollab sheets: 5x4 grid of 40 px faces in the standard emotion order).
+   - A talk box with the speaker's portrait (Mystery Dungeon style) pops up bottom-left; emote bubbles pop over heads.
+   - Played alone: lonely, sad and scared lines (they miss the other two).
+   - Summoning one of the others: a reunion, hearts. Hurting one makes the others angry; a faint makes them cry out;
+     coming back is a teary relief. They also cheer on each other's skills, react to bosses and to their Z-Move,
+     and chat now and then while together.
+   Personalities: Uxie (knowledge) calm, logical, quietly protective · Mesprit (emotion) warm, teasing, empathic ·
+   Azelf (willpower) brash, hot-headed, secretly the softest of the three. Needs js/lake-trio.js. */
+(() => {
+  'use strict';
+  if (window.PS_LAKE_TALK_INSTALLED) return; window.PS_LAKE_TALK_INSTALLED = true;
+  const E = () => window.PS_HOOPA_ENGINE, TAU = Math.PI * 2;
+  const NAME = { 480: 'Uxie', 481: 'Mesprit', 482: 'Azelf' }, COLOR = { 480: '#ffd84a', 481: '#ff8ad0', 482: '#5ab0ff' };
+  const FACE = { normal: 0, happy: 1, pain: 2, angry: 3, worried: 4, sad: 5, crying: 6, shouting: 7, teary: 8, determined: 9, joyous: 10, inspired: 11, surprised: 12, dizzy: 13, sigh: 16, stunned: 17 };
+  const CFG = { gap: 5, aloneEvery: [45, 75], chatEvery: [55, 90] };   // seconds between low-priority lines, lonely lines, banter
+
+  // ================= lines: [face, text, emote] — {name} = the Pokemon being talked about =================
+  const L = {
+    480: {   // Uxie: calm, logical, quietly protective
+      aloneStart: [['sigh', 'Mesprit... Azelf... I calculated a hundred ways this could go. In none of them was I alone.', 'dots'], ['sad', 'The lake is so quiet without the other two. I keep listening for their voices.', 'dots'], ['worried', 'Knowledge says I can survive alone. Something else says I shouldn\'t have to.', 'sweat']],
+      alone: [['sad', '...I keep turning to explain things to Azelf. There\'s no one there.', 'dots'], ['sigh', 'Mesprit would be laughing at me for talking to myself by now.', 'dots'], ['worried', 'Too many of them. Too few of us. ...Too few of me.', 'sweat'], ['teary', 'If I close my eyes, it almost feels like the three of us are back at the lake.', 'tear'], ['sad', 'All the knowledge in the world, and I don\'t know how to stop missing them.', 'dots']],
+      aloneHurt: [['worried', 'Th-this is... statistically very bad. I need them. I need them here.', 'sweat'], ['teary', 'Mesprit... Azelf... please, wherever you are... I can\'t hold this alone.', 'tear'], ['crying', 'I-I\'m scared... I know I shouldn\'t be, but I am...', 'tear']],
+      bigHit: [['stunned', '...What... was that? My thoughts are scattered...', 'question'], ['dizzy', 'Ugh... I didn\'t foresee that. I always foresee things...', 'question']],
+      call: { 481: [['joyous', 'Mesprit! I knew— no, I HOPED you\'d answer. Come here!', 'heart'], ['happy', 'Mesprit, I need you. ...And not only tactically.', 'heart']], 482: [['joyous', 'Azelf! Your timing is impulsive and perfect, as always!', 'heart'], ['happy', 'Azelf, stand with me. I\'ve calculated we\'re stronger together.', 'heart']] },
+      arrive: { 481: [['happy', 'I felt your heart racing, Mesprit, so I came. Stay behind me.', 'heart'], ['determined', 'I\'m here. I\'ve analyzed every enemy. None of them will touch you.', 'note']], 482: [['happy', 'Azelf. Breathe. I\'m here now — let\'s think before we charge. ...A little.', 'heart'], ['determined', 'You called and I came. Point me at the problem.', 'note']] },
+      again: [['teary', '...I\'m back. I\'m sorry I scared you. I won\'t let that happen twice.', 'tear'], ['determined', 'I\'ve reformed. And I\'ve learned exactly how they hit me. It won\'t work again.', 'exclaim']],
+      angry: [['angry', 'You will NOT touch {name}. I have memorized your every move.', 'anger'], ['angry', 'Step away from {name}. That is the last calm thing I will say.', 'anger'], ['determined', 'Hurt {name} again and I\'ll make you forget your own name.', 'anger']],
+      pain: [['pain', 'Ngh... I\'m fine. I\'m built for this.', 'sweat'], ['pain', 'That... was within my margin of error. Barely.', 'sweat']],
+      faint: [['shouting', '{name}!! NO — get up, please get up!', 'exclaim'], ['crying', '{name}... I promised I\'d protect you...', 'tear']],
+      cry: [['crying', '{name}... no... not again...', 'tear'], ['teary', 'Hold on, {name}... the lake will bring you back. It has to.', 'tear']],
+      reunion: [['joyous', '{name}! You\'re back! Don\'t ever do that to me again!', 'heart'], ['teary', 'Welcome back, {name}. I may have... calculated the worst.', 'heart']],
+      ownerLow: [['worried', '{name}, fall back behind me! I\'ll take the hits!', 'sweat'], ['determined', 'Stay close, {name}. Nothing reaches you while I\'m standing.', 'exclaim']],
+      lostLast: [['sad', '...Alone again. I hate how familiar this silence feels.', 'dots']],
+      boss: [['surprised', 'That one\'s... large. Recalculating. Recalculating!', 'exclaim'], ['surprised', 'Everyone, focus! That signature is far beyond the others!', 'exclaim']],
+      z: [['inspired', 'Knowledge, emotion, willpower — together! Now!', 'spark'], ['inspired', 'This is the answer to every problem. All of us, at once!', 'spark']],
+      skill: { cosmic: [['determined', 'Cosmic Power. Stand inside my shield.', 'note'], ['determined', 'Defense rising. Trust the numbers.', 'note']], shove: [['angry', 'Back. Away. From. My. Family.', 'anger']], recover: [['happy', 'Recovering... and sharing it with you all.', 'note']] },
+      chat: [['happy', 'Mesprit says I think too much. I\'ve thought about it, and she\'s right.', 'note'], ['joyous', 'Being together like this... I could study this feeling forever.', 'heart'], ['inspired', 'Did you know we\'re stronger as three than the sum of us? I checked.', 'spark'], ['happy', 'Azelf, stop showing off. ...Fine. It was impressive.', 'heart']],
+      level: [['inspired', 'We\'re growing. I can feel it in my mind.', 'spark']] },
+    481: {   // Mesprit: warm, teasing, empathic
+      aloneStart: [['sad', 'Uxie? Azelf? ...It\'s so quiet. I can\'t feel your hearts from here.', 'dots'], ['teary', 'I\'m the Being of Emotion and right now all I feel is lonely.', 'tear'], ['worried', 'I don\'t like this. I don\'t like being the only one.', 'sweat']],
+      alone: [['sigh', 'Uxie would have a plan by now. Azelf would have charged already. And me? I just miss them.', 'dots'], ['sad', 'Every heart out here is angry or scared. None of them are theirs.', 'dots'], ['teary', 'I keep making jokes and there\'s no one to laugh at them...', 'tear'], ['sad', 'Hey, lake... if you can hear me, send them back to me, okay?', 'dots'], ['worried', 'Being brave is Azelf\'s thing... I\'m just pretending really hard.', 'sweat']],
+      aloneHurt: [['crying', 'It hurts... I want Uxie\'s shield... I want Azelf\'s yelling... I want them!', 'tear'], ['worried', 'N-no no no, I can\'t fall here, not alone, not like this...', 'sweat'], ['teary', 'Someone... anyone... please...', 'tear']],
+      bigHit: [['stunned', 'Wh— everything\'s spinning~ That was NOT a nice feeling!', 'question'], ['dizzy', 'Ooh... I think I saw three of me. That\'s still not enough...', 'question']],
+      call: { 480: [['joyous', 'Uxie!! I knew you\'d come! Okay, I hoped. Same thing~', 'heart'], ['happy', 'Uxie, come shield me and tell me I\'m being reckless. I missed it!', 'heart']], 482: [['joyous', 'Azelf! Get over here, you wonderful hothead!', 'heart'], ['happy', 'Azelf~! Come on, I saved you the biggest ones!', 'heart']] },
+      arrive: { 480: [['happy', 'Did you miss me, Uxie? Your heart says yes. Your face says "logically, yes."', 'heart'], ['joyous', 'I\'m here! I could feel how lonely you were from across the lake~', 'heart']], 482: [['joyous', 'Azelf! I felt you calling — loud as ever~', 'heart'], ['happy', 'You were lonely. Don\'t argue, I can FEEL it. I\'m here now.', 'heart']] },
+      again: [['teary', 'I\'m back... I\'m okay... I could feel you worrying the whole time.', 'tear'], ['happy', 'Miss me? Don\'t answer, I already know~', 'heart']],
+      angry: [['angry', 'HEY! Nobody makes {name} cry but ME!', 'anger'], ['angry', 'You hurt {name}?! Oh, you are SO getting it now!', 'anger'], ['shouting', 'Get AWAY from {name}!', 'anger']],
+      pain: [['pain', 'Ow ow ow! Okay, that one stung!', 'sweat'], ['pain', 'I\'m fine! Mostly! Kind of!', 'sweat']],
+      faint: [['shouting', '{name}!!! No, no, no — look at me!', 'exclaim'], ['crying', '{name}... I can\'t feel your heart anymore...', 'tear']],
+      cry: [['crying', '{name}... come back... please come back...', 'tear'], ['crying', 'This isn\'t fair... we just found each other again...', 'tear']],
+      reunion: [['joyous', '{name}!! You\'re okay! Hug! Group hug! Now!', 'heart'], ['teary', 'Don\'t you EVER scare me like that again, {name}...', 'heart']],
+      ownerLow: [['worried', '{name}, you\'re hurt! Hold on, I\'m coming!', 'sweat'], ['worried', 'Your heart is racing, {name}! Let me help!', 'sweat']],
+      lostLast: [['crying', 'Alone again... I really hate this feeling...', 'tear']],
+      boss: [['surprised', 'Eek! That one\'s HUGE! And so grumpy!', 'exclaim'], ['surprised', 'Whoa — that one\'s heart is pure rage!', 'exclaim']],
+      z: [['inspired', 'All three hearts at once — here we gooo!', 'spark'], ['joyous', 'Together! This is my favorite feeling in the world!', 'spark']],
+      skill: { wish: [['happy', 'Healing Wish! Everybody, feel better~', 'heart']], lullaby: [['happy', 'Shhh... sleep tight, meanies~', 'note']], protect: [['determined', 'Protect! I\'ve got you!', 'exclaim']] },
+      chat: [['happy', 'Uxie, you\'re overthinking again. I can tell, your eyebrows are doing the thing.', 'note'], ['joyous', 'Azelf, admit it, you missed us. ...Your heart just said yes!', 'heart'], ['happy', 'This is nice. Fighting monsters, sure, but together~', 'heart'], ['inspired', 'Knowledge, emotion, willpower. We\'re basically unbeatable!', 'spark']],
+      level: [['joyous', 'We leveled up! Celebration! Okay, celebrate later, fight now!', 'spark']] },
+    482: {   // Azelf: brash, hot-headed, secretly the softest
+      aloneStart: [['sigh', 'Tch. Fine. I don\'t need them. ...I don\'t.', 'dots'], ['sad', '...Uxie? Mesprit? Guys? This isn\'t funny.', 'dots'], ['worried', 'Since when is it this quiet? Since when am I this... small?', 'sweat']],
+      alone: [['sad', 'I\'d never say it out loud, but... I miss them. A lot.', 'dots'], ['sigh', 'Uxie would tell me I\'m being reckless. Wish he were here to say it.', 'dots'], ['teary', 'Willpower, willpower... why does willpower feel so lonely?', 'tear'], ['angry', 'I can do this alone! I can! ...I just don\'t want to.', 'anger'], ['sad', 'Mesprit would know what I\'m feeling. I don\'t even know.', 'dots']],
+      aloneHurt: [['crying', 'D-damn it... I\'m not scared! I\'m not... I just want them here...', 'tear'], ['worried', 'Too many... Uxie, where are you?! Mesprit?!', 'sweat'], ['teary', 'I can\'t lose here. I can\'t. ...Somebody...', 'tear']],
+      bigHit: [['stunned', 'Gah—! Who— which one of you did that?!', 'question'], ['dizzy', 'The sky\'s spinning... no it\'s not, I\'M spinning...', 'question']],
+      call: { 480: [['joyous', 'UXIE! Get over here, brainiac! I need a plan — and you!', 'heart'], ['happy', 'Uxie... yeah, I called. Don\'t make it weird.', 'heart']], 481: [['joyous', 'MESPRIT! Finally! Okay, okay, I\'m happy, don\'t read my heart!', 'heart'], ['happy', 'Mesprit, come on! It\'s way less fun without you yelling at me!', 'heart']] },
+      arrive: { 480: [['determined', 'Uxie! I\'m here! Point at something and I\'ll blow it up!', 'exclaim'], ['happy', 'You called me? Ha! Knew you couldn\'t do it without me!', 'heart']], 481: [['happy', 'Mesprit! I\'m here, I\'m here! Who made you sad? I\'ll fight them.', 'heart'], ['joyous', 'Missed me? ...Yeah. Me too.', 'heart']] },
+      again: [['determined', 'I\'m BACK! Did you think a little faint would stop ME?!', 'exclaim'], ['teary', '...Sorry. I got careless. I\'m here now. I\'m not leaving.', 'tear']],
+      angry: [['angry', 'THAT\'S IT. Nobody hurts {name} and walks away!', 'anger'], ['shouting', 'HEY! That\'s MY {name}! You\'re DONE!', 'anger'], ['angry', 'You just made the worst mistake of your life. {name} is family.', 'anger']],
+      pain: [['pain', 'Gh— that\'s nothing! NOTHING!', 'sweat'], ['pain', 'Ow! Okay — okay, that one actually hurt.', 'sweat']],
+      faint: [['shouting', '{name}!!! NO! GET UP, YOU HEAR ME?!', 'exclaim'], ['crying', '{name}... no... this is my fault...', 'tear']],
+      cry: [['crying', '{name}... I should\'ve been faster... I\'m sorry...', 'tear'], ['angry', 'You\'ll PAY for {name}. Every last one of you!', 'anger']],
+      reunion: [['joyous', '{name}! You\'re back!! Don\'t— don\'t ever do that again, got it?!', 'heart'], ['teary', 'I wasn\'t crying. Shut up. Welcome back, {name}.', 'heart']],
+      ownerLow: [['worried', '{name}! You\'re hurt — stay back, I\'ll handle it!', 'sweat'], ['angry', 'Who touched {name}?! I\'ll take them ALL down!', 'anger']],
+      lostLast: [['sad', '...Alone again. I hate this. I HATE this.', 'dots']],
+      boss: [['determined', 'A big one! Finally, something worth hitting!', 'exclaim'], ['surprised', 'Whoa — okay, that\'s bigger than I thought. Still hitting it!', 'exclaim']],
+      z: [['inspired', 'TOGETHER! Let\'s show them what the three of us can do!', 'spark'], ['shouting', 'ALL OF US — FULL POWER!!', 'spark']],
+      skill: { boost: [['shouting', 'PSYCHO BOOST! Take THAT!', 'exclaim']], plot: [['determined', 'Nasty Plot. Everyone, hit HARDER.', 'spark']], future: [['determined', 'Future Sight. In a second, that whole crowd\'s gone.', 'note']] },
+      chat: [['happy', 'Uxie, I took out more than you. Don\'t count, just trust me.', 'note'], ['joyous', 'This is way better than fighting alone. ...Don\'t tell anyone I said that.', 'heart'], ['determined', 'Mesprit, watch this one! ...Did you see?! Did you see?!', 'exclaim'], ['happy', 'Being together like this... yeah. This is good.', 'heart']],
+      level: [['determined', 'Stronger! We\'re getting STRONGER!', 'spark']] } };
+
+  // ================= talk box =================
+  const css = document.createElement('style');
+  css.textContent = `
+  #ps-lake-talk{position:fixed;left:16px;bottom:132px;z-index:60;width:min(440px,calc(100vw - 32px));display:flex;gap:10px;align-items:stretch;pointer-events:none;
+    padding:8px;border-radius:12px;background:linear-gradient(180deg,#2c519f,#1a3170);border:3px solid #f4f8ff;box-shadow:inset 0 0 0 2px #5b83d6,0 4px 0 rgba(0,0,0,.35);
+    color:#fff;font:15px Pixelify,system-ui,sans-serif;opacity:0;transform:translateY(12px);transition:opacity .2s,transform .2s}
+  #ps-lake-talk.on{opacity:1;transform:none}
+  #ps-lake-talk .pf{flex:none;width:80px;height:80px;border-radius:6px;border:3px solid #f4f8ff;box-shadow:0 0 0 2px #0b1838;background-repeat:no-repeat;background-size:400px 320px;image-rendering:pixelated;background-color:#0b1838}
+  #ps-lake-talk .tx{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+  #ps-lake-talk .nm{font-weight:700;font-size:16px;margin-bottom:2px;text-shadow:2px 2px 0 #0b1838}
+  #ps-lake-talk .ln{line-height:1.3;text-shadow:1px 1px 0 #0b1838;min-height:2.6em}
+  @media (max-width:700px),(max-height:520px){#ps-lake-talk{bottom:auto;top:58px;font-size:13px}#ps-lake-talk .pf{width:60px;height:60px;background-size:300px 240px}}`;
+  const box = document.createElement('div'); box.id = 'ps-lake-talk';
+  box.innerHTML = '<div class="pf"></div><div class="tx"><div class="nm"></div><div class="ln"></div></div>';
+  const pf = box.querySelector('.pf'), nm = box.querySelector('.nm'), ln = box.querySelector('.ln');
+  const queue = []; let cur = null, lastLow = -1e9;
+  function face(dex, f) { const i = FACE[f] ?? 0, k = pf.offsetWidth / 40 || 2; pf.style.backgroundImage = 'url(assets/portraits/' + dex + '.png)'; pf.style.backgroundPosition = -(i % 5) * 40 * k + 'px ' + -Math.floor(i / 5) * 40 * k + 'px'; }
+  const recent = {};
+  function pick(list) { if (!list || !list.length) return null; const key = list[0][1]; const last = recent[key]; let i = Math.floor(Math.random() * list.length); if (list.length > 1 && i === last) i = (i + 1) % list.length; recent[key] = i; return list[i]; }
+  // say: dex speaks one of the lines; prio lines skip the gap and cut the queue
+  function say(dex, list, o) {
+    o = o || {}; const ln0 = pick(list); if (!ln0 || !NAME[dex]) return false; const now = clock();
+    if (!o.prio && (cur || queue.length || now - lastLow < CFG.gap)) return false;
+    if (!o.prio) lastLow = now;
+    const item = { dex, face: ln0[0], text: ln0[1].replace(/\{name\}/g, o.name || ''), emote: ln0[2], delay: o.delay || 0 };
+    if (o.prio && queue.length > 2) queue.splice(0, queue.length - 2);
+    queue.push(item); return true;
+  }
+  const clock = () => performance.now() / 1000;
+  function show(it) { cur = { it, t: 0, dur: Math.max(2.8, Math.min(6, 1.6 + it.text.length * 0.045)) }; nm.textContent = NAME[it.dex]; nm.style.color = COLOR[it.dex]; face(it.dex, it.face); ln.textContent = ''; box.classList.add('on'); if (it.emote) emote(it.dex, it.emote); }
+  function tickBox(dt) {
+    if (!cur) { const nx = queue[0]; if (nx) { nx.delay -= dt; if (nx.delay <= 0) show(queue.shift()); } return; }
+    cur.t += dt; const n = Math.min(cur.it.text.length, Math.floor(cur.t * 45)); if (ln.textContent.length !== n) ln.textContent = cur.it.text.slice(0, n);
+    if (cur.t >= cur.dur) { cur = null; if (!queue.length) box.classList.remove('on'); }
+  }
+
+  // ================= emote bubbles (world space) =================
+  const emotes = [];
+  function where(dex) { const p = E()?.Game?.player; if (p && Number(p.dex) === Number(dex)) return p; const s = window.PS_LAKE?._ally?.(dex); return s && !s.dead && s.spawnT >= 1.4 ? s : null; }
+  function emote(dex, kind) { for (let i = emotes.length - 1; i >= 0; i--) if (emotes[i].dex === dex) emotes.splice(i, 1); emotes.push({ dex, kind, t: 0, life: 2.4, hearts: kind === 'heart' ? [0, 1, 2].map(i => ({ dx: (i - 1) * 9, d: i * 0.25 })) : null }); }
+  function heartPath(ctx, x, y, s) { ctx.beginPath(); ctx.moveTo(x, y + s * 0.35); ctx.bezierCurveTo(x - s * 1.1, y - s * 0.35, x - s * 0.45, y - s * 1.05, x, y - s * 0.4); ctx.bezierCurveTo(x + s * 0.45, y - s * 1.05, x + s * 1.1, y - s * 0.35, x, y + s * 0.35); }
+  function drop(ctx, x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y - s); ctx.quadraticCurveTo(x + s * 0.8, y, x, y + s * 0.55); ctx.quadraticCurveTo(x - s * 0.8, y, x, y - s); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(x - s * 0.25, y - s * 0.2, s * 0.2, s * 0.35); }
+  function drawEmote(ctx, e, x, y) {
+    const pop = Math.min(1, e.t / 0.15), fade = Math.min(1, (e.life - e.t) / 0.3), bob = Math.sin(e.t * 6) * 1.5;
+    ctx.save(); ctx.globalAlpha = fade; ctx.translate(x, y + bob); ctx.scale(pop, pop);
+    // bubble
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#1a1030'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-12, -11); ctx.arcTo(13, -11, 13, 9, 6); ctx.arcTo(13, 9, -12, 9, 6); ctx.lineTo(3, 9); ctx.lineTo(-2, 15); ctx.lineTo(-3, 9); ctx.arcTo(-12, 9, -12, -11, 6); ctx.arcTo(-12, -11, 13, -11, 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    const k = e.kind;
+    if (k === 'heart') { heartPath(ctx, 0.5, 0, 8); ctx.fillStyle = '#ff4f86'; ctx.fill(); ctx.fillStyle = '#ffd0e0'; ctx.fillRect(-4, -4, 2, 2); }
+    else if (k === 'anger') { ctx.strokeStyle = '#e8303a'; ctx.lineWidth = 2.5; for (let i = 0; i < 4; i++) { ctx.save(); ctx.rotate(i * Math.PI / 2 + Math.PI / 4); ctx.beginPath(); ctx.moveTo(2, -6); ctx.quadraticCurveTo(2, -2, 6, -2); ctx.stroke(); ctx.restore(); } }
+    else if (k === 'sweat') drop(ctx, 1, 0, 7, '#4aa8ff');
+    else if (k === 'tear') { drop(ctx, -4, 1, 5, '#4aa8ff'); drop(ctx, 5, -1, 5, '#4aa8ff'); }
+    else { ctx.fillStyle = k === 'exclaim' ? '#e8303a' : k === 'spark' ? '#f0b400' : k === 'note' ? '#7a4cff' : '#1a1030'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(k === 'exclaim' ? '!' : k === 'question' ? '?' : k === 'note' ? '♪' : k === 'spark' ? '★' : '...', 0.5, k === 'dots' ? -2 : 0); }
+    ctx.restore();
+    if (e.hearts) for (const h of e.hearts) { const u = e.t - h.d; if (u <= 0 || u > 1.6) continue; ctx.save(); ctx.globalAlpha = Math.max(0, 1 - u / 1.6); heartPath(ctx, x + h.dx + Math.sin(u * 5 + h.dx) * 4, y - 16 - u * 26, 4.5); ctx.fillStyle = '#ff6a9a'; ctx.fill(); ctx.restore(); }
+  }
+  function drawEmotes(ctx) { for (const e of emotes) { const w = where(e.dex); if (!w) continue; const h = Number(w.bodyH) || 40; drawEmote(ctx, e, w.x + 14, w.psLake !== undefined || w.caster ? w.y - 78 : w.y - h - 30); } }   // allies: above their name label
+
+  // ================= what they react to =================
+  let runP = null, aloneT = 0, chatT = 0, lastHp = 0, low = false, bigCd = 0, bossCd = 0, lvl = 0, lostLastCd = 0;
+  const seenBoss = new WeakSet();
+  const me = () => { const p = E()?.Game?.player; return p && NAME[Number(p.dex)] ? p : null; };
+  const live = () => (window.PS_LAKE?.allies || []).filter(a => !a.dead && !a.spawning).map(a => a.dex);
+  const party = () => { const p = me(); return p ? [Number(p.dex), ...live()] : []; };
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  function onLake(ev) {
+    const d = ev.detail || {}, p = me(); if (!p) return; const P = Number(p.dex), dex = Number(d.dex);
+    if (d.type === 'summon') { if (!d.again) say(P, L[P].call[dex], { prio: true }); }
+    else if (d.type === 'arrive') {
+      if (d.again) { say(dex, L[dex].again, { prio: true }); say(P, L[P].reunion, { prio: true, name: NAME[dex], delay: 0.4 }); }
+      else { say(dex, L[dex].arrive[P], { prio: true, delay: 0.2 }); setTimeout(() => emote(P, 'heart'), 300); }
+      aloneT = 0; }
+    else if (d.type === 'hurt') { say(dex, L[dex].pain, { prio: true }); const others = party().filter(x => x !== dex); const by = others[Math.floor(Math.random() * others.length)]; if (by) say(by, L[by].angry, { prio: true, name: NAME[dex], delay: 0.3 }); }
+    else if (d.type === 'faint') { const others = party().filter(x => x !== dex); others.forEach((by, i) => say(by, i === 0 ? L[by].faint : L[by].cry, { prio: true, name: NAME[dex], delay: i * 0.3 }));
+      if (!live().filter(x => x !== dex).length && clock() > lostLastCd) { lostLastCd = clock() + 60; say(P, L[P].lostLast, { prio: true, delay: 0.5 }); } }
+    else if (d.type === 'skill') { const S = L[dex] && L[dex].skill && L[dex].skill[d.skill]; if (S && Math.random() < 0.35) say(dex, S); }
+    else if (d.type === 'z') { const all = party(); all.forEach((by, i) => say(by, L[by].z, { prio: true, delay: i * 0.25 })); }
+  }
+  addEventListener('ps-lake', onLake);
+  function watch(dt) {
+    const N = E(), g = N?.Game, p = me();
+    if (!p || !g || g.state === 'over' || g.state === 'ui') { if (runP) { runP = null; queue.length = 0; cur = null; box.classList.remove('on'); emotes.length = 0; } return; }
+    if (p !== runP) { runP = p; aloneT = 3; chatT = rnd(...CFG.chatEvery); lastHp = p.hp; low = false; lvl = p.level; bigCd = 0; bossCd = 0; queue.length = 0; cur = null; }
+    if (g.state !== 'playing') return;
+    const P = Number(p.dex), allies = live(), alone = !allies.length && !(window.PS_LAKE?.allies || []).some(a => a.spawning);
+    // alone: lonely, sad, scared
+    if (alone) { aloneT -= dt; if (aloneT <= 0) { say(P, runP.__lakeStarted ? L[P].alone : L[P].aloneStart, { prio: !runP.__lakeStarted }); runP.__lakeStarted = true; aloneT = rnd(...CFG.aloneEvery); } }
+    else { chatT -= dt; if (chatT <= 0) { chatT = rnd(...CFG.chatEvery); const all = party(); const by = all[Math.floor(Math.random() * all.length)]; if (say(by, L[by].chat)) { const other = all.find(x => x !== by); if (other) setTimeout(() => emote(other, 'heart'), 900); } } }
+    // your HP
+    const f = p.hp / p.maxHp; bigCd -= dt; bossCd -= dt;
+    if (lastHp - p.hp > p.maxHp * 0.22 && bigCd <= 0) { bigCd = 25; say(P, L[P].bigHit, { prio: true }); }
+    if (!low && f < 0.35) { low = true; if (alone) say(P, L[P].aloneHurt, { prio: true }); else { const by = allies[Math.floor(Math.random() * allies.length)]; say(by, L[by].ownerLow, { prio: true, name: NAME[P] }); } }
+    if (low && f > 0.6) low = false; lastHp = p.hp;
+    // bosses
+    if (bossCd <= 0) for (const e of N.EnemyMgr.all()) { if (!e || e.dead || !(e.boss || e.legend) || seenBoss.has(e)) continue; seenBoss.add(e); bossCd = 40; const all = party(); const by = all[Math.floor(Math.random() * all.length)]; say(by, L[by].boss, { prio: true }); break; }
+    // level ups (with company)
+    if (p.level > lvl) { lvl = p.level; if (!alone && Math.random() < 0.4) { const all = party(); const by = all[Math.floor(Math.random() * all.length)]; say(by, L[by].level); } }
+  }
+  let last = performance.now();
+  function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.1, (now - last) / 1000); last = now; try { watch(dt); tickBox(dt); for (let i = emotes.length - 1; i >= 0; i--) if ((emotes[i].t += dt) > emotes[i].life) emotes.splice(i, 1); } catch (e) { console.warn('[lake-talk]', e); } }
+  let hooked = false;
+  function hook() { const N = E(); if (hooked || !N || !N.Ult || !N.Ult.drawUnits) return; hooked = true; const du = N.Ult.drawUnits; N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { if (me()) drawEmotes(ctx); } catch (e) { console.warn('[lake-talk]', e); } }; }
+  function init() { document.head.append(css); document.body.append(box); for (const d of [480, 481, 482]) { const i = new Image(); i.src = 'assets/portraits/' + d + '.png'; } (function h() { hook(); if (!hooked) setTimeout(h, 200); })(); requestAnimationFrame(loop); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
+  window.PS_LAKE_TALK = { lines: L, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, cfg: CFG };
+})();
