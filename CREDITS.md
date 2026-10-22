@@ -7,6 +7,9 @@ Los sprites estilo *Pokémon Mundo Misterioso* vienen de
 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/):
 uso **no comercial** y con atribución a sus artistas.
 
+Los retratos de Uxie, Mesprit y Azelf (`assets/portraits/480.png`, `481.png`, `482.png`, usados en sus
+diálogos) también son hojas de retratos de SpriteCollab, con la misma licencia.
+
 | Artista | Contacto | Sprites (nº de Pokédex) |
 |---|---|---|
 | 3Monika4 | <@270755102178934785> | 20, 61, 63 |
