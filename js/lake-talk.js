@@ -46,7 +46,8 @@
       standEnd: [['determined', 'The shield\'s fading... I\'ve recovered enough. Back to work.', 'note'], ['sigh', 'Thank you... I\'m okay now. Mostly.', 'dots']],
       cheerConfuse: [['happy', 'Well done, Mesprit. Chaos, applied precisely.', 'note']],
       riseMax: [['inspired', 'Azelf\'s fire is in my veins. ...Figuratively. Mostly.', 'spark'], ['surprised', 'Fifty percent?! Azelf, that\'s — that\'s actually remarkable!', 'exclaim']],
-      thanks: [['happy', 'Thank you, Mesprit. That was... very warm.', 'heart'], ['happy', 'Ah... much better. You always know exactly what I need.', 'heart']] },
+      thanks: [['happy', 'Thank you, Mesprit. That was... very warm.', 'heart'], ['happy', 'Ah... much better. You always know exactly what I need.', 'heart']],
+      mystic: { push: [['determined', 'Mystical Power. Five studs back — exactly as calculated.', 'spark'], ['determined', 'Shields up, sisters. And you lot — out of our space.', 'anger'], ['happy', 'Knowledge is a wall. Lean on it.', 'note']] } },
     481: {   // Mesprit: warm, teasing, empathic
       aloneStart: [['sad', 'Uxie? Azelf? ...It\'s so quiet. I can\'t feel your hearts from here.', 'dots'], ['teary', 'I\'m the Being of Emotion and right now all I feel is lonely.', 'tear'], ['worried', 'I don\'t like this. I don\'t like being the only one.', 'sweat']],
       alone: [['sigh', 'Uxie would have a plan by now. Azelf would have charged already. And me? I just miss them.', 'dots'], ['sad', 'Every heart out here is angry or scared. None of them are theirs.', 'dots'], ['teary', 'I keep making jokes and there\'s no one to laugh at them...', 'tear'], ['sad', 'Hey, lake... if you can hear me, send them back to me, okay?', 'dots'], ['worried', 'Being brave is Azelf\'s thing... I\'m just pretending really hard.', 'sweat']],
@@ -75,7 +76,9 @@
       guardUxie: [['determined', 'Uxie! Over here, I\'ve got you!', 'exclaim'], ['worried', 'Get behind me, Uxie! Nobody touches you!', 'sweat']],
       cheerConfuse: [['joyous', 'Hehe, look at it go! Uxie made it dizzy~', 'note'], ['happy', 'Uxie! That one\'s punching its own friends!', 'note']],
       riseMax: [['joyous', 'I can feel Azelf\'s heart burning — it\'s contagious!', 'spark'], ['inspired', 'Fifty percent! Azelf, you\'re on FIRE~!', 'spark']],
-      rise: [['happy', 'Ooh, I feel faster! Thanks, Azelf~', 'spark']] },
+      rise: [['happy', 'Ooh, I feel faster! Thanks, Azelf~', 'spark']],
+      mystic: { boost: [['joyous', 'Mystical Power — and a little extra love for my sisters~!', 'heart'], ['inspired', 'Twenty percent more! Feel my heart, both of you!', 'spark']],
+        fear: [['happy', 'Mystical Power! Now walk it back, meanies~', 'note'], ['determined', 'Shoo! Backwards, all of you!', 'exclaim'], ['happy', 'Feel that? That\'s how scary a big sister can be~', 'note']] } },
     482: {   // Azelf: brash, hot-headed, secretly the softest
       aloneStart: [['sigh', 'Tch. Fine. I don\'t need them. ...I don\'t.', 'dots'], ['sad', '...Uxie? Mesprit? Guys? This isn\'t funny.', 'dots'], ['worried', 'Since when is it this quiet? Since when am I this... small?', 'sweat']],
       alone: [['sad', 'I\'d never say it out loud, but... I miss them. A lot.', 'dots'], ['sigh', 'Uxie would tell me I\'m being reckless. Wish he were here to say it.', 'dots'], ['teary', 'Willpower, willpower... why does willpower feel so lonely?', 'tear'], ['angry', 'I can do this alone! I can! ...I just don\'t want to.', 'anger'], ['sad', 'Mesprit would know what I\'m feeling. I don\'t even know.', 'dots']],
@@ -101,7 +104,8 @@
       riseMax: [['shouting', 'FIFTY PERCENT! NOTHING can stop us now!!', 'spark'], ['inspired', 'MAX POWER! Sisters — let\'s END this!', 'spark']],
       guardUxie: [['angry', 'Uxie! Behind me, NOW! I\'ll handle these jerks!', 'anger'], ['determined', 'I\'ve got you, Uxie. Breathe. I\'m right here.', 'exclaim']],
       cheerConfuse: [['happy', 'Ha! It\'s hitting its own buddies! Nice one!', 'note'], ['joyous', 'Look at them fight each other! Do it again!', 'note']],
-      thanks: [['happy', 'Th-thanks, Mesprit. I wasn\'t hurt. Much.', 'heart'], ['happy', '...Okay, that felt nice. Don\'t make it a thing.', 'heart']] } };
+      thanks: [['happy', 'Th-thanks, Mesprit. I wasn\'t hurt. Much.', 'heart'], ['happy', '...Okay, that felt nice. Don\'t make it a thing.', 'heart']],
+      mystic: { power: [['determined', 'Mystical Power! Faster, stronger — ALL of us!', 'spark'], ['shouting', 'Take my willpower, sisters! Hit HARDER!', 'spark'], ['joyous', 'You feel that?! That\'s us!', 'spark']] } } };
 
   // ================= talk box =================
   const css = document.createElement('style');
@@ -192,6 +196,8 @@
       else if (Math.random() < 0.5) { if (say(482, L[482].rise) && Math.random() < 0.4 && party().includes(481)) say(481, L[481].rise, { delay: 0.2, follow: true }); } }
     else if (d.type === 'mesprit') {   // Mesprit's 5-second pulse
       if (Math.random() < 0.35 && say(481, L[481].pulse[d.kind]) && d.kind === 'heal') { const others = party().filter(x => x !== 481 && L[x].thanks); const by = others[Math.floor(Math.random() * others.length)]; if (by && Math.random() < 0.5) say(by, L[by].thanks, { delay: 0.2, follow: true }); } }
+    else if (d.type === 'mystical') {   // Mystical Power buffing the sisters
+      const S = L[dex] && L[dex].mystic && L[dex].mystic[d.kind]; if (S && Math.random() < (d.kind === 'boost' || d.kind === 'fear' ? 0.5 : 0.35)) say(dex, S); }
     else if (d.type === 'z') { const all = party(); all.forEach((by, i) => say(by, L[by].z, { prio: true, delay: i * 0.25 })); }
   }
   addEventListener('ps-lake', onLake);

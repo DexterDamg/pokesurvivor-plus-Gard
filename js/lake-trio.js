@@ -19,6 +19,9 @@
        Azelf    the main damage dealer. Her attacks can raise ATK and SPEED by 10% (up to +50%); like every buff she
                 gets, her sisters get it too. Lv1 Psystrike / Psycho Cut · Lv2 Nasty Plot (+2 stacks) ·
                 Lv3 Future Sight (delayed blast) · Lv4 Psycho Boost (huge single hit) · Lv5 all stronger.
+     MYSTICAL POWER (yours, and in each summoned sister's moveset) is a real buff on the buffs all three share:
+       Uxie +10% DEF and pushes enemies back 5 studs · Mesprit +10% ATK & DEF, then either +20% more or enemies walk
+       backwards for 5 s · Azelf +10% ATK & SPEED. Up to +50% per stat; the buff part works once every 6 s.
      Playing as one of them, you get her passives too (Uxie: confuse on hit + last stand; Mesprit: the 5 s pulse;
      Azelf: rising ATK & SPEED from your attacks).
    - Their Z-Move deals 3x the damage of a normal Z-Move, with twice the cooldown.
@@ -30,19 +33,21 @@
   const CFG = { respawn: 20, spawnTime: 1.4, meltTime: 1.0, moveCd: 12, zDmg: 3, zCd: 2, unlockLevel: 3,
     confuseOnHit: 0.10, confuseDur: 3, lastStand: 0.10, lastStandTime: 20, lastStandCd: 60,   // Uxie
     riseChance: 0.15, riseChancePlayer: 0.06, riseStep: 0.10, riseMax: 5, riseTime: 12,       // Azelf: +10% ATK & SPD per stack, up to +50%
-    mespritEvery: 5, mespritStun: 3, mespritConfuse: 3, mespritDrain: 0.05, mespritHeal: 0.10 };   // Mesprit
+    mespritEvery: 5, mespritStun: 3, mespritConfuse: 3, mespritDrain: 0.05, mespritHeal: 0.10,      // Mesprit
+    buffStep: 0.10, buffMax: 5, buffTime: 10,   // every trio buff is a +10% stack (up to +50%) on the buffs all three share
+    mysticCd: 6, mysticRadius: 260, stud: 32, pushStuds: 5, mespritExtra: 2, fearTime: 5 };   // Mystical Power
   const TRIO = {
     480: { key: 'uxie', name: 'Uxie', move: 'lake-uxie', role: 'Guardian', hp: 2.0, atk: 0.6, spd: 1.0, take: 0.8, leash: 260, dead: 90, ideal: 200,
       kit: ['confusion'], drop: ['#fff7c0', '#ffd84a', '#c8960c'], ring: '#ffd84a',
-      desc: 'Calls Uxie, a permanent guardian ally (on your right). Draws enemies but dodges them, buffs the team, confuses, stuns and pushes enemies back. Hitting her can confuse the attacker; near fainting she turns untouchable and runs to her sisters.',
-      ups: ['Cosmic Power: team defense that keeps rising', 'Recover: heals and shares regeneration', 'Psychic Shove: pushes enemies back and stuns them', 'Max: stronger in every way (defense up to 50%)'] },
+      desc: 'Calls Uxie, a permanent guardian ally (on your right). Draws enemies but dodges them. Her Mystical Power raises the DEF of all three sisters and pushes enemies back 5 studs; she also confuses and stuns. Hitting her can confuse the attacker; near fainting she turns untouchable and runs to her sisters.',
+      ups: ['Cosmic Power: +10% DEF for all three sisters', 'Recover: heals and shares regeneration', 'Psychic Shove: pushes enemies back and stuns them', 'Max: stronger in every way'] },
     481: { key: 'mesprit', name: 'Mesprit', move: 'lake-mesprit', role: 'Balance', hp: 1.25, atk: 1.1, spd: 1.0, take: 1, leash: 260, dead: 45, ideal: 170,
       kit: ['psybeam', 'confusion'], drop: ['#ffe0f4', '#ff8ad0', '#c0408a'], ring: '#ff8ad0',
-      desc: 'Calls Mesprit, a permanent all-round ally. Every 5 seconds she stuns, confuses, drains 5% HP from enemies or heals her sisters 10%, and she also buffs, shields and attacks.',
+      desc: 'Calls Mesprit, a permanent all-round ally. Her Mystical Power raises the ATK and DEF of all three sisters, then either 20% more or makes enemies walk backwards for 5 s. Every 5 seconds she stuns, confuses, drains 5% HP from enemies or heals her sisters 10%, and she also buffs, shields and attacks.',
       ups: ['Lullaby: slows and stuns the enemies around you', 'Protect: a short shield for the whole team', 'Healing Wish + Helping Hand: a big heal and a team buff', 'Max: stronger in every way'] },
     482: { key: 'azelf', name: 'Azelf', move: 'lake-azelf', role: 'DPS', hp: 0.8, atk: 2.0, spd: 1.15, take: 1, leash: 420, dead: 50, ideal: 150,
       kit: ['psystrike', 'psycho-cut', 'psybeam'], drop: ['#e0f2ff', '#5ab0ff', '#2060c0'], ring: '#5ab0ff',
-      desc: 'Calls Azelf, a permanent damage dealer (on your left). Her attacks can raise her ATK and SPEED by 10% (up to 50%), and every buff she gets is shared with her sisters.',
+      desc: 'Calls Azelf, a permanent damage dealer (on your left). Her Mystical Power raises the ATK and SPEED of all three sisters. Her attacks can raise her ATK and SPEED by 10% (up to 50%), and every buff she gets is shared with her sisters.',
       ups: ['Nasty Plot: two stacks of rising ATK & SPEED', 'Future Sight: a delayed psychic blast', 'Psycho Boost: a huge single hit', 'Max: stronger in every way'] } };
   const IDS = Object.keys(TRIO).map(Number), MOVE_DEX = {}; for (const d of IDS) MOVE_DEX[TRIO[d].move] = d;
   const isTrio = dex => !!TRIO[Number(dex)];
@@ -64,6 +69,11 @@
     const N = E(), M = N && N.Moves; if (registered || !M || !M.BY_ID || !Array.isArray(M.ALL)) return; registered = true;
     for (const d of IDS) { const def = moveDef(d); if (!M.BY_ID[def.id]) { M.ALL.push(def); M.BY_ID[def.id] = def; } }
   }
+  // Mystical Power's card text says what it now does (the moves come from js/legend-moves.js)
+  const MYSTIC_TEXT = { 'mystical-power-uxie': ' Raises the DEF of all three sisters and pushes enemies back 5 studs.',
+    'mystical-power-mesprit': ' Raises the ATK and DEF of all three sisters, then either 20% more or enemies walk backwards for 5 s.',
+    'mystical-power-azelf': ' Raises the ATK and SPEED of all three sisters.' };
+  function patchMystical() { const M = E()?.Moves; if (!M || !M.BY_ID) return; for (const id in MYSTIC_TEXT) { const d = M.BY_ID[id]; if (d && !d.__lake) { d.desc = (d.desc || '') + MYSTIC_TEXT[id]; d.__lake = true; } } }
   // level-up rewards: the other two summons (never your own), pushed to the front until learned
   function hookPool() {
     const M = E()?.Moves; if (!M || typeof M.poolFor !== 'function' || M.poolFor.__lake) return;
@@ -82,11 +92,10 @@
   // ================= the team =================
   let owner = null, ownerPos = null;
   const allies = {};   // dex -> ally
-  const team = { guard: 0, guardT: 0, protect: 0, protectT: 0 };
+  const team = { protect: 0, protectT: 0 };   // Protect: a short extra shield (the DEF buffs live on the shared buffs)
   const sights = [], fx = [];   // Future Sight markers, splash/melt effects
   const moveOf = (p, dex) => p && Array.isArray(p.moves) ? p.moves.find(m => m && m.id === TRIO[dex].move) : null;
   const lvlMul = s => 1 + 0.12 * ((s.lvl || 1) - 1);
-  const guardCap = s => Math.min(0.5, 0.25 + 0.05 * (s.lvl || 1));
   function sideFor(dex) {   // +1 right, -1 left
     if (dex === 482) return -1; if (dex === 480) return 1;
     return Number(owner && owner.dex) === 482 ? -1 : 1;   // Mesprit: whichever side is free
@@ -127,7 +136,7 @@
     if (s.hp <= 0 || s.dead) { s.hp = 0; s.dead = false; faint(s); return; }
     if (!s.low && s.hp < s.maxHp * 0.5) { s.low = true; emit('hurt', { dex: s.dex, frac: s.hp / s.maxHp }); }
   }
-  function clearAll() { for (const d of IDS) delete allies[d]; sights.length = 0; fx.length = 0; team.guard = team.guardT = team.protect = team.protectT = 0; team.pPulse = undefined; team.pStandT = team.pStandCd = 0; owner = null; ownerPos = null; }
+  function clearAll() { for (const d of IDS) delete allies[d]; sights.length = 0; fx.length = 0; team.protect = team.protectT = 0; team.pPulse = undefined; team.pStandT = team.pStandCd = 0; owner = null; ownerPos = null; }
 
   // ---- skills ----
   function foes() { const N = E(); return N.EnemyMgr.all().filter(e => e && !e.dead && !e.remote); }
@@ -154,7 +163,7 @@
   // Azelf: +10% ATK and SPEED per stack (up to +50%), on the shared buffs, so her sisters get it too
   function rise(n, from) {
     if (!owner) return; const B = owner.buffs || {}; const before = (B.atk && B.atk.n) || 0;
-    for (let i = 0; i < (n || 1); i++) { owner.addBuff('atk', CFG.riseStep, CFG.riseTime, CFG.riseMax); owner.addBuff('spd', CFG.riseStep, CFG.riseTime, CFG.riseMax); }
+    teamBuff('atk', n || 1); teamBuff('spd', n || 1);
     const now = (B.atk && B.atk.n) || 0; if (now <= before) return;
     const x = from ? from.x : owner.x, y = from ? from.y : owner.y; say(x, y - 56, 'ATK & SPD +' + now * 10 + '%', '#5ab0ff');
     for (const m of teamPos()) try { E().FX.ring(m.x, m.y, 6, 44, '#5ab0ff', 0.45, 4); } catch (_) {}
@@ -178,25 +187,52 @@
   }
   // Uxie: below 10% HP she turns untouchable for 20 s and runs to one of her sisters
   function lastStand(s) { s.standT = CFG.lastStandTime; s.standCd = CFG.lastStandTime + CFG.lastStandCd; say(s.x, s.y - 56, 'Untouchable!', '#ffe27a'); sfx('shield'); emit('stand', { dex: 480 }); }
+  // a real buff on the shared buff pool: it shows on the HUD, in the Stats panel, and reaches all three sisters
+  function teamBuff(stat, n) { if (!owner) return; for (let i = 0; i < (n || 1); i++) owner.addBuff(stat, CFG.buffStep, CFG.buffTime, CFG.buffMax); }
+  const stacks = stat => (owner && owner.buffs && owner.buffs[stat] && owner.buffs[stat].n) || 0;
+  // MYSTICAL POWER — Uxie: DEF + pushes enemies back 5 studs · Mesprit: ATK + DEF, then +20% more or enemies walk
+  // backwards for 5 s · Azelf: ATK + SPEED. Always on the shared buffs, so her sisters get it too.
+  const mysticAt = {};
+  function mystical(dex, src) {
+    const now = performance.now() / 1000; if (now - (mysticAt[dex] || -99) < CFG.mysticCd) return false; mysticAt[dex] = now;
+    const N = E(), col = TRIO[dex].ring, R = CFG.mysticRadius; let kind = '';
+    if (dex === 480) { teamBuff('def'); const dist5 = CFG.pushStuds * CFG.stud;
+      for (const e of foes()) { const dd = dist(e, src); if (dd > R + (e.r || 12)) continue; const a = Math.atan2(e.y - src.y, e.x - src.x), k = (e.boss || e.legend) ? 1 / 3 : 1; e.__lakePush = { vx: Math.cos(a) * dist5 * k / 0.25, vy: Math.sin(a) * dist5 * k / 0.25, t: 0.25 }; }
+      say(src.x, src.y - 60, 'DEF ↑ ' + stacks('def') * 10 + '% · Pushed back!', col); kind = 'push'; }
+    else if (dex === 481) { teamBuff('atk'); teamBuff('def');
+      if (Math.random() < 0.5) { teamBuff('atk', CFG.mespritExtra); teamBuff('def', CFG.mespritExtra); say(src.x, src.y - 60, 'Sisters +20%! ATK & DEF ↑', col); kind = 'boost'; }
+      else { for (const e of foes()) if (!e.boss && !e.legend && dist(e, src) < R + (e.r || 12)) e.__lakeFearT = CFG.fearTime; say(src.x, src.y - 60, 'ATK & DEF ↑ · Back off!', col); kind = 'fear'; } }
+    else { teamBuff('atk'); teamBuff('spd'); say(src.x, src.y - 60, 'ATK & SPD ↑ ' + stacks('atk') * 10 + '%', col); kind = 'power'; }
+    for (const m of teamMembers()) try { N.FX.ring(m.x, m.y, 6, 46, col, 0.5, 4); } catch (_) {}
+    emit('mystical', { dex, kind }); return true;
+  }
+  // a summoned sister's own Mystical Power: a psychic wave around her, then the buff
+  function mysticalAlly(s) { if (!near(s, CFG.mysticRadius).length) return false; const N = E();
+    blast(s, s.x, s.y, CFG.mysticRadius, (s.dex === 482 ? 2.8 : s.dex === 481 ? 2 : 1.2) * lvlMul(s), { color: s.t.ring });
+    try { N.FX.ring(s.x, s.y, 10, CFG.mysticRadius * 0.6, '#ffffff', 0.4, 4); N.FX.burst(s.x, s.y - 20, s.t.ring, 18, 200); } catch (_) {}
+    say(s.x, s.y - 46, 'Mystical Power!', s.t.ring); mystical(s.dex, s); return true; }
   // Uxie's last stand: the closest of Azelf / Mesprit (you, if you are one of them)
   function sisterNear(s) { const L = []; if (owner && Number(owner.dex) !== 480) L.push(owner); for (const d of [481, 482]) { const a = allies[d]; if (a && !a.dead && a.spawnT >= CFG.spawnTime) L.push(a); } return L.sort((a, b) => dist(a, s) - dist(b, s))[0] || owner; }
   const SKILLS = {
     480: [   // Uxie: buffs for herself and her sisters, confusion, stuns and knockback
+      { lv: 1, cd: 7, use: s => mysticalAlly(s) },
       { lv: 1, cd: 6, use: s => { const L = near(s, 130); if (!L.length) return false; let n = 0; for (const e of L) if (Math.random() < 0.6 && confuse(e, 2.5)) n++; try { E().FX.ring(s.x, s.y, 8, 130, '#c86bff', 0.5, 5); } catch (_) {} if (n) emit('skill', { dex: 480, skill: 'confuse' }); return true; } },
       { lv: 2, cd: 10, use: s => cosmic(s) },
       { lv: 3, cd: 12, use: s => (s.hp < s.maxHp * 0.7 || teamMembers().some(m => m.hp < m.maxHp * 0.5)) && recover(s) },
       { lv: 4, cd: 7, use: s => near(s, 160).length >= 2 && shove(s) }],
     481: [   // Mesprit: stall, defense, heal and buff on top of her 5-second pulse
+      { lv: 1, cd: 7, use: s => mysticalAlly(s) },
       { lv: 2, cd: 8, use: s => near(owner, 170).length >= 3 && (blast(s, owner.x, owner.y, 170, 0.3, { slow: 0.5, slowT: 3, stun: 0.9, stunChance: 0.6, color: '#ffb0e0' }), say(s.x, s.y - 50, 'Lullaby', s.t.ring), emit('skill', { dex: 481, skill: 'lullaby' }), true) },
       { lv: 3, cd: 14, use: s => teamMembers().some(m => m.hp < m.maxHp * 0.45) && (team.protect = 0.35, team.protectT = 4, say(owner.x, owner.y - 60, 'Protect!', s.t.ring), sfx('shield'), emit('skill', { dex: 481, skill: 'protect' }), true) },
       { lv: 4, cd: 22, use: s => { if (teamMembers().some(m => m.hp < m.maxHp * 0.4)) { healTeam(0.3, s); say(s.x, s.y - 50, 'Healing Wish', s.t.ring); sfx('levelup'); emit('skill', { dex: 481, skill: 'wish' }); return true; }
         if (near(s, 260).length) { rise(1, s); say(s.x, s.y - 50, 'Helping Hand', s.t.ring); emit('skill', { dex: 481, skill: 'hand' }); return true; } return false; } }],
     482: [   // Azelf: damage
+      { lv: 1, cd: 7, use: s => mysticalAlly(s) },
       { lv: 2, cd: 14, use: s => near(s, 300).length > 0 && (rise(2, s), say(s.x, s.y - 50, 'Nasty Plot!', s.t.ring), emit('skill', { dex: 482, skill: 'plot' }), true) },
       { lv: 3, cd: 8, use: s => futureSight(s) },
       { lv: 4, cd: 10, use: s => { const tg = foes().filter(e => dist(e, s) < 320).sort((a, b) => (b.maxHp || 0) - (a.maxHp || 0))[0]; if (!tg) return false;
         blast(s, tg.x, tg.y, 40, 7 * lvlMul(s), { knock: 120, color: '#9ad0ff' }); say(tg.x, tg.y - 50, 'Psycho Boost!', s.t.ring); sfx('boss'); emit('skill', { dex: 482, skill: 'boost' }); return true; } }] };
-  function cosmic(s) { emit('skill', { dex: 480, skill: 'cosmic' }); team.guard = Math.min(guardCap(s), team.guard + 0.1); team.guardT = 8; say(s.x, s.y - 50, 'Cosmic Power! DEF ↑ ' + Math.round(team.guard * 100) + '%', s.t.ring); sfx('shield'); for (const m of teamMembers()) try { E().FX.ring(m.x, m.y, 6, 50, '#ffe27a', 0.5, 4); } catch (_) {} return true; }
+  function cosmic(s) { emit('skill', { dex: 480, skill: 'cosmic' }); teamBuff('def'); say(s.x, s.y - 50, 'Cosmic Power! DEF ↑ ' + stacks('def') * 10 + '%', s.t.ring); sfx('shield'); for (const m of teamMembers()) try { E().FX.ring(m.x, m.y, 6, 50, '#ffe27a', 0.5, 4); } catch (_) {} return true; }
   function recover(s) { emit('skill', { dex: 480, skill: 'recover' }); s.hp = Math.min(s.maxHp, s.hp + s.maxHp * 0.3); try { owner.heal(owner.maxHp * 0.08); } catch (_) {} owner.addBuff('regen', Math.max(1, owner.maxHp * 0.01), 6, 3); say(s.x, s.y - 50, 'Recover', '#5fe08a'); return true; }
   function shove(s) { emit('skill', { dex: 480, skill: 'shove' }); blast(s, s.x, s.y, 160, 0.6 * lvlMul(s), { knock: 300, stun: 1.5 }); say(s.x, s.y - 50, 'Psychic Shove!', s.t.ring); sfx('quake'); return true; }
   function futureSight(s) { const tg = densest(s, 360); if (!tg) return false; emit('skill', { dex: 482, skill: 'future' }); sights.push({ s, x: tg.x, y: tg.y, t: 0, dur: 1.2, r: 120 }); say(s.x, s.y - 50, 'Future Sight', s.t.ring); return true; }
@@ -220,7 +256,7 @@
     // came through a Rift or any teleport: bring the team along
     if (ownerPos && Math.hypot(p.x - ownerPos.x, p.y - ownerPos.y) > 420) for (const d of IDS) { const s = allies[d]; if (s) { s.x = p.x + s.side * 70; s.y = p.y + 8; s.path = []; } }
     ownerPos = { x: p.x, y: p.y };
-    if ((team.guardT -= dt) <= 0) team.guard = 0; if ((team.protectT -= dt) <= 0) team.protect = 0;
+    if ((team.protectT -= dt) <= 0) team.protect = 0;
     for (let i = sights.length - 1; i >= 0; i--) { const f = sights[i]; f.t += dt; if (f.t >= f.dur) { blast(f.s, f.x, f.y, f.r, 4 * lvlMul(f.s), { knock: 140, color: '#9ad0ff' }); sfx('boss'); sights.splice(i, 1); } }
     for (let i = fx.length - 1; i >= 0; i--) { fx[i].t += dt; if (fx[i].t > fx[i].life) fx.splice(i, 1); }
     const enemies = N.EnemyMgr.all().filter(e => e && !e.dead);
@@ -290,7 +326,10 @@
     const N = E(); if (hooked || !N || !N.Combat || !N.EnemyMgr || !N.Ult || !N.Enemy || !N.Player) return; hooked = true;
     // the move: its cooldown calls the ally or its command (works from any move slot, like Hyperspace Hole)
     const prevCast = window.PS_CAST;
-    window.PS_CAST = function (pl, def, hit, ghost) { if (def && MOVE_DEX[def.psCast]) return; return prevCast ? prevCast.apply(this, arguments) : undefined; };
+    window.PS_CAST = function (pl, def, hit, ghost) { if (def && MOVE_DEX[def.psCast]) return;
+      const r = prevCast ? prevCast.apply(this, arguments) : undefined;
+      try { const m = def && /^mystical-power-(uxie|mesprit|azelf)$/.exec(def.id || ''); if (m && !ghost && pl && pl === N.Game.player && isTrio(pl.dex)) { if (owner !== pl) { clearAll(); owner = pl; } mystical(Number(pl.dex), pl); } } catch (err) { console.warn('[lake]', err); }
+      return r; };
     const tick = N.Combat.tick;
     N.Combat.tick = function (dt, pl) {
       const mine = pl && isTrio(pl.dex) && Array.isArray(pl.moves) ? pl.moves.filter(m => m && MOVE_DEX[m.id]) : [];
@@ -314,6 +353,11 @@
     // enemies go for the trio too (Uxie draws them in)
     const eup = N.Enemy.prototype.update, aggro = new WeakMap();
     N.Enemy.prototype.update = function (dt, target) {
+      // Uxie's Mystical Power: shoved back 5 studs
+      if (this.__lakePush && !this.dead) { const P = this.__lakePush, k = Math.min(dt, P.t); this.x += P.vx * k; this.y += P.vy * k; try { N.World.collide(this); } catch (_) {} if ((P.t -= dt) <= 0) this.__lakePush = null; }
+      // Mesprit's Mystical Power: it walks backwards, away from the team, for 5 s
+      if (this.__lakeFearT > 0 && !this.dead) { this.__lakeFearT -= dt; this.touchCd = Math.max(Number(this.touchCd) || 0, 0.25); const o = owner || N.Game.player || this, a = Math.atan2(this.y - o.y, this.x - o.x);
+        arguments[1] = { x: this.x + Math.cos(a) * 200, y: this.y + Math.sin(a) * 200, r: 1, dead: false, hp: 1, maxHp: 1, hurt() {} }; return eup.apply(this, arguments); }
       // confused (Uxie / Mesprit): it goes after its own allies instead of you
       if (this.__lakeConfT > 0 && !this.dead) {
         this.__lakeConfT -= dt; this.touchCd = Math.max(Number(this.touchCd) || 0, 0.25);
@@ -349,10 +393,10 @@
     N.Player.prototype.cast = function () { const r = pc.apply(this, arguments);
       try { if (!this.psLake && this === N.Game.player && Number(this.dex) === 482 && owner === this) { const t = performance.now(); if (t - riseAt > 1000 && Math.random() < CFG.riseChancePlayer) { riseAt = t; rise(1, this); } } } catch (_) {}
       return r; };
-    // shared defense: Cosmic Power, Protect, and Uxie's own toughness
+    // shared defense: Protect, and Uxie's own toughness (Cosmic Power / Mystical Power DEF are real buffs)
     const H = window.PS_HOOKS || (window.PS_HOOKS = {}), take = H.take;
     H.take = function (type, who, amt) { let m = take ? take.apply(this, arguments) : 1;
-      try { if (owner && (who === owner || (who && who.psLake))) { m *= (1 - team.guard) * (1 - team.protect); if (who.psLake && who.psLake.dex === 480) m *= TRIO[480].take; } } catch (_) {} return m; };
+      try { if (owner && (who === owner || (who && who.psLake))) { m *= 1 - team.protect; if (who.psLake && who.psLake.dex === 480) m *= TRIO[480].take; } } catch (_) {} return m; };
     // Z-Move: 3x damage, twice the cooldown (only the Lake Guardians)
     const P = N.Projectiles, C = N.Combat; let zScope = false;
     const addField = C.addField;
@@ -397,11 +441,12 @@
     for (const f of sights) { const k = f.t / f.dur; ctx.save(); ctx.globalAlpha = 0.25 + 0.4 * k; ctx.strokeStyle = '#9ad0ff'; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.lineDashOffset = -now * 40;
       ctx.beginPath(); ctx.ellipse(f.x, f.y, f.r * k, f.r * 0.45 * k, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 0.15 * k; ctx.fillStyle = '#5ab0ff'; ctx.fill(); ctx.restore(); }
     // shared shield glow (Cosmic Power / Protect)
-    const sh = Math.max(team.guard, team.protect);
+    const sh = Math.max(team.protect, stacks('def') * CFG.buffStep);
     if (sh > 0) for (const m of teamMembers()) { ctx.save(); ctx.globalAlpha = 0.25 + sh; ctx.strokeStyle = team.protect > 0 ? '#ff9ad8' : '#ffe27a'; ctx.lineWidth = 2;
       for (let i = 0; i < 6; i++) { const a = now * 0.8 + i * TAU / 6, R = 26; ctx.beginPath(); ctx.moveTo(m.x + Math.cos(a) * R, m.y - 18 + Math.sin(a) * R * 0.9); const b = a + TAU / 6; ctx.lineTo(m.x + Math.cos(b) * R, m.y - 18 + Math.sin(b) * R * 0.9); ctx.stroke(); } ctx.restore(); }
     for (const e of foes()) if (e.__lakeConfT > 0) { const h = Number(e.bodyH) || 30; ctx.save(); for (let i = 0; i < 3; i++) { const a = now * 4 + i * TAU / 3, x = e.x + Math.cos(a) * 12, y = e.y - h - 8 + Math.sin(a) * 4;
         ctx.fillStyle = i === 1 ? '#c86bff' : '#ffe27a'; ctx.beginPath(); for (let k = 0; k < 5; k++) { const b = -Math.PI / 2 + k * TAU / 5, r = k % 2 ? 1.6 : 3.6; ctx.lineTo(x + Math.cos(b) * 3.6, y + Math.sin(b) * 3.6); ctx.lineTo(x + Math.cos(b + TAU / 10) * 1.6, y + Math.sin(b + TAU / 10) * 1.6); } ctx.fill(); } ctx.restore(); }
+    for (const e of foes()) if (e.__lakeFearT > 0) { const h = Number(e.bodyH) || 30, x = e.x + 10, y = e.y - h - 6 + Math.sin(now * 10) * 1.5; ctx.save(); ctx.fillStyle = '#4aa8ff'; ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.quadraticCurveTo(x + 4.5, y, x, y + 3); ctx.quadraticCurveTo(x - 4.5, y, x, y - 6); ctx.fill(); ctx.restore(); }
     const stand = (x, y, t) => { ctx.save(); ctx.globalAlpha = 0.35 + 0.15 * Math.sin(now * 8); ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(x, y - 18, 26, 30, 0, 0, TAU); ctx.stroke();
       ctx.globalAlpha = 0.12; ctx.fillStyle = '#fff6c0'; ctx.fill(); ctx.globalAlpha = 1; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030'; ctx.fillStyle = '#ffe27a';
       const tx = 'Untouchable ' + Math.ceil(t) + 's'; ctx.strokeText(tx, x, y + 24); ctx.fillText(tx, x, y + 24); ctx.restore(); };
@@ -418,7 +463,7 @@
   }
 
   // ================= boot =================
-  (function boot() { try { register(); hookPool(); hook(); } catch (err) { console.warn('[lake]', err); } if (!(registered && hooked)) setTimeout(boot, 200); else setInterval(() => { try { hookPool(); } catch (_) {} }, 1000); })();
+  (function boot() { try { register(); hookPool(); hook(); } catch (err) { console.warn('[lake]', err); } if (!(registered && hooked)) setTimeout(boot, 200); else setInterval(() => { try { hookPool(); patchMystical(); } catch (_) {} }, 1000); })();
   window.PS_LAKE = { cfg: CFG, trio: TRIO, team, get allies() { return IDS.map(d => allies[d]).filter(Boolean).map(s => ({ dex: s.dex, name: s.name, hp: Math.round(s.hp), maxHp: s.maxHp, lvl: s.lvl, dead: s.dead, spawning: s.spawnT < CFG.spawnTime, x: s.x, y: s.y })); },
     _ally: dex => allies[Number(dex)] || null,
     summon: dex => { const p = player(); if (!p || !isTrio(p.dex) || Number(dex) === Number(p.dex)) return null; if (owner !== p) { clearAll(); owner = p; } delete allies[dex]; return !!summon(Number(dex)); } };
