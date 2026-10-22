@@ -8,7 +8,8 @@
      stand (the others rush to cover her), Azelf's rising ATK & SPEED (everyone cheers at +50%), and Mesprit's
      5-second pulse (stun / confuse / drain / heal, with thanks from her sisters).
    Personalities: Uxie (knowledge) calm, logical, quietly protective · Mesprit (emotion) warm, teasing, empathic ·
-   Azelf (willpower) brash, hot-headed, secretly the softest of the three. Needs js/lake-trio.js. */
+   Azelf (willpower) brash, hot-headed, secretly the softest of the three. Needs js/lake-trio.js.
+   Everything here is drawn only on your own screen (never sent to the other players in co-op). */
 (() => {
   'use strict';
   if (window.PS_LAKE_TALK_INSTALLED) return; window.PS_LAKE_TALK_INSTALLED = true;
@@ -47,6 +48,7 @@
       cheerConfuse: [['happy', 'Well done, Mesprit. Chaos, applied precisely.', 'note']],
       riseMax: [['inspired', 'Azelf\'s fire is in my veins. ...Figuratively. Mostly.', 'spark'], ['surprised', 'Fifty percent?! Azelf, that\'s — that\'s actually remarkable!', 'exclaim']],
       thanks: [['happy', 'Thank you, Mesprit. That was... very warm.', 'heart'], ['happy', 'Ah... much better. You always know exactly what I need.', 'heart']],
+      item: [['happy', 'I\'ll hold on to this. I already know three ways to use it.', 'note'], ['inspired', 'Fascinating. This should help.', 'spark']],
       mystic: { push: [['determined', 'Mystical Power. Five studs back — exactly as calculated.', 'spark'], ['determined', 'Shields up, sisters. And you lot — out of our space.', 'anger'], ['happy', 'Knowledge is a wall. Lean on it.', 'note']] } },
     481: {   // Mesprit: warm, teasing, empathic
       aloneStart: [['sad', 'Uxie? Azelf? ...It\'s so quiet. I can\'t feel your hearts from here.', 'dots'], ['teary', 'I\'m the Being of Emotion and right now all I feel is lonely.', 'tear'], ['worried', 'I don\'t like this. I don\'t like being the only one.', 'sweat']],
@@ -77,6 +79,7 @@
       cheerConfuse: [['joyous', 'Hehe, look at it go! Uxie made it dizzy~', 'note'], ['happy', 'Uxie! That one\'s punching its own friends!', 'note']],
       riseMax: [['joyous', 'I can feel Azelf\'s heart burning — it\'s contagious!', 'spark'], ['inspired', 'Fifty percent! Azelf, you\'re on FIRE~!', 'spark']],
       rise: [['happy', 'Ooh, I feel faster! Thanks, Azelf~', 'spark']],
+      item: [['joyous', 'Ooh, shiny! Finders keepers~', 'heart'], ['happy', 'Look what I found! It\'s mine now~', 'note']],
       mystic: { boost: [['joyous', 'Mystical Power — and a little extra love for my sisters~!', 'heart'], ['inspired', 'Twenty percent more! Feel my heart, both of you!', 'spark']],
         fear: [['happy', 'Mystical Power! Now walk it back, meanies~', 'note'], ['determined', 'Shoo! Backwards, all of you!', 'exclaim'], ['happy', 'Feel that? That\'s how scary a big sister can be~', 'note']] } },
     482: {   // Azelf: brash, hot-headed, secretly the softest
@@ -105,6 +108,7 @@
       guardUxie: [['angry', 'Uxie! Behind me, NOW! I\'ll handle these jerks!', 'anger'], ['determined', 'I\'ve got you, Uxie. Breathe. I\'m right here.', 'exclaim']],
       cheerConfuse: [['happy', 'Ha! It\'s hitting its own buddies! Nice one!', 'note'], ['joyous', 'Look at them fight each other! Do it again!', 'note']],
       thanks: [['happy', 'Th-thanks, Mesprit. I wasn\'t hurt. Much.', 'heart'], ['happy', '...Okay, that felt nice. Don\'t make it a thing.', 'heart']],
+      item: [['determined', 'Mine! ...What does it do? Doesn\'t matter, it\'s mine!', 'exclaim'], ['happy', 'Ha! Even stronger now!', 'spark']],
       mystic: { power: [['determined', 'Mystical Power! Faster, stronger — ALL of us!', 'spark'], ['shouting', 'Take my willpower, sisters! Hit HARDER!', 'spark'], ['joyous', 'You feel that?! That\'s us!', 'spark']] } } };
 
   // ================= talk box =================
@@ -169,7 +173,8 @@
   // ================= what they react to =================
   let runP = null, aloneT = 0, chatT = 0, lastHp = 0, low = false, bigCd = 0, bossCd = 0, lvl = 0, lostLastCd = 0;
   const seenBoss = new WeakSet();
-  const me = () => { const p = E()?.Game?.player; return p && NAME[Number(p.dex)] ? p : null; };
+  // only ever YOUR screen: the box, emotes and lines follow your own player and your own sisters, and nothing is sent over co-op
+  const me = () => { const p = E()?.Game?.player; return p && !p.remote && NAME[Number(p.dex)] ? p : null; };
   const live = () => (window.PS_LAKE?.allies || []).filter(a => !a.dead && !a.spawning).map(a => a.dex);
   const party = () => { const p = me(); return p ? [Number(p.dex), ...live()] : []; };
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -196,6 +201,7 @@
       else if (Math.random() < 0.5) { if (say(482, L[482].rise) && Math.random() < 0.4 && party().includes(481)) say(481, L[481].rise, { delay: 0.2, follow: true }); } }
     else if (d.type === 'mesprit') {   // Mesprit's 5-second pulse
       if (Math.random() < 0.35 && say(481, L[481].pulse[d.kind]) && d.kind === 'heal') { const others = party().filter(x => x !== 481 && L[x].thanks); const by = others[Math.floor(Math.random() * others.length)]; if (by && Math.random() < 0.5) say(by, L[by].thanks, { delay: 0.2, follow: true }); } }
+    else if (d.type === 'item') say(dex, L[dex] && L[dex].item);
     else if (d.type === 'mystical') {   // Mystical Power buffing the sisters
       const S = L[dex] && L[dex].mystic && L[dex].mystic[d.kind]; if (S && Math.random() < (d.kind === 'boost' || d.kind === 'fear' ? 0.5 : 0.35)) say(dex, S); }
     else if (d.type === 'z') { const all = party(); all.forEach((by, i) => say(by, L[by].z, { prio: true, delay: i * 0.25 })); }

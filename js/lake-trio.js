@@ -24,6 +24,11 @@
        backwards for 5 s · Azelf +10% ATK & SPEED. Up to +50% per stat; the buff part works once every 6 s.
      Playing as one of them, you get her passives too (Uxie: confuse on hit + last stand; Mesprit: the 5 s pulse;
      Azelf: rising ATK & SPEED from your attacks).
+   - SMART, LIKE PLAYERS: every sister sidesteps enemy shots, runs from crowds (Uxie at the first enemy, Mesprit at 2,
+     Azelf at 4, or 2 when hurt; anyone below 30% HP backs off), circles her target instead of standing still, and
+     when nothing is near she picks up drops (a held item becomes HER item; XP, coins and the rest go to you), opens
+     chests, waits at a big chest until it opens, and activates the power-up crystals.
+   - CO-OP: while her sister-player is far away (600+) or down, she follows and fights for the nearest other player.
    - Their Z-Move deals 3x the damage of a normal Z-Move, with twice the cooldown.
    Solo (your own allies only). Their portraits and emotes (js/lake-talk.js) react to what happens here. */
 (() => {
@@ -35,7 +40,8 @@
     riseChance: 0.15, riseChancePlayer: 0.06, riseStep: 0.10, riseMax: 5, riseTime: 12,       // Azelf: +10% ATK & SPD per stack, up to +50%
     mespritEvery: 5, mespritStun: 3, mespritConfuse: 3, mespritDrain: 0.05, mespritHeal: 0.10,      // Mesprit
     buffStep: 0.10, buffMax: 5, buffTime: 10,   // every trio buff is a +10% stack (up to +50%) on the buffs all three share
-    mysticCd: 6, mysticRadius: 260, stud: 32, pushStuds: 5, mespritExtra: 2, fearTime: 5 };   // Mystical Power
+    mysticCd: 6, mysticRadius: 260, stud: 32, pushStuds: 5, mespritExtra: 2, fearTime: 5,   // Mystical Power
+    coopFar: 600, jobRange: 320, jobSafe: 150 };   // co-op: follow another player past this distance · loot/chest/crystal search, and how clear it must be
   const TRIO = {
     480: { key: 'uxie', name: 'Uxie', move: 'lake-uxie', role: 'Guardian', hp: 2.0, atk: 0.6, spd: 1.0, take: 0.8, leash: 260, dead: 90, ideal: 200,
       kit: ['confusion'], drop: ['#fff7c0', '#ffd84a', '#c8960c'], ring: '#ffd84a',
@@ -100,11 +106,12 @@
     if (dex === 482) return -1; if (dex === 480) return 1;
     return Number(owner && owner.dex) === 482 ? -1 : 1;   // Mesprit: whichever side is free
   }
-  const SHARE = ['atkMul', 'atkPerm', 'spdMul', 'spdPerm', 'cdMul', 'cdPerm', 'critChance', 'critPerm', 'regenFlat', 'regenPct', 'reductionBase', 'defBonus', 'buffs', 'item', 'powers', 'level', 'magnet', 'xpMul', 'coinMul', 'atkItemK'];
+  const SHARE = ['atkMul', 'atkPerm', 'spdMul', 'spdPerm', 'cdMul', 'cdPerm', 'critChance', 'critPerm', 'regenFlat', 'regenPct', 'reductionBase', 'defBonus', 'buffs', 'powers', 'level', 'magnet', 'xpMul', 'coinMul', 'atkItemK'];
   function makeActor(s) {
     const N = E(), a = new N.Player(N.DEX_BY[s.dex], {}, s.shiny); s.caster = a; a.psLake = s;
     for (const k of ['x', 'y', 'r', 'bodyH', 'anim', 'dead', 'hp', 'maxHp', 'aim', 'target']) Object.defineProperty(a, k, { configurable: true, get: () => s[k], set: v => { s[k] = v; } });
     for (const k of SHARE) Object.defineProperty(a, k, { configurable: true, get: () => s.owner[k], set: () => {} });   // shared with you at 100%
+    Object.defineProperty(a, 'item', { configurable: true, get: () => s.ownItem || s.owner.item, set: v => { s.ownItem = v; } });   // her own held item once she picks one up
     Object.defineProperty(a, 'baseAtk', { configurable: true, get: () => (Number(s.owner.baseAtk) || 1) * s.t.atk * lvlMul(s) });
     Object.defineProperty(a, 'baseSpd', { configurable: true, get: () => Number(s.owner.baseSpd) || 100 });
     Object.defineProperty(a, 'floating', { configurable: true, get: () => true });
@@ -139,7 +146,7 @@
   function clearAll() { for (const d of IDS) delete allies[d]; sights.length = 0; fx.length = 0; team.protect = team.protectT = 0; team.pPulse = undefined; team.pStandT = team.pStandCd = 0; owner = null; ownerPos = null; }
 
   // ---- skills ----
-  function foes() { const N = E(); return N.EnemyMgr.all().filter(e => e && !e.dead && !e.remote); }
+  function foes() { const N = E(); return N.EnemyMgr.all().filter(e => e && !e.dead); }   // remote (co-op) enemies too: e.hurt / applyStun route through the host
   function blast(s, x, y, radius, dmgK, o) {
     const N = E(); o = o || {}; let n = 0;
     for (const e of foes()) { if (Math.hypot(e.x - x, e.y - y) > radius + (e.r || 12)) continue;
@@ -151,7 +158,7 @@
     try { N.FX.ring(x, y, 10, radius, o.color || s.t.ring, 0.6, 6); } catch (_) {}
     return n;
   }
-  function teamMembers() { const L = [owner]; for (const d of IDS) { const s = allies[d]; if (s && !s.dead && s.spawnT >= CFG.spawnTime) L.push(s); } return L; }
+  function teamMembers() { const L = owner && !owner.dead ? [owner] : []; for (const d of IDS) { const s = allies[d]; if (s && !s.dead && s.spawnT >= CFG.spawnTime) L.push(s); } return L; }
   function healTeam(frac, s) { for (const m of teamMembers()) { const amt = (Number(m.maxHp) || 100) * frac; if (m === owner) { try { owner.heal(amt); } catch (_) { owner.hp = Math.min(owner.maxHp, owner.hp + amt); } } else { m.hp = Math.min(m.maxHp, m.hp + amt); say(m.x, m.y - 44, '+' + Math.round(amt), '#5fe08a'); } }
     try { E().FX.ring(owner.x, owner.y, 8, 120, s.t.ring, 0.5, 5); } catch (_) {} }
   const near = (c, r) => foes().filter(e => dist(e, c) < r);
@@ -197,11 +204,11 @@
     const now = performance.now() / 1000; if (now - (mysticAt[dex] || -99) < CFG.mysticCd) return false; mysticAt[dex] = now;
     const N = E(), col = TRIO[dex].ring, R = CFG.mysticRadius; let kind = '';
     if (dex === 480) { teamBuff('def'); const dist5 = CFG.pushStuds * CFG.stud;
-      for (const e of foes()) { const dd = dist(e, src); if (dd > R + (e.r || 12)) continue; const a = Math.atan2(e.y - src.y, e.x - src.x), k = (e.boss || e.legend) ? 1 / 3 : 1; e.__lakePush = { vx: Math.cos(a) * dist5 * k / 0.25, vy: Math.sin(a) * dist5 * k / 0.25, t: 0.25 }; }
+      for (const e of foes()) { const dd = dist(e, src); if (e.remote || dd > R + (e.r || 12)) continue; const a = Math.atan2(e.y - src.y, e.x - src.x), k = (e.boss || e.legend) ? 1 / 3 : 1; e.__lakePush = { vx: Math.cos(a) * dist5 * k / 0.25, vy: Math.sin(a) * dist5 * k / 0.25, t: 0.25 }; }
       say(src.x, src.y - 60, 'DEF ↑ ' + stacks('def') * 10 + '% · Pushed back!', col); kind = 'push'; }
     else if (dex === 481) { teamBuff('atk'); teamBuff('def');
       if (Math.random() < 0.5) { teamBuff('atk', CFG.mespritExtra); teamBuff('def', CFG.mespritExtra); say(src.x, src.y - 60, 'Sisters +20%! ATK & DEF ↑', col); kind = 'boost'; }
-      else { for (const e of foes()) if (!e.boss && !e.legend && dist(e, src) < R + (e.r || 12)) e.__lakeFearT = CFG.fearTime; say(src.x, src.y - 60, 'ATK & DEF ↑ · Back off!', col); kind = 'fear'; } }
+      else { for (const e of foes()) if (!e.boss && !e.legend && !e.remote && dist(e, src) < R + (e.r || 12)) e.__lakeFearT = CFG.fearTime; say(src.x, src.y - 60, 'ATK & DEF ↑ · Back off!', col); kind = 'fear'; } }
     else { teamBuff('atk'); teamBuff('spd'); say(src.x, src.y - 60, 'ATK & SPD ↑ ' + stacks('atk') * 10 + '%', col); kind = 'power'; }
     for (const m of teamMembers()) try { N.FX.ring(m.x, m.y, 6, 46, col, 0.5, 4); } catch (_) {}
     emit('mystical', { dex, kind }); return true;
@@ -233,7 +240,7 @@
       { lv: 4, cd: 10, use: s => { const tg = foes().filter(e => dist(e, s) < 320).sort((a, b) => (b.maxHp || 0) - (a.maxHp || 0))[0]; if (!tg) return false;
         blast(s, tg.x, tg.y, 40, 7 * lvlMul(s), { knock: 120, color: '#9ad0ff' }); say(tg.x, tg.y - 50, 'Psycho Boost!', s.t.ring); sfx('boss'); emit('skill', { dex: 482, skill: 'boost' }); return true; } }] };
   function cosmic(s) { emit('skill', { dex: 480, skill: 'cosmic' }); teamBuff('def'); say(s.x, s.y - 50, 'Cosmic Power! DEF ↑ ' + stacks('def') * 10 + '%', s.t.ring); sfx('shield'); for (const m of teamMembers()) try { E().FX.ring(m.x, m.y, 6, 50, '#ffe27a', 0.5, 4); } catch (_) {} return true; }
-  function recover(s) { emit('skill', { dex: 480, skill: 'recover' }); s.hp = Math.min(s.maxHp, s.hp + s.maxHp * 0.3); try { owner.heal(owner.maxHp * 0.08); } catch (_) {} owner.addBuff('regen', Math.max(1, owner.maxHp * 0.01), 6, 3); say(s.x, s.y - 50, 'Recover', '#5fe08a'); return true; }
+  function recover(s) { emit('skill', { dex: 480, skill: 'recover' }); s.hp = Math.min(s.maxHp, s.hp + s.maxHp * 0.3); try { if (!owner.dead) owner.heal(owner.maxHp * 0.08); } catch (_) {} owner.addBuff('regen', Math.max(1, owner.maxHp * 0.01), 6, 3); say(s.x, s.y - 50, 'Recover', '#5fe08a'); return true; }
   function shove(s) { emit('skill', { dex: 480, skill: 'shove' }); blast(s, s.x, s.y, 160, 0.6 * lvlMul(s), { knock: 300, stun: 1.5 }); say(s.x, s.y - 50, 'Psychic Shove!', s.t.ring); sfx('quake'); return true; }
   function futureSight(s) { const tg = densest(s, 360); if (!tg) return false; emit('skill', { dex: 482, skill: 'future' }); sights.push({ s, x: tg.x, y: tg.y, t: 0, dur: 1.2, r: 120 }); say(s.x, s.y - 50, 'Future Sight', s.t.ring); return true; }
   // the move's cooldown: call the ally, or use its signature command
@@ -248,13 +255,71 @@
   }
 
   // ---- AI ----
+  const freeAt = (x, y, r) => { try { return window.PS_HOOPA?.summonFree ? window.PS_HOOPA.summonFree(x, y, r) : true; } catch (_) { return true; } };
+  function everyone() { try { const N = E(), ev = N.Game.everyone; const L = typeof ev === 'function' ? ev.call(N.Game) : ev; return Array.isArray(L) ? L : []; } catch (_) { return []; } }
+  const coopOn = () => !!(E()?.Coop?.active);
+  // co-op: while her sister-player is far away or down, she follows and fights for the nearest other player
+  function anchorFor(s, p) {
+    if (!coopOn() || (!p.dead && dist(s, p) < CFG.coopFar)) return p;
+    let best = null, bd = Infinity; for (const q of everyone()) { if (!q || q === p || q.dead || !Number.isFinite(q.x)) continue; const dd = dist(s, q); if (dd < bd) { bd = dd; best = q; } }
+    return best || p;
+  }
+  // an enemy shot about to hit her: the sidestep direction
+  function incoming(s) {
+    for (const q of E().Projectiles.all()) { if (!q || q.friendly || q.ghost) continue; const dx = s.x - q.x, dy = s.y - q.y, dd = Math.hypot(dx, dy); if (dd > 170) continue;
+      const v = Math.hypot(q.vx || 0, q.vy || 0); if (v < 1) continue; const ux = q.vx / v, uy = q.vy / v; if (dx * ux + dy * uy <= 0) continue;
+      const perp = dx * uy - dy * ux; if (Math.abs(perp) > 34) continue; const sd = perp >= 0 ? 1 : -1; return { x: uy * sd, y: -ux * sd }; }
+    return null;
+  }
+  // running from a crowd: the free spot (of 16) furthest from enemies, without straying from whoever she protects
+  function escapePoint(s, enemies, A) {
+    let best = null, bs = -Infinity;
+    for (let i = 0; i < 16; i++) { const a = i * TAU / 16, pt = { x: s.x + Math.cos(a) * 120, y: s.y + Math.sin(a) * 120 }; if (!freeAt(pt.x, pt.y, s.r)) continue;
+      let sc = 0; for (const e of enemies) { const dd = dist(pt, e); if (dd < 280) sc -= 4000 / (dd + 20); } sc -= Math.max(0, dist(pt, A) - 140) * 0.8;
+      if (sc > bs) { bs = sc; best = pt; } }
+    return best || { x: A.x, y: A.y };
+  }
+  // ---- jobs, like a player: loot, power-up crystals, chests (and waiting at the big chest) ----
+  const keyOf = c => c.type + ':' + c.tx + ':' + c.ty + ':' + Math.round(c.x) + ':' + Math.round(c.y);
+  const claimed = (s, ref) => IDS.some(d => { const o = allies[d]; return o && o !== s && !o.dead && o.job && o.job.ref === ref; });
+  function chestsNear(x, y, r) { const W = E().World; return [...new Set([...(W.propsInCircle(x, y, r) || []), ...(W.specialsNear(x, y, r) || [])])].filter(c => c && (c.type === 'chest' || c.type === 'bigchest') && !c.hoopaOpened && !c.broken); }
+  const chestRange = (s, c) => Math.max(46, (c.r || 16) + s.r + 24);
+  function pickJob(s, A, enemies) {
+    const N = E(), R = CFG.jobRange, clear = (pt, r) => !enemies.some(e => !(e.__lakeConfT > 0) && !(e.__lakeFearT > 0) && dist(e, pt) < r);
+    if (!clear(s, 100)) { s.jobWhy = 'threat'; return null; }   // a real threat: the fight comes first, and she comes back to the job after
+    const ok = pt => dist(pt, A) < s.t.leash * 1.2 && clear(pt, CFG.jobSafe);   // a new job needs a quiet spot...
+    let j = s.job;
+    if (j) { const still = j.kind === 'crystal' ? !j.ref.used : j.kind === 'loot' ? N.Pickups.all().includes(j.ref) : !j.ref.hoopaOpened && !j.ref.broken && chestsNear(j.ref.x, j.ref.y, 8).some(c => keyOf(c) === keyOf(j.ref));
+      if (!still || dist(j.ref, A) > s.t.leash * 1.3 || !clear(j.ref, 90)) { s.jobWhy = !still ? 'done' : !clear(j.ref, 90) ? 'unsafe spot' : 'too far'; j = s.job = null; } }   // ...an ongoing one only stops for a real threat
+    if (!j) {
+      const alt = (N.World.specialsNear(s.x, s.y, R + 180) || []).filter(c => c && c.type === 'altar' && !c.used && c.kind !== 4 && ok(c) && !claimed(s, c)).sort((a, b) => dist(a, s) - dist(b, s))[0];
+      const ch = !alt && chestsNear(s.x, s.y, R).filter(c => ok(c) && !claimed(s, c)).sort((a, b) => dist(a, s) - dist(b, s))[0];
+      const team = teamMembers().some(m => m.hp < m.maxHp * 0.7);
+      const loot = !alt && !ch && N.Pickups.all().filter(dr => dr && dist(dr, s) < R && ok(dr) && !claimed(s, dr)).sort((a, b) => (dist(a, s) - (a.kind === 'item' ? 200 : a.kind === 'heal' && team ? 120 : 0)) - (dist(b, s) - (b.kind === 'item' ? 200 : b.kind === 'heal' && team ? 120 : 0)))[0];
+      if (alt) j = { kind: 'crystal', ref: alt }; else if (ch) j = { kind: ch.type === 'bigchest' ? 'bigchest' : 'chest', ref: ch }; else if (loot) j = { kind: 'loot', ref: loot };
+      s.job = j; }
+    if (!j) return null;
+    return { kind: j.kind, pos: { x: j.ref.x, y: j.ref.y }, stop: j.kind === 'loot' ? 0 : chestRange(s, j.ref) - 12 };
+  }
+  function doJob(s, dt) {
+    const N = E(), j = s.job; if (!j || s.mode !== j.kind) return;
+    if (j.kind === 'crystal') { if (!j.ref.used && dist(s, j.ref) < chestRange(s, j.ref)) { N.Interact.hoopaActivateAltar(s.owner, j.ref); say(s.x, s.y - 50, 'Power up!', s.t.ring); s.job = null; } return; }
+    if (j.kind === 'chest' || j.kind === 'bigchest') { const c = j.ref; if (dist(s, c) > chestRange(s, c)) { s.chestTime = 0; return; }
+      s.chestTime = (s.chestTime || 0) + dt;
+      if (j.kind === 'bigchest') { c.open = Math.max(c.open || 0, s.chestTime); if (s.chestTime >= (N.Interact.CHEST_TIME || 3.5)) { c.hoopaOpened = true; N.World.breakProp(c); say(s.x, s.y - 50, 'Opened it!', s.t.ring); s.job = null; s.chestTime = 0; } }
+      else if (s.chestTime >= 0.6) { try { s.anim && s.anim.play('Attack'); } catch (_) {} c.hoopaOpened = true; N.World.breakProp(c); s.job = null; s.chestTime = 0; } }
+  }
+  // a held item she picks up is hers (until then she shares yours)
+  const ITEM_NAME = id => String(id).replace(/(orb|band|scarf|claw|sash|bell|coin|charm|egg|lens|berry|helmet|ice|rock|balloon|button|vest)$/, ' $1').replace(/^./, c => c.toUpperCase());
+  function equipSister(s, id) { try { s.caster.equip(id); } catch (_) { s.ownItem = id; } if (!s.ownItem) s.ownItem = id; say(s.x, s.y - 56, s.name + ' equipped ' + ITEM_NAME(id), s.t.ring); emit('item', { dex: s.dex, item: id }); }
+  const sistersAlive = () => IDS.map(d => allies[d]).filter(s => s && !s.dead && s.spawnT >= CFG.spawnTime);
   function update(dt) {
     const N = E(), p = N?.Game?.player;
-    if (!p || !isTrio(p.dex) || p.dead) { if (owner) clearAll(); return; }
+    if (!p || !isTrio(p.dex) || (p.dead && !(coopOn() && everyone().some(q => q && q !== p && !q.dead)))) { if (owner) clearAll(); return; }
     if (p !== owner) { clearAll(); owner = p; }
     if (N.Game.state !== 'playing') return;
     // came through a Rift or any teleport: bring the team along
-    if (ownerPos && Math.hypot(p.x - ownerPos.x, p.y - ownerPos.y) > 420) for (const d of IDS) { const s = allies[d]; if (s) { s.x = p.x + s.side * 70; s.y = p.y + 8; s.path = []; } }
+    if (!p.dead && ownerPos && Math.hypot(p.x - ownerPos.x, p.y - ownerPos.y) > 420) for (const d of IDS) { const s = allies[d]; if (s) { s.x = p.x + s.side * 70; s.y = p.y + 8; s.path = []; } }
     ownerPos = { x: p.x, y: p.y };
     if ((team.protectT -= dt) <= 0) team.protect = 0;
     for (let i = sights.length - 1; i >= 0; i--) { const f = sights[i]; f.t += dt; if (f.t >= f.dur) { blast(f.s, f.x, f.y, f.r, 4 * lvlMul(f.s), { knock: 140, color: '#9ad0ff' }); sfx('boss'); sights.splice(i, 1); } }
@@ -275,38 +340,42 @@
       for (const k of ['invuln', 'reviveShield', 'shadeInv', 'balloonCd']) s.caster[k] = Math.max(0, (Number(s.caster[k]) || 0) - dt);   // the engine's hit i-frames wear off
       s.hurtCd = Math.max(0, s.hurtCd - dt); s.stunT = Math.max(0, s.stunT - dt); s.slowT = Math.max(0, s.slowT - dt);
       if (s.standCd > 0) s.standCd -= dt; if (s.standT > 0 && (s.standT -= dt) <= 0) { s.standT = 0; emit('standEnd', { dex: d }); }
-      // target: enemies close to you (Azelf hunts further out)
+      // whom she follows and fights for: you — or in co-op, the nearest other player while you are far away or down
+      const A = anchorFor(s, p);
       let target = null, best = Infinity;
-      for (const e of enemies) { if (dist(e, p) > s.t.leash) continue; const sc = dist(s, e) - ((e.behavior === 'thief' || e.golden) ? 400 : 0); if (sc < best) { best = sc; target = e; } }
+      for (const e of enemies) { if (dist(e, A) > s.t.leash) continue; const sc = dist(s, e) - ((e.behavior === 'thief' || e.golden) ? 400 : 0) + (e.__lakeConfT > 0 ? 200 : 0); if (sc < best) { best = sc; target = e; } }
       s.target = target;
-      const post = { x: p.x + s.side * 70, y: p.y + 10 };
-      let goal = null, stop = 0;
+      const post = { x: A.x + s.side * 70, y: A.y + 10 };
       const kitId = s.t.kit[s.kitI % s.t.kit.length], def = N.Moves.BY_ID[kitId] ? N.Moves.instance(kitId, Math.min(N.Moves.BY_ID[kitId].maxLvl || 1, s.lvl)) : null;
       const range = def && window.PS_HOOPA?.attackRange ? window.PS_HOOPA.attackRange(def) : { min: 0, ideal: s.t.ideal, max: 260 };
-      if (target) { const a = Math.atan2(s.y - target.y, s.x - target.x), want = Math.min(range.ideal, s.t.ideal * 1.6); goal = { x: target.x + Math.cos(a) * want, y: target.y + Math.sin(a) * want }; stop = 6; }
-      else if (dist(s, post) > s.t.dead) { goal = post; stop = s.t.dead * 0.5; }   // Uxie only catches up when it drifts far
-      if (d === 480) {   // Uxie draws enemies in, but never lets them touch her: she kites, dodges, and runs to a sister on her last stand
-        const sis = s.standT > 0 ? sisterNear(s) : null;
-        if (sis) { goal = { x: sis.x + (s.x < sis.x ? -34 : 34), y: sis.y + 10 }; stop = 20; }
-        else {
-          let fx = 0, fy = 0; for (const e of enemies) { const dd = dist(s, e); if (dd < 150 && dd > 0.01) { const w = (150 - dd) / 150; fx += (s.x - e.x) / dd * w; fy += (s.y - e.y) / dd * w; } }
-          const fl = Math.hypot(fx, fy);
-          if (fl > 0.05) { goal = { x: s.x + fx / fl * 90, y: s.y + fy / fl * 90 }; stop = 0; if (dist(goal, p) > s.t.leash) { goal.x = (goal.x + post.x) / 2; goal.y = (goal.y + post.y) / 2; } }
-          else if (target) { const a = Math.atan2(s.y - target.y, s.x - target.x); goal = { x: target.x + Math.cos(a) * s.t.ideal, y: target.y + Math.sin(a) * s.t.ideal }; stop = 12; }
-          s.dodgeT = Math.max(0, (s.dodgeT || 0) - dt);
-          if (s.dodgeT <= 0) for (const q of N.Projectiles.all()) { if (!q || q.friendly || q.ghost) continue; const dx = s.x - q.x, dy = s.y - q.y, dd = Math.hypot(dx, dy); if (dd > 170) continue;
-            const v = Math.hypot(q.vx || 0, q.vy || 0); if (v < 1) continue; const ux = q.vx / v, uy = q.vy / v; if (dx * ux + dy * uy <= 0) continue;
-            const perp = dx * uy - dy * ux; if (Math.abs(perp) > 34) continue; const sd = perp >= 0 ? 1 : -1; s.dodge = { x: uy * sd, y: -ux * sd }; s.dodgeT = 0.3; break; } } }
-      const spd = Math.max(60, Number(s.caster.spd) || 110) * s.t.spd * (s.slowT > 0 ? 0.5 : 1) * (s.standT > 0 ? 1.5 : 1);
+      // ---- think: dodge > last stand > escape the crowd > regroup > jobs (loot, chests, crystals) > fight > post ----
+      let goal = null, stop = 0; s.mode = 'idle';
+      const hpF = s.hp / s.maxHp, crowd = enemies.filter(e => dist(e, s) < 130 && !(e.__lakeConfT > 0) && !(e.__lakeFearT > 0));
+      const panic = d === 480 ? 1 : d === 481 ? 2 : (hpF < 0.5 ? 2 : 4);
+      s.dodgeT = Math.max(0, (s.dodgeT || 0) - dt);
+      if (s.dodgeT <= 0) { const q = incoming(s); if (q && Math.random() < (d === 482 ? 0.75 : d === 481 ? 0.85 : 1)) { s.dodge = q; s.dodgeT = 0.3; } }
+      if (d === 480 && s.standT > 0) { const sis = sisterNear(s); goal = { x: sis.x + (s.x < sis.x ? -34 : 34), y: sis.y + 10 }; stop = 20; s.mode = 'stand'; }
+      else if (crowd.length >= panic || (hpF < 0.3 && crowd.length)) { goal = escapePoint(s, enemies, A); s.mode = 'escape'; }
+      else if (dist(s, A) > s.t.leash * 1.3) { goal = post; stop = 30; s.mode = 'regroup'; }
+      else { const job = pickJob(s, A, enemies);
+        if (job) { goal = job.pos; stop = job.stop; s.mode = job.kind; }
+        else if (target) { s.orbit = (s.orbit ?? (s.side > 0 ? 0.6 : -0.6)) + (s.side > 0 ? 0.35 : -0.35) * dt;   // circle the target instead of standing still
+          const want = d === 480 ? s.t.ideal : Math.min(range.ideal, s.t.ideal * 1.6), a = Math.atan2(s.y - target.y, s.x - target.x) + Math.sin(s.orbit) * 0.5;
+          goal = { x: target.x + Math.cos(a) * want, y: target.y + Math.sin(a) * want }; stop = 8; s.mode = 'fight'; }
+        else if (dist(s, post) > s.t.dead) { goal = post; stop = s.t.dead * 0.5; s.mode = 'follow'; } }
+      if (s.mode !== 'chest' && s.mode !== 'bigchest') s.chestTime = 0;
+      const spd = Math.max(60, Number(s.caster.spd) || 110) * s.t.spd * (s.slowT > 0 ? 0.5 : 1) * (s.standT > 0 || s.mode === 'escape' ? 1.35 : 1);
       let moved = false;
-      if (d === 480 && s.dodgeT > 0 && s.dodge && s.stunT <= 0) { const st = spd * 1.8 * dt, nx = s.x + s.dodge.x * st, ny = s.y + s.dodge.y * st;
-        let ok = true; try { if (window.PS_HOOPA?.summonFree) ok = window.PS_HOOPA.summonFree(nx, ny, s.r); } catch (_) {} if (ok) { s.x = nx; s.y = ny; moved = true; goal = null; } }
+      if (s.dodgeT > 0 && s.dodge && s.stunT <= 0) { const st = spd * 1.8 * dt, nx = s.x + s.dodge.x * st, ny = s.y + s.dodge.y * st;
+        if (freeAt(nx, ny, s.r)) { s.x = nx; s.y = ny; moved = true; goal = null; } }
       if (goal && s.stunT <= 0) { const dd = dist(s, goal); const step = Math.min(Math.max(0, dd - stop), spd * dt);
         if (step > 0.5) { moved = true; try { if (window.PS_HOOPA?.navigate) window.PS_HOOPA.navigate(s, goal, step, dt, enemies); else { const a = Math.atan2(goal.y - s.y, goal.x - s.x); s.x += Math.cos(a) * step; s.y += Math.sin(a) * step; } } catch (_) {} } }
+      try { doJob(s, dt); } catch (err) { console.warn('[lake]', err); }
+      try { s.caster.berryTick(dt); } catch (_) {}   // held berries work for her too
       // keep the trio from stacking on each other and on you
       for (const o of [p, ...IDS.map(x => allies[x]).filter(o => o && o !== s && !o.dead)]) { let dx = s.x - o.x, dy = s.y - o.y, dd = Math.hypot(dx, dy); if (dd < 40) { if (dd < 0.01) { dx = s.side; dy = 0; dd = 1; } const push = Math.min(40 - dd, 80 * dt); s.x += dx / dd * push; s.y += dy / dd * push; } }
       try { N.World.collide(s); } catch (_) {}
-      if (s.anim) { s.anim.loop(moved ? 'Walk' : 'Idle'); if (target) s.anim.dir = N.Sprites.dirFromAngle(Math.atan2(target.y - s.y, target.x - s.x)); else if (!moved) s.anim.dir = N.Sprites.dirFromAngle(Math.atan2(p.y - s.y, p.x - s.x)); s.anim.update(dt); }
+      if (s.anim) { s.anim.loop(moved ? 'Walk' : 'Idle'); if (target) s.anim.dir = N.Sprites.dirFromAngle(Math.atan2(target.y - s.y, target.x - s.x)); else if (!moved) s.anim.dir = N.Sprites.dirFromAngle(Math.atan2(A.y - s.y, A.x - s.x)); s.anim.update(dt); }
       if (s.stunT > 0) continue;
       if (d === 481) { s.pulseT = (s.pulseT ?? CFG.mespritEvery) - dt; if (s.pulseT <= 0) { s.pulseT = CFG.mespritEvery; try { mespritPulse(s); } catch (err) { console.warn('[lake]', err); } } }
       // attack with its own moves (they level up with the summon move)
@@ -350,6 +419,21 @@
         const shots = N.Projectiles.all(); for (let i = shots.length - 1; i >= 0; i--) { const q = shots[i]; if (!q || q.friendly || q.ghost || dist(s, q) > s.r + (q.r || 4)) continue; hurt(s, q.pct ? Math.max(q.dmg, s.maxHp * q.pct) : q.dmg, q.mtype); shots.splice(i, 1); } }
       return r;
     };
+    // pseudo-players: the sisters collect drops. A held item is theirs; XP, coins, hearts and the rest go to you.
+    const pu = N.Pickups.update;
+    if (typeof pu === 'function') N.Pickups.update = function (dt, players, onCollect) {
+      const live = owner && owner === N.Game.player ? sistersAlive() : []; if (!live.length || typeof onCollect !== 'function') return pu.apply(this, arguments);
+      for (const s of live) s.magnet = Math.max(45, (Number(owner.magnet) || 78) * 0.6);
+      const col = Array.isArray(players) ? players.slice() : [players]; col.push(...live);
+      return pu.call(this, dt, col, (drop, c) => {
+        if (live.includes(c)) { if (drop && drop.kind === 'item' && N.Items.BY && N.Items.BY[drop.value]) { equipSister(c, drop.value); return; } return onCollect(drop, owner); }
+        return onCollect(drop, c); });
+    };
+    // the big chest keeps the progress a sister builds while she waits at it
+    const iu = N.Interact.update;
+    if (typeof iu === 'function') N.Interact.update = function () {
+      const held = sistersAlive().filter(s => s.mode === 'bigchest' && s.job && s.chestTime > 0).map(s => ({ c: s.job.ref, open: s.chestTime }));
+      const r = iu.apply(this, arguments); for (const h of held) if (!h.c.hoopaOpened) h.c.open = Math.max(h.c.open || 0, h.open); return r; };
     // enemies go for the trio too (Uxie draws them in)
     const eup = N.Enemy.prototype.update, aggro = new WeakMap();
     N.Enemy.prototype.update = function (dt, target) {
@@ -370,8 +454,8 @@
         const a = performance.now() / 400 + (this.x % 7); arguments[1] = { x: this.x + Math.cos(a) * 80, y: this.y + Math.sin(a) * 80, r: 1, dead: false, hp: 1, maxHp: 1, hurt() {} };   // nobody near: it staggers around
         return eup.apply(this, arguments);
       }
-      if (owner && owner === N.Game.player && !owner.dead) { const live = IDS.map(d => allies[d]).filter(s => s && !s.dead && s.spawnT >= CFG.spawnTime);
-        if (live.length) { let a = aggro.get(this); if (!a || (a.t -= dt) <= 0 || a.c.dead) { let best = owner, bs = dist(this, owner);
+      if (owner && owner === N.Game.player) { const live = IDS.map(d => allies[d]).filter(s => s && !s.dead && s.spawnT >= CFG.spawnTime);
+        if (live.length) { let a = aggro.get(this); if (!a || (a.t -= dt) <= 0 || a.c.dead) { let best = owner, bs = owner.dead ? Infinity : dist(this, owner);
             for (const s of live) { const sc = dist(this, s) - (s.dex === 480 ? 140 : 0); if (sc < bs) { bs = sc; best = s; } } a = { c: best, t: 0.75 }; aggro.set(this, a); this.__lakeAggro = best === owner ? null : best.name; }
           if (a.c !== owner) { arguments[1] = a.c.caster || a.c; target = arguments[1]; } } }
       return eup.apply(this, arguments);
@@ -458,7 +542,7 @@
       ctx.save(); ctx.strokeStyle = s.t.ring; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.ellipse(s.x, s.y, 20, 7.5, 0, 0, TAU); ctx.stroke(); ctx.restore();
       if (s.anim) s.anim.draw(ctx, s.x, s.y);
       ctx.save(); ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030'; ctx.fillStyle = '#fff';
-      const label = (s.shiny ? '★ ' : '') + s.name + ' · ' + s.t.role + ' · Lv' + s.lvl; ctx.strokeText(label, s.x, s.y - 50); ctx.fillText(label, s.x, s.y - 50);
+      const label = (s.shiny ? '★ ' : '') + s.name + ' · ' + s.t.role + ' · Lv' + s.lvl + (s.ownItem ? ' · ' + ITEM_NAME(s.ownItem) : ''); ctx.strokeText(label, s.x, s.y - 50); ctx.fillText(label, s.x, s.y - 50);
       ctx.fillStyle = '#25152f'; ctx.fillRect(s.x - 22, s.y - 44, 44, 4); ctx.fillStyle = s.t.ring; ctx.fillRect(s.x - 22, s.y - 44, 44 * Math.max(0, s.hp / s.maxHp), 4); ctx.restore(); }
   }
 
@@ -466,5 +550,6 @@
   (function boot() { try { register(); hookPool(); hook(); } catch (err) { console.warn('[lake]', err); } if (!(registered && hooked)) setTimeout(boot, 200); else setInterval(() => { try { hookPool(); patchMystical(); } catch (_) {} }, 1000); })();
   window.PS_LAKE = { cfg: CFG, trio: TRIO, team, get allies() { return IDS.map(d => allies[d]).filter(Boolean).map(s => ({ dex: s.dex, name: s.name, hp: Math.round(s.hp), maxHp: s.maxHp, lvl: s.lvl, dead: s.dead, spawning: s.spawnT < CFG.spawnTime, x: s.x, y: s.y })); },
     _ally: dex => allies[Number(dex)] || null,
+    _anchor: (dex, p) => { const s = allies[Number(dex)]; return s ? anchorFor(s, p || owner) : null; },
     summon: dex => { const p = player(); if (!p || !isTrio(p.dex) || Number(dex) === Number(p.dex)) return null; if (owner !== p) { clearAll(); owner = p; } delete allies[dex]; return !!summon(Number(dex)); } };
 })();
