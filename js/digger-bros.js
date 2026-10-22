@@ -81,7 +81,7 @@
     makeActor(s); s.maxHp = Math.max(30, Math.round((Number(o.maxHp) || 100) * CFG.hp)); s.hp = s.maxHp; bro = s; sfx('quake');
   }
   function hurt(amt, type, by) {
-    const s = bro; if (!s || s.dead || s.emergeT < CFG.emerge || s.hurtCd > 0 || !Number.isFinite(amt) || amt <= 0) return;
+    const s = bro; if (!s || s.dead || s.thrown || s.emergeT < CFG.emerge || s.hurtCd > 0 || !Number.isFinite(amt) || amt <= 0) return;
     s.hurtCd = 0.35; const h = s.hp; try { E().Player.prototype.hurt.call(s.caster, amt, type); } catch (_) { s.hp -= amt; }
     if (s.hp <= 0 || s.dead) { s.hp = 0; s.dead = true; s.sink = 0; nextAt = (E().Game.st?.time ?? 0) + CFG.resummon; txt(s.x, s.y - 40, 'Drilbur burrowed away!', '#9ad8ff'); both(DRIL, D.faint, X.faint, 1); return; }
     if (h >= s.maxHp * 0.5 && s.hp < s.maxHp * 0.5) both(EXCA, X.hurt, null);
@@ -100,6 +100,7 @@
     if (!bro || (bro.dead && bro.sink > 1.2)) { if (now >= nextAt && !p.dead) summon(!!bro); if (!bro) return; }
     const s = bro; s.owner = p;
     if (s.dead) { s.sink += dt; return; }
+    if (s.thrown) return;   // Excadrill is bowling with him (js/kamina-moves.js)
     if (s.emergeT < CFG.emerge) { s.emergeT += dt; if (s.anim) { s.anim.loop('Idle'); s.anim.update(dt); } if (s.emergeT >= CFG.emerge) { both(DRIL, s.again ? D.back : D.arrive, s.again ? X.back : X.arrive, 0.9); } return; }
     for (const key of ['invuln', 'reviveShield', 'shadeInv', 'balloonCd']) s.caster[key] = Math.max(0, (Number(s.caster[key]) || 0) - dt);
     s.hurtCd = Math.max(0, s.hurtCd - dt); s.stunT = Math.max(0, s.stunT - dt); s.slowT = Math.max(0, s.slowT - dt); s.scratchT -= dt;
@@ -184,13 +185,14 @@
     [DRIL, 'normal', '...Watch me, Aniki. My drill is gonna pierce the heavens.', 'heart']];
   function start(p) {
     const N = E(), solo = !(N.Coop && N.Coop.active); usedRun = p;
-    cs = { p, i: -1, next: 0, solo, aura: 0, giga: null };
+    cs = { p, i: -1, next: 0, solo, aura: 0, giga: null, noGiga: !!window.PS_DIGGER.noGigaNext }; window.PS_DIGGER.noGigaNext = false;   // after his own Giga Drill Break (js/kamina-moves.js) Drilbur skips his
     if (solo) { try { B().game.soloHold(true); } catch (_) {} }
     window.PS_DIGGER.active = true;
   }
   const dur = t => Math.max(2.2, Math.min(4.8, 1.1 + t.length * 0.038));
   function advance() {
     const c = cs; c.i++; const st = SCRIPT[c.i]; if (st === undefined) return finish();
+    if (st === 'GIGA' && c.noGiga) { c.aura = c.aura || 0.5; c.next = 0.05; return; }
     if (st === 'GIGA') { c.giga = { t: 0, done: false }; try { T().cut(DRIL, 'normal', 'GIGAAA... DRILL... BREAAAK!!', 'spark', 2.0); } catch (_) {} sfx('judge'); c.next = 2.6; return; }
     const [who, face, text, em, act] = st;
     if (act === 'awaken') { c.aura = 0.01; sfx('legend'); }
@@ -243,14 +245,14 @@
     N.EnemyMgr.update = function () {
       try { update(arguments[0]); } catch (err) { console.warn('[digger]', err); }
       const r = emu.apply(this, arguments); const s = bro;
-      if (s && !s.dead && s.emergeT >= CFG.emerge && N.Game.state === 'playing') {
+      if (s && !s.dead && !s.thrown && s.emergeT >= CFG.emerge && N.Game.state === 'playing') {
         for (const e of N.EnemyMgr.all()) if (e && !e.dead && dist(s, e) < s.r + (e.r || 12)) { let d = 0; try { d = typeof e.dmg === 'function' ? e.dmg() : e.dmg; } catch (_) {} hurt(Number(d) || 8, e.atkType, e); }
         const shots = N.Projectiles.all(); for (let i = shots.length - 1; i >= 0; i--) { const q = shots[i]; if (!q || q.friendly || q.ghost || dist(s, q) > s.r + (q.r || 4)) continue; hurt(q.pct ? Math.max(q.dmg, s.maxHp * q.pct) : q.dmg, q.mtype); shots.splice(i, 1); } }
       return r; };
     // enemies mostly go for the loud one; Drilbur only draws them when he's much closer (or has his Spiral power)
     const eup = N.Enemy.prototype.update;
     N.Enemy.prototype.update = function (dt) { const s = bro;
-      if (s && !s.dead && s.emergeT >= CFG.emerge && owner && owner === N.Game.player && !(this.__lakeConfT > 0) && !(this.__lakeFearT > 0)) {
+      if (s && !s.dead && !s.thrown && s.emergeT >= CFG.emerge && owner && owner === N.Game.player && !(this.__lakeConfT > 0) && !(this.__lakeFearT > 0)) {
         if (dist(this, s) + (spiral ? 0 : 80) < (owner.dead ? Infinity : dist(this, owner))) arguments[1] = s.caster; }
       return eup.apply(this, arguments); };
     // pseudo-player: he collects drops — a held item is his, the rest goes to you
@@ -278,6 +280,7 @@
   function mound(ctx, x, y, u) { const r = 22 * Math.min(1, u * 1.6); ctx.save(); ctx.fillStyle = '#6a4a2a'; ctx.beginPath(); ctx.ellipse(x, y + 2, r, r * 0.42, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#8a6438'; ctx.beginPath(); ctx.ellipse(x, y, r * 0.8, r * 0.3, 0, 0, TAU); ctx.fill();
     for (let i = 0; i < 6; i++) { const a = -Math.PI * (0.1 + 0.8 * i / 5), k = (u * 3 + i * 0.17) % 1; ctx.fillStyle = i % 2 ? '#8a6438' : '#5a3a1c'; ctx.fillRect(x + Math.cos(a) * 18 * k - 2, y - 6 + Math.sin(a) * 26 * k + 30 * k * k, 4, 4); } ctx.restore(); }
   function drawBody(ctx, s) {
+    if (s.thrown) return;
     const now = clock();
     if (s.dead) { const u = Math.min(1, (s.sink || 0) / 1.2); mound(ctx, s.x, s.y, 1 - u); if (s.anim && u < 1) { ctx.save(); ctx.beginPath(); ctx.rect(s.x - 40, s.y - 80, 80, 82); ctx.clip(); ctx.globalAlpha = 1 - u; s.anim.draw(ctx, s.x, s.y + u * 34); ctx.restore(); } return; }
     if (s.emergeT < CFG.emerge) { const u = s.emergeT / CFG.emerge; mound(ctx, s.x, s.y, u); if (s.anim && u > 0.35) { const up = (u - 0.35) / 0.65; ctx.save(); ctx.beginPath(); ctx.rect(s.x - 40, s.y - 80, 80, 82); ctx.clip(); s.anim.draw(ctx, s.x, s.y + (1 - up) * 34); ctx.restore(); } return; }
@@ -297,7 +300,7 @@
   function drawSimonAura(ctx, p) { const now = clock(); ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(125,255,106,.55)'; ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < 44; i++) { const a = i * 0.5 + now * 6, r = 5 + i * 0.65; ctx.lineTo(p.x + Math.cos(a) * r, p.y - 14 + Math.sin(a) * r * 0.5); } ctx.stroke(); ctx.restore(); }
   function drawTop(ctx) {
     if (simon && simon === E().Game.player && !simon.dead) { drawSimonAura(ctx, simon); return; }
-    const s = bro; if (!s || !owner || owner !== E().Game.player || s.dead || s.emergeT < CFG.emerge) return;
+    const s = bro; if (!s || !owner || owner !== E().Game.player || s.dead || s.thrown || s.emergeT < CFG.emerge) return;
     ctx.save(); ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030'; ctx.fillStyle = spiral ? '#7dff6a' : '#fff';
     const label = (s.shiny ? '★ ' : '') + 'Drilbur · ' + (spiral ? 'Spiral' : s.mode === 'escape' ? 'Hiding' : s.mode === 'cornered' ? 'Cornered!' : 'Digger') + (s.ownItem ? ' · ' + (K()?.itemName ? K().itemName(s.ownItem) : s.ownItem) : '');
     ctx.strokeText(label, s.x, s.y - 44); ctx.fillText(label, s.x, s.y - 44);
