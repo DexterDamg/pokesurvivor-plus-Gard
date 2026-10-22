@@ -14,8 +14,8 @@
   'use strict';
   if (window.PS_LAKE_TALK_INSTALLED) return; window.PS_LAKE_TALK_INSTALLED = true;
   const E = () => window.PS_HOOPA_ENGINE, TAU = Math.PI * 2;
-  const NAME = { 480: 'Uxie', 481: 'Mesprit', 482: 'Azelf', 483: 'Dialga', 484: 'Palkia' }, COLOR = { 480: '#ffd84a', 481: '#ff8ad0', 482: '#5ab0ff', 483: '#8fd8ff', 484: '#ff9ad8' };
-  const TRIO = [480, 481, 482];   // Dialga and Palkia only speak as guests (js/creation-rift.js)
+  const NAME = { 480: 'Uxie', 481: 'Mesprit', 482: 'Azelf', 483: 'Dialga', 484: 'Palkia', 487: 'Giratina' }, COLOR = { 480: '#ffd84a', 481: '#ff8ad0', 482: '#5ab0ff', 483: '#8fd8ff', 484: '#ff9ad8', 487: '#ff4a5e' };
+  const TRIO = [480, 481, 482];   // Dialga, Palkia and Giratina only speak as guests (js/creation-rift.js, js/giratina-void.js)
   const FACE = { normal: 0, happy: 1, pain: 2, angry: 3, worried: 4, sad: 5, crying: 6, shouting: 7, teary: 8, determined: 9, joyous: 10, inspired: 11, surprised: 12, dizzy: 13, sigh: 16, stunned: 17 };
   const CFG = { gap: 5, aloneEvery: [45, 75], chatEvery: [55, 90] };   // seconds between low-priority lines, lonely lines, banter
 
@@ -49,6 +49,7 @@
       cheerConfuse: [['happy', 'Well done, Mesprit. Chaos, applied precisely.', 'note']],
       riseMax: [['inspired', 'Azelf\'s fire is in my veins. ...Figuratively. Mostly.', 'spark'], ['surprised', 'Fifty percent?! Azelf, that\'s — that\'s actually remarkable!', 'exclaim']],
       thanks: [['happy', 'Thank you, Mesprit. That was... very warm.', 'heart'], ['happy', 'Ah... much better. You always know exactly what I need.', 'heart']],
+      tether: [['worried', 'Don\'t stray so far. Statistically, alone is how things go wrong.', 'sweat'], ['determined', 'Come back here. I\'m not losing track of you again.', 'exclaim'], ['sigh', 'I\'m pulling you back. Please stay where I can see you.', 'dots']],
       item: [['happy', 'I\'ll hold on to this. I already know three ways to use it.', 'note'], ['inspired', 'Fascinating. This should help.', 'spark']],
       mystic: { push: [['determined', 'Mystical Power. Five studs back — exactly as calculated.', 'spark'], ['determined', 'Shields up, sisters. And you lot — out of our space.', 'anger'], ['happy', 'Knowledge is a wall. Lean on it.', 'note']] } },
     481: {   // Mesprit: warm, teasing, empathic
@@ -80,6 +81,7 @@
       cheerConfuse: [['joyous', 'Hehe, look at it go! Uxie made it dizzy~', 'note'], ['happy', 'Uxie! That one\'s punching its own friends!', 'note']],
       riseMax: [['joyous', 'I can feel Azelf\'s heart burning — it\'s contagious!', 'spark'], ['inspired', 'Fifty percent! Azelf, you\'re on FIRE~!', 'spark']],
       rise: [['happy', 'Ooh, I feel faster! Thanks, Azelf~', 'spark']],
+      tether: [['angry', 'Hey! Where do you think you\'re going without us?!', 'anger'], ['happy', 'Nope~ Too far! Back you come!', 'heart'], ['worried', 'I can barely feel your heart from there — come closer!', 'sweat']],
       item: [['joyous', 'Ooh, shiny! Finders keepers~', 'heart'], ['happy', 'Look what I found! It\'s mine now~', 'note']],
       mystic: { boost: [['joyous', 'Mystical Power — and a little extra love for my sisters~!', 'heart'], ['inspired', 'Twenty percent more! Feel my heart, both of you!', 'spark']],
         fear: [['happy', 'Mystical Power! Now walk it back, meanies~', 'note'], ['determined', 'Shoo! Backwards, all of you!', 'exclaim'], ['happy', 'Feel that? That\'s how scary a big sister can be~', 'note']] } },
@@ -109,6 +111,7 @@
       guardUxie: [['angry', 'Uxie! Behind me, NOW! I\'ll handle these jerks!', 'anger'], ['determined', 'I\'ve got you, Uxie. Breathe. I\'m right here.', 'exclaim']],
       cheerConfuse: [['happy', 'Ha! It\'s hitting its own buddies! Nice one!', 'note'], ['joyous', 'Look at them fight each other! Do it again!', 'note']],
       thanks: [['happy', 'Th-thanks, Mesprit. I wasn\'t hurt. Much.', 'heart'], ['happy', '...Okay, that felt nice. Don\'t make it a thing.', 'heart']],
+      tether: [['angry', 'HEY! Get back here! We stick TOGETHER!', 'anger'], ['determined', 'Too far! I\'m dragging you back, whether you like it or not!', 'exclaim'], ['sigh', 'Ugh, don\'t make me chase you. ...Fine, I\'ll pull you.', 'dots']],
       item: [['determined', 'Mine! ...What does it do? Doesn\'t matter, it\'s mine!', 'exclaim'], ['happy', 'Ha! Even stronger now!', 'spark']],
       mystic: { power: [['determined', 'Mystical Power! Faster, stronger — ALL of us!', 'spark'], ['shouting', 'Take my willpower, sisters! Hit HARDER!', 'spark'], ['joyous', 'You feel that?! That\'s us!', 'spark']] } } };
 
@@ -138,7 +141,7 @@
     if (!o.prio) lastLow = now;
     const item = { dex, face: ln0[0], text: ln0[1].replace(/\{name\}/g, o.name || ''), emote: ln0[2], delay: o.delay || 0 };
     if (o.prio && queue.length > 2) queue.splice(0, queue.length - 2);
-    queue.push(item); return true;
+    if (o.front) queue.unshift(item); else queue.push(item); return true;   // front: urgent, it plays next
   }
   const clock = () => performance.now() / 1000;
   function show(it) { cur = { it, t: 0, dur: it.dur || Math.max(2.8, Math.min(6, 1.6 + it.text.length * 0.045)) }; nm.textContent = NAME[it.dex]; nm.style.color = COLOR[it.dex]; face(it.dex, it.face); ln.textContent = ''; box.classList.add('on'); if (it.emote) emote(it.dex, it.emote); }
@@ -180,7 +183,9 @@
   const live = () => (window.PS_LAKE?.allies || []).filter(a => !a.dead && !a.spawning).map(a => a.dex);
   const party = () => { const p = me(); return p ? [Number(p.dex), ...live()] : []; };
   const rnd = (a, b) => a + Math.random() * (b - a);
+  const scene = () => !!(window.PS_CREATION_RIFT?.active || window.PS_GIRATINA?.active);   // a cutscene owns the talk box
   function onLake(ev) {
+    if (scene()) return;
     const d = ev.detail || {}, p = me(); if (!p) return; const P = Number(p.dex), dex = Number(d.dex);
     if (d.type === 'summon') { if (!d.again) say(P, L[P].call[dex], { prio: true }); }
     else if (d.type === 'arrive') {
@@ -204,6 +209,7 @@
     else if (d.type === 'mesprit') {   // Mesprit's 5-second pulse
       if (Math.random() < 0.35 && say(481, L[481].pulse[d.kind]) && d.kind === 'heal') { const others = party().filter(x => x !== 481 && L[x].thanks); const by = others[Math.floor(Math.random() * others.length)]; if (by && Math.random() < 0.5) say(by, L[by].thanks, { delay: 0.2, follow: true }); } }
     else if (d.type === 'item') say(dex, L[dex] && L[dex].item);
+    else if (d.type === 'tether') { const t = clock(); if (t - (onLake.tetherAt || -99) > 15) { onLake.tetherAt = t; say(dex, L[dex] && L[dex].tether, { prio: true, front: true }); if (cur && cur.it.dex !== dex) cur.dur = Math.min(cur.dur, cur.t + 0.4); } }
     else if (d.type === 'mystical') {   // Mystical Power buffing the sisters
       const S = L[dex] && L[dex].mystic && L[dex].mystic[d.kind]; if (S && Math.random() < (d.kind === 'boost' || d.kind === 'fear' ? 0.5 : 0.35)) say(dex, S); }
     else if (d.type === 'z') { const all = party(); all.forEach((by, i) => say(by, L[by].z, { prio: true, delay: i * 0.25 })); }
@@ -213,7 +219,7 @@
     const N = E(), g = N?.Game, p = me();
     if (!p || !g || g.state === 'over' || g.state === 'ui') { if (runP) { runP = null; queue.length = 0; cur = null; box.classList.remove('on'); emotes.length = 0; } return; }
     if (p !== runP) { runP = p; aloneT = 3; chatT = rnd(...CFG.chatEvery); lastHp = p.hp; low = false; lvl = p.level; bigCd = 0; bossCd = 0; queue.length = 0; cur = null; }
-    if (g.state !== 'playing') return;
+    if (g.state !== 'playing' || scene()) { if (scene()) lastHp = p.hp; return; }
     const P = Number(p.dex), allies = live(), alone = !allies.length && !(window.PS_LAKE?.allies || []).some(a => a.spawning);
     // alone: lonely, sad, scared
     if (alone) { aloneT -= dt; if (aloneT <= 0) { say(P, runP.__lakeStarted ? L[P].alone : L[P].aloneStart, { prio: !runP.__lakeStarted }); runP.__lakeStarted = true; aloneT = rnd(...CFG.aloneEvery); } }
@@ -232,7 +238,7 @@
   function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.1, (now - last) / 1000); last = now; try { watch(dt); tickBox(dt); for (let i = emotes.length - 1; i >= 0; i--) if ((emotes[i].t += dt) > emotes[i].life) emotes.splice(i, 1); } catch (e) { console.warn('[lake-talk]', e); } }
   let hooked = false;
   function hook() { const N = E(); if (hooked || !N || !N.Ult || !N.Ult.drawUnits) return; hooked = true; const du = N.Ult.drawUnits; N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { if (me()) drawEmotes(ctx); } catch (e) { console.warn('[lake-talk]', e); } }; }
-  function init() { document.head.append(css); document.body.append(box); for (const d of [480, 481, 482, 483, 484]) { const i = new Image(); i.src = 'assets/portraits/' + d + '.png'; } (function h() { hook(); if (!hooked) setTimeout(h, 200); })(); requestAnimationFrame(loop); }
+  function init() { document.head.append(css); document.body.append(box); for (const d of [480, 481, 482, 483, 484, 487]) { const i = new Image(); i.src = 'assets/portraits/' + d + '.png'; } (function h() { hook(); if (!hooked) setTimeout(h, 200); })(); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
   // a cutscene line: shown right away for a fixed time (clears whatever was waiting)
   function cut(dex, f, text, em, dur) { queue.length = 0; show({ dex, face: f, text, emote: em, dur }); }

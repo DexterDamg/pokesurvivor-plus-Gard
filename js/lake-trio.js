@@ -41,7 +41,8 @@
     mespritEvery: 5, mespritStun: 3, mespritConfuse: 3, mespritDrain: 0.05, mespritHeal: 0.10,      // Mesprit
     buffStep: 0.10, buffMax: 5, buffTime: 10,   // every trio buff is a +10% stack (up to +50%) on the buffs all three share
     mysticCd: 6, mysticRadius: 260, stud: 32, pushStuds: 5, mespritExtra: 2, fearTime: 5,   // Mystical Power
-    coopFar: 600, jobRange: 320, jobSafe: 150 };   // co-op: follow another player past this distance · loot/chest/crystal search, and how clear it must be
+    coopFar: 600, jobRange: 320, jobSafe: 150,
+    tetherFar: 450, tetherNear: 260, tetherSpeed: 320 };   // stray this far from your sisters and they pull you back   // co-op: follow another player past this distance · loot/chest/crystal search, and how clear it must be
   const TRIO = {
     480: { key: 'uxie', name: 'Uxie', move: 'lake-uxie', role: 'Guardian', hp: 2.0, atk: 0.6, spd: 1.0, take: 0.8, leash: 260, dead: 90, ideal: 200,
       kit: ['confusion'], drop: ['#fff7c0', '#ffd84a', '#c8960c'], ring: '#ffd84a',
@@ -114,7 +115,7 @@
     Object.defineProperty(a, 'item', { configurable: true, get: () => s.ownItem || s.owner.item, set: v => { s.ownItem = v; } });   // her own held item once she picks one up
     Object.defineProperty(a, 'baseAtk', { configurable: true, get: () => (Number(s.owner.baseAtk) || 1) * s.t.atk * lvlMul(s) });
     Object.defineProperty(a, 'baseSpd', { configurable: true, get: () => Number(s.owner.baseSpd) || 100 });
-    Object.defineProperty(a, 'floating', { configurable: true, get: () => true });
+    Object.defineProperty(a, 'floating', { configurable: true, get: () => false });   // they walk: no hovering over water or obstacles
     a.hurt = (amt, type) => hurt(s, amt, type); a.ultCd = Infinity; a.ultT = 0;
   }
   function hpFor(s) { return Math.max(30, Math.round((Number(s.owner.maxHp) || 100) * s.t.hp * lvlMul(s))); }
@@ -124,7 +125,7 @@
     const s = { dex, t, name: t.name, owner: o, side, shiny, x: o.x + side * 70, y: o.y + 8, r: 16, bodyH: 36, dead: false, spawnT: 0, age: 0, lvl: moveOf(o, dex)?.lvl || 1,
       next: 0.5, kitI: 0, cd: {}, hurtCd: 0, stunT: 0, slowT: 0, path: [], aim: 0, target: null, anim: null };
     try { N.Sprites.preload([dex], 4000, shiny); s.anim = new N.Sprites.Animator(dex, 1, shiny); } catch (_) {}
-    try { const H = window.PS_HOOPA; if (H && H.summonFree && !H.summonFree(s.x, s.y, s.r)) { s.x = o.x; s.y = o.y + 30; } } catch (_) {}
+    { const f = nearFree(s.x, s.y, s.r); s.x = f.x; s.y = f.y; }   // rises from open ground, never inside a rock or a wall
     makeActor(s); s.maxHp = hpFor(s); s.hp = s.maxHp; s.again = !!again; allies[dex] = s;
     sfx('surge'); emit('summon', { dex, again: !!again }); return s;
   }
@@ -255,7 +256,9 @@
   }
 
   // ---- AI ----
-  const freeAt = (x, y, r) => { try { return window.PS_HOOPA?.summonFree ? window.PS_HOOPA.summonFree(x, y, r) : true; } catch (_) { return true; } };
+  // solid ground for a body of radius r: the engine's own check (walls, rocks, trees' trunks, water...)
+  const freeAt = (x, y, r) => { try { return E().World.isFree(x, y, Math.max(6, (r || 16) * 0.6)); } catch (_) { return true; } };
+  function nearFree(x, y, r) { if (freeAt(x, y, r)) return { x, y }; for (let d = 8; d <= 240; d += 8) for (let i = 0; i < 16; i++) { const a = i * TAU / 16, nx = x + Math.cos(a) * d, ny = y + Math.sin(a) * d; if (freeAt(nx, ny, r)) return { x: nx, y: ny }; } return { x, y }; }
   function everyone() { try { const N = E(), ev = N.Game.everyone; const L = typeof ev === 'function' ? ev.call(N.Game) : ev; return Array.isArray(L) ? L : []; } catch (_) { return []; } }
   const coopOn = () => !!(E()?.Coop?.active);
   // co-op: while her sister-player is far away or down, she follows and fights for the nearest other player
@@ -319,7 +322,7 @@
     if (p !== owner) { clearAll(); owner = p; }
     if (N.Game.state !== 'playing') return;
     // came through a Rift or any teleport: bring the team along
-    if (!p.dead && ownerPos && Math.hypot(p.x - ownerPos.x, p.y - ownerPos.y) > 420) for (const d of IDS) { const s = allies[d]; if (s) { s.x = p.x + s.side * 70; s.y = p.y + 8; s.path = []; } }
+    if (!p.dead && ownerPos && Math.hypot(p.x - ownerPos.x, p.y - ownerPos.y) > 420) for (const d of IDS) { const s = allies[d]; if (s) { const f = nearFree(p.x + s.side * 70, p.y + 8, s.r); s.x = f.x; s.y = f.y; s.path = []; s.okX = f.x; s.okY = f.y; } }
     ownerPos = { x: p.x, y: p.y };
     if ((team.protectT -= dt) <= 0) team.protect = 0;
     for (let i = sights.length - 1; i >= 0; i--) { const f = sights[i]; f.t += dt; if (f.t >= f.dur) { blast(f.s, f.x, f.y, f.r, 4 * lvlMul(f.s), { knock: 140, color: '#9ad0ff' }); sfx('boss'); sights.splice(i, 1); } }
@@ -375,6 +378,9 @@
       // keep the trio from stacking on each other and on you
       for (const o of [p, ...IDS.map(x => allies[x]).filter(o => o && o !== s && !o.dead)]) { let dx = s.x - o.x, dy = s.y - o.y, dd = Math.hypot(dx, dy); if (dd < 40) { if (dd < 0.01) { dx = s.side; dy = 0; dd = 1; } const push = Math.min(40 - dd, 80 * dt); s.x += dx / dd * push; s.y += dy / dd * push; } }
       try { N.World.collide(s); } catch (_) {}
+      // never inside an obstacle: whatever moved her there (a path shortcut, a sidestep, a shove), she goes back to her last legal spot
+      if (!freeAt(s.x, s.y, s.r)) { if (s.okX != null && freeAt(s.okX, s.okY, s.r)) { s.x = s.okX; s.y = s.okY; } else { const f = nearFree(s.x, s.y, s.r); s.x = f.x; s.y = f.y; } s.path = []; }
+      s.okX = s.x; s.okY = s.y;
       if (s.anim) { s.anim.loop(moved ? 'Walk' : 'Idle'); if (target) s.anim.dir = N.Sprites.dirFromAngle(Math.atan2(target.y - s.y, target.x - s.x)); else if (!moved) s.anim.dir = N.Sprites.dirFromAngle(Math.atan2(A.y - s.y, A.x - s.x)); s.anim.update(dt); }
       if (s.stunT > 0) continue;
       if (d === 481) { s.pulseT = (s.pulseT ?? CFG.mespritEvery) - dt; if (s.pulseT <= 0) { s.pulseT = CFG.mespritEvery; try { mespritPulse(s); } catch (err) { console.warn('[lake]', err); } } }
@@ -387,8 +393,22 @@
         s.kitI++; s.next = Math.max(0.3, (def.cd || 1) * (Number(s.caster.cdK) || 1) * (d === 482 ? 0.8 : 1)); } }
       for (const sk of SKILLS[d]) { const k = sk.lv + ''; s.cd[k] = (s.cd[k] || 0) - dt; if (s.lvl >= sk.lv && s.cd[k] <= 0) { let used = false; try { used = !!sk.use(s); } catch (err) { console.warn('[lake]', err); } s.cd[k] = used ? sk.cd * (Number(s.caster.cdK) || 1) / (s.lvl >= 5 ? 1.25 : 1) : 0.5; } }
     }
+    tether(p, dt);
   }
 
+  // ---- the tether: stray too far from your sisters and they psychically pull you back to them ----
+  let pull = null;   // {s} while pulling
+  function tether(p, dt) {
+    const N = E(); if (p.dead || window.PS_CREATION_RIFT?.active || window.PS_GIRATINA?.active) { pull = null; return; }
+    const live = sistersAlive().filter(s => !(s.standT > 0)); if (!live.length) { pull = null; return; }
+    const s = live.sort((a, b) => dist(a, p) - dist(b, p))[0], d = dist(s, p);
+    if (!pull && d > CFG.tetherFar) { pull = { s }; emit('tether', { dex: s.dex }); sfx('surge'); }
+    if (!pull) return; if (pull.s !== s) pull.s = s;
+    if (d < CFG.tetherNear) { pull = null; return; }
+    const a = Math.atan2(s.y - p.y, s.x - p.x), st = Math.min(d - CFG.tetherNear + 1, CFG.tetherSpeed * dt), ox = p.x, oy = p.y;
+    p.x += Math.cos(a) * st; p.y += Math.sin(a) * st; try { N.World.collide(p); } catch (_) {}
+    if (Math.hypot(p.x - ox, p.y - oy) < st * 0.2) { s.x += (p.x - s.x) * 0.02; s.y += (p.y - s.y) * 0.02; }   // blocked: she drifts your way too
+  }
   // ================= engine hooks =================
   let hooked = false;
   function hook() {
@@ -493,6 +513,10 @@
     const ucast = N.Ult.cast, uupd = N.Ult.update;
     const zc = zWrap(ucast); N.Ult.cast = function (actor) { const r = zc.apply(this, arguments); if (r && actor && actor === N.Game.player && isTrio(actor.dex)) { actor.ultCd = (Number(N.Ult.CD) || 90) * CFG.zCd; emit('z', { dex: Number(actor.dex) }); } return r; };
     N.Ult.update = zWrap(uupd);
+    // the sisters join the engine's depth-sorted world drawables (the same way js/catching.js adds the trainer)
+    const td = N.Training && N.Training.drawables;
+    if (typeof td === 'function') { sorted = true; N.Training.drawables = function () { let r = td.apply(this, arguments); if (!Array.isArray(r)) r = [];
+      try { if (owner && owner === N.Game.player) for (const d of IDS) { const s = allies[d]; if (s) r.push({ y: s.y, draw: g => drawBody(g, s) }); } } catch (err) { console.warn('[lake]', err); } return r; }; }
     // drawing (world space, under the HUD)
     const du = N.Ult.drawUnits;
     N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { draw(ctx); } catch (err) { console.warn('[lake]', err); } };
@@ -519,6 +543,15 @@
     ctx.restore();
   }
   function tear(ctx, x, y, w, h, hi, mid, lo) { const g = ctx.createLinearGradient(x, y - h, x, y + w); g.addColorStop(0, hi); g.addColorStop(0.6, mid); g.addColorStop(1, lo); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, y - h); ctx.bezierCurveTo(x + w * 0.4, y - h * 0.4, x + w, y - w * 0.2, x + w, y + w * 0.2); ctx.arc(x, y + w * 0.2, w, 0, Math.PI); ctx.bezierCurveTo(x - w, y - w * 0.2, x - w * 0.4, y - h * 0.4, x, y - h); ctx.fill(); }
+  // her body: drawn in the engine's depth-sorted world pass (with trees, rocks, enemies and players), so a tree in
+  // front of her covers her like it covers you. Name, HP bar and effects stay on top (draw below).
+  let sorted = false;
+  function drawBody(ctx, s) {
+    if (s.dead) { const k = Math.min(1, s.melt / CFG.meltTime); if (k < 1) { if (s.anim) { ctx.save(); ctx.globalAlpha = 1 - k; s.anim.draw(ctx, s.x, s.y); ctx.restore(); } drop(ctx, s.x, s.y, s, 1.35 - k * 0.8); } return; }
+    if (s.spawnT < CFG.spawnTime) { drop(ctx, s.x, s.y, s, s.spawnT); if (s.anim && s.spawnT > 0.95) { ctx.save(); ctx.globalAlpha = Math.min(1, (s.spawnT - 0.95) / 0.4); s.anim.draw(ctx, s.x, s.y); ctx.restore(); } return; }
+    ctx.save(); ctx.strokeStyle = s.t.ring; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.ellipse(s.x, s.y, 20, 7.5, 0, 0, TAU); ctx.stroke(); ctx.restore();
+    if (s.anim) s.anim.draw(ctx, s.x, s.y);
+  }
   function draw(ctx) {
     if (!owner || owner !== E().Game.player) return; const now = performance.now() / 1000;
     // Future Sight markers
@@ -535,12 +568,13 @@
       ctx.globalAlpha = 0.12; ctx.fillStyle = '#fff6c0'; ctx.fill(); ctx.globalAlpha = 1; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030'; ctx.fillStyle = '#ffe27a';
       const tx = 'Untouchable ' + Math.ceil(t) + 's'; ctx.strokeText(tx, x, y + 24); ctx.fillText(tx, x, y + 24); ctx.restore(); };
     if (team.pStandT > 0 && owner) stand(owner.x, owner.y, team.pStandT);
+    if (pull && pull.s && owner) { const s = pull.s, n = 18, a = Math.atan2(owner.y - s.y, owner.x - s.x) + Math.PI / 2; ctx.save(); ctx.strokeStyle = s.t.ring; ctx.lineWidth = 3; ctx.shadowColor = s.t.ring; ctx.shadowBlur = 10; ctx.globalAlpha = 0.85; ctx.beginPath();
+      for (let i = 0; i <= n; i++) { const u = i / n, x = s.x + (owner.x - s.x) * u, y = s.y - 18 + (owner.y - s.y) * u, w = Math.sin(u * Math.PI * 4 - now * 14) * 6 * Math.sin(u * Math.PI); ctx.lineTo(x + Math.cos(a) * w, y + Math.sin(a) * w); }
+      ctx.stroke(); ctx.restore(); }
     for (const d of IDS) { const s = allies[d]; if (!s) continue;
       if (s.standT > 0 && !s.dead) stand(s.x, s.y, s.standT);
-      if (s.dead) { const k = Math.min(1, s.melt / CFG.meltTime); if (k < 1) { if (s.anim) { ctx.save(); ctx.globalAlpha = 1 - k; s.anim.draw(ctx, s.x, s.y); ctx.restore(); } drop(ctx, s.x, s.y, s, 1.35 - k * 0.8); } continue; }
-      if (s.spawnT < CFG.spawnTime) { drop(ctx, s.x, s.y, s, s.spawnT); if (s.anim && s.spawnT > 0.95) { ctx.save(); ctx.globalAlpha = Math.min(1, (s.spawnT - 0.95) / 0.4); s.anim.draw(ctx, s.x, s.y); ctx.restore(); } continue; }
-      ctx.save(); ctx.strokeStyle = s.t.ring; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.ellipse(s.x, s.y, 20, 7.5, 0, 0, TAU); ctx.stroke(); ctx.restore();
-      if (s.anim) s.anim.draw(ctx, s.x, s.y);
+      if (!sorted) drawBody(ctx, s);   // normally her body is drawn in the world's depth-sorted pass (see drawBody)
+      if (s.dead || s.spawnT < CFG.spawnTime) continue;
       ctx.save(); ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030'; ctx.fillStyle = '#fff';
       const label = (s.shiny ? '★ ' : '') + s.name + ' · ' + s.t.role + ' · Lv' + s.lvl + (s.ownItem ? ' · ' + ITEM_NAME(s.ownItem) : ''); ctx.strokeText(label, s.x, s.y - 50); ctx.fillText(label, s.x, s.y - 50);
       ctx.fillStyle = '#25152f'; ctx.fillRect(s.x - 22, s.y - 44, 44, 4); ctx.fillStyle = s.t.ring; ctx.fillRect(s.x - 22, s.y - 44, 44 * Math.max(0, s.hp / s.maxHp), 4); ctx.restore(); }
@@ -548,7 +582,7 @@
 
   // ================= boot =================
   (function boot() { try { register(); hookPool(); hook(); } catch (err) { console.warn('[lake]', err); } if (!(registered && hooked)) setTimeout(boot, 200); else setInterval(() => { try { hookPool(); patchMystical(); } catch (_) {} }, 1000); })();
-  window.PS_LAKE = { cfg: CFG, trio: TRIO, team, get allies() { return IDS.map(d => allies[d]).filter(Boolean).map(s => ({ dex: s.dex, name: s.name, hp: Math.round(s.hp), maxHp: s.maxHp, lvl: s.lvl, dead: s.dead, spawning: s.spawnT < CFG.spawnTime, x: s.x, y: s.y })); },
+  window.PS_LAKE = { cfg: CFG, trio: TRIO, team, get pulling() { return !!pull; }, get allies() { return IDS.map(d => allies[d]).filter(Boolean).map(s => ({ dex: s.dex, name: s.name, hp: Math.round(s.hp), maxHp: s.maxHp, lvl: s.lvl, dead: s.dead, spawning: s.spawnT < CFG.spawnTime, x: s.x, y: s.y })); },
     _ally: dex => allies[Number(dex)] || null,
     _anchor: (dex, p) => { const s = allies[Number(dex)]; return s ? anchorFor(s, p || owner) : null; },
     summon: dex => { const p = player(); if (!p || !isTrio(p.dex) || Number(dex) === Number(p.dex)) return null; if (owner !== p) { clearAll(); owner = p; } delete allies[dex]; return !!summon(Number(dex)); } };
