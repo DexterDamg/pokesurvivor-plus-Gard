@@ -4,7 +4,9 @@
    - Played alone: lonely, sad and scared lines (they miss the other two).
    - Summoning one of the others: a reunion, hearts. Hurting one makes the others angry; a faint makes them cry out;
      coming back is a teary relief. They also cheer on each other's skills, react to bosses and to their Z-Move,
-     and chat now and then while together.
+     and chat now and then while together. Their passives get lines too: Uxie confusing an attacker and her last
+     stand (the others rush to cover her), Azelf's rising ATK & SPEED (everyone cheers at +50%), and Mesprit's
+     5-second pulse (stun / confuse / drain / heal, with thanks from her sisters).
    Personalities: Uxie (knowledge) calm, logical, quietly protective · Mesprit (emotion) warm, teasing, empathic ·
    Azelf (willpower) brash, hot-headed, secretly the softest of the three. Needs js/lake-trio.js. */
 (() => {
@@ -36,7 +38,15 @@
       z: [['inspired', 'Knowledge, emotion, willpower — together! Now!', 'spark'], ['inspired', 'This is the answer to every problem. All of us, at once!', 'spark']],
       skill: { cosmic: [['determined', 'Cosmic Power. Stand inside my shield.', 'note'], ['determined', 'Defense rising. Trust the numbers.', 'note']], shove: [['angry', 'Back. Away. From. My. Family.', 'anger']], recover: [['happy', 'Recovering... and sharing it with you all.', 'note']] },
       chat: [['happy', 'Mesprit says I think too much. I\'ve thought about it, and she\'s right.', 'note'], ['joyous', 'Being together like this... I could study this feeling forever.', 'heart'], ['inspired', 'Did you know we\'re stronger as three than the sum of us? I checked.', 'spark'], ['happy', 'Azelf, stop showing off. ...Fine. It was impressive.', 'heart']],
-      level: [['inspired', 'We\'re growing. I can feel it in my mind.', 'spark']] },
+      level: [['inspired', 'We\'re growing. I can feel it in my mind.', 'spark']],
+      // passives
+      confuse: [['determined', 'You struck me. Now you can\'t tell friend from foe — go on, hit your friends.', 'spark'], ['happy', 'Confusion is just knowledge, rearranged badly.', 'note'], ['determined', 'Touch me again and you\'ll forget which side you\'re on.', 'spark'], ['sigh', 'I told you not to touch me. Now look at you.', 'dots']],
+      stand: [['worried', 'I-I\'m at my limit! Falling back — Azelf! Mesprit!', 'sweat'], ['teary', 'I need my sisters... just for a moment... please...', 'tear'], ['worried', 'Shield up! I\'m retreating — someone cover me!', 'sweat']],
+      standAlone: [['crying', 'Not here... not like this... Shield, hold! Please hold!', 'tear'], ['worried', 'Twenty seconds... I have twenty seconds to think of something...', 'sweat']],
+      standEnd: [['determined', 'The shield\'s fading... I\'ve recovered enough. Back to work.', 'note'], ['sigh', 'Thank you... I\'m okay now. Mostly.', 'dots']],
+      cheerConfuse: [['happy', 'Well done, Mesprit. Chaos, applied precisely.', 'note']],
+      riseMax: [['inspired', 'Azelf\'s fire is in my veins. ...Figuratively. Mostly.', 'spark'], ['surprised', 'Fifty percent?! Azelf, that\'s — that\'s actually remarkable!', 'exclaim']],
+      thanks: [['happy', 'Thank you, Mesprit. That was... very warm.', 'heart'], ['happy', 'Ah... much better. You always know exactly what I need.', 'heart']] },
     481: {   // Mesprit: warm, teasing, empathic
       aloneStart: [['sad', 'Uxie? Azelf? ...It\'s so quiet. I can\'t feel your hearts from here.', 'dots'], ['teary', 'I\'m the Being of Emotion and right now all I feel is lonely.', 'tear'], ['worried', 'I don\'t like this. I don\'t like being the only one.', 'sweat']],
       alone: [['sigh', 'Uxie would have a plan by now. Azelf would have charged already. And me? I just miss them.', 'dots'], ['sad', 'Every heart out here is angry or scared. None of them are theirs.', 'dots'], ['teary', 'I keep making jokes and there\'s no one to laugh at them...', 'tear'], ['sad', 'Hey, lake... if you can hear me, send them back to me, okay?', 'dots'], ['worried', 'Being brave is Azelf\'s thing... I\'m just pretending really hard.', 'sweat']],
@@ -56,7 +66,16 @@
       z: [['inspired', 'All three hearts at once — here we gooo!', 'spark'], ['joyous', 'Together! This is my favorite feeling in the world!', 'spark']],
       skill: { wish: [['happy', 'Healing Wish! Everybody, feel better~', 'heart']], lullaby: [['happy', 'Shhh... sleep tight, meanies~', 'note']], protect: [['determined', 'Protect! I\'ve got you!', 'exclaim']] },
       chat: [['happy', 'Uxie, you\'re overthinking again. I can tell, your eyebrows are doing the thing.', 'note'], ['joyous', 'Azelf, admit it, you missed us. ...Your heart just said yes!', 'heart'], ['happy', 'This is nice. Fighting monsters, sure, but together~', 'heart'], ['inspired', 'Knowledge, emotion, willpower. We\'re basically unbeatable!', 'spark']],
-      level: [['joyous', 'We leveled up! Celebration! Okay, celebrate later, fight now!', 'spark']] },
+      level: [['joyous', 'We leveled up! Celebration! Okay, celebrate later, fight now!', 'spark']],
+      // passives
+      pulse: { stun: [['happy', 'Freeze right there~!', 'note'], ['determined', 'Stay put, you!', 'exclaim'], ['happy', 'Hold still~ This won\'t hurt. Much.', 'note']],
+        confuse: [['happy', 'Spin, spin, spin~ Which way is up?', 'note'], ['joyous', 'Now you don\'t know who your friends are~', 'note'], ['happy', 'Oopsie, did I scramble your heart?', 'heart']],
+        drain: [['happy', 'Just a little piece of your heart, please~', 'heart'], ['determined', 'I\'ll take that, thank you!', 'note'], ['happy', 'Five percent each! Fair\'s fair~', 'note']],
+        heal: [['happy', 'Everyone okay? Here, have some love~', 'heart'], ['joyous', 'Heal time! Feel my heart~', 'heart'], ['happy', 'There we go. All better~', 'heart']] },
+      guardUxie: [['determined', 'Uxie! Over here, I\'ve got you!', 'exclaim'], ['worried', 'Get behind me, Uxie! Nobody touches you!', 'sweat']],
+      cheerConfuse: [['joyous', 'Hehe, look at it go! Uxie made it dizzy~', 'note'], ['happy', 'Uxie! That one\'s punching its own friends!', 'note']],
+      riseMax: [['joyous', 'I can feel Azelf\'s heart burning — it\'s contagious!', 'spark'], ['inspired', 'Fifty percent! Azelf, you\'re on FIRE~!', 'spark']],
+      rise: [['happy', 'Ooh, I feel faster! Thanks, Azelf~', 'spark']] },
     482: {   // Azelf: brash, hot-headed, secretly the softest
       aloneStart: [['sigh', 'Tch. Fine. I don\'t need them. ...I don\'t.', 'dots'], ['sad', '...Uxie? Mesprit? Guys? This isn\'t funny.', 'dots'], ['worried', 'Since when is it this quiet? Since when am I this... small?', 'sweat']],
       alone: [['sad', 'I\'d never say it out loud, but... I miss them. A lot.', 'dots'], ['sigh', 'Uxie would tell me I\'m being reckless. Wish he were here to say it.', 'dots'], ['teary', 'Willpower, willpower... why does willpower feel so lonely?', 'tear'], ['angry', 'I can do this alone! I can! ...I just don\'t want to.', 'anger'], ['sad', 'Mesprit would know what I\'m feeling. I don\'t even know.', 'dots']],
@@ -76,7 +95,13 @@
       z: [['inspired', 'TOGETHER! Let\'s show them what the three of us can do!', 'spark'], ['shouting', 'ALL OF US — FULL POWER!!', 'spark']],
       skill: { boost: [['shouting', 'PSYCHO BOOST! Take THAT!', 'exclaim']], plot: [['determined', 'Nasty Plot. Everyone, hit HARDER.', 'spark']], future: [['determined', 'Future Sight. In a second, that whole crowd\'s gone.', 'note']] },
       chat: [['happy', 'Uxie, I took out more than you. Don\'t count, just trust me.', 'note'], ['joyous', 'This is way better than fighting alone. ...Don\'t tell anyone I said that.', 'heart'], ['determined', 'Mesprit, watch this one! ...Did you see?! Did you see?!', 'exclaim'], ['happy', 'Being together like this... yeah. This is good.', 'heart']],
-      level: [['determined', 'Stronger! We\'re getting STRONGER!', 'spark']] } };
+      level: [['determined', 'Stronger! We\'re getting STRONGER!', 'spark']],
+      // passives
+      rise: [['determined', 'Hah! I\'m just getting started!', 'spark'], ['happy', 'Feel that? That\'s willpower! It\'s yours too!', 'spark'], ['determined', 'Faster! Stronger! Keep up, you two!', 'spark'], ['joyous', 'Another one! Can you feel it?!', 'spark']],
+      riseMax: [['shouting', 'FIFTY PERCENT! NOTHING can stop us now!!', 'spark'], ['inspired', 'MAX POWER! Sisters — let\'s END this!', 'spark']],
+      guardUxie: [['angry', 'Uxie! Behind me, NOW! I\'ll handle these jerks!', 'anger'], ['determined', 'I\'ve got you, Uxie. Breathe. I\'m right here.', 'exclaim']],
+      cheerConfuse: [['happy', 'Ha! It\'s hitting its own buddies! Nice one!', 'note'], ['joyous', 'Look at them fight each other! Do it again!', 'note']],
+      thanks: [['happy', 'Th-thanks, Mesprit. I wasn\'t hurt. Much.', 'heart'], ['happy', '...Okay, that felt nice. Don\'t make it a thing.', 'heart']] } };
 
   // ================= talk box =================
   const css = document.createElement('style');
@@ -100,7 +125,7 @@
   // say: dex speaks one of the lines; prio lines skip the gap and cut the queue
   function say(dex, list, o) {
     o = o || {}; const ln0 = pick(list); if (!ln0 || !NAME[dex]) return false; const now = clock();
-    if (!o.prio && (cur || queue.length || now - lastLow < CFG.gap)) return false;
+    if (!o.prio && !o.follow && (cur || queue.length || now - lastLow < CFG.gap)) return false;   // follow: a reply chained to the line just queued
     if (!o.prio) lastLow = now;
     const item = { dex, face: ln0[0], text: ln0[1].replace(/\{name\}/g, o.name || ''), emote: ln0[2], delay: o.delay || 0 };
     if (o.prio && queue.length > 2) queue.splice(0, queue.length - 2);
@@ -155,6 +180,18 @@
     else if (d.type === 'faint') { const others = party().filter(x => x !== dex); others.forEach((by, i) => say(by, i === 0 ? L[by].faint : L[by].cry, { prio: true, name: NAME[dex], delay: i * 0.3 }));
       if (!live().filter(x => x !== dex).length && clock() > lostLastCd) { lostLastCd = clock() + 60; say(P, L[P].lostLast, { prio: true, delay: 0.5 }); } }
     else if (d.type === 'skill') { const S = L[dex] && L[dex].skill && L[dex].skill[d.skill]; if (S && Math.random() < 0.35) say(dex, S); }
+    else if (d.type === 'confuse') {   // Uxie confused the Pokemon that hit her (or her own pulse)
+      if (say(480, L[480].confuse) && Math.random() < 0.6) { const others = party().filter(x => x !== 480); const by = others[Math.floor(Math.random() * others.length)]; if (by) say(by, L[by].cheerConfuse, { delay: 0.2, follow: true }); } }
+    else if (d.type === 'stand') {     // Uxie below 10%: untouchable, running to a sister
+      const sis = party().filter(x => x !== 480);
+      say(480, sis.length ? L[480].stand : L[480].standAlone, { prio: true });
+      sis.forEach((by, i) => { if (L[by].guardUxie) say(by, L[by].guardUxie, { prio: true, delay: 0.3 + i * 0.3 }); }); }
+    else if (d.type === 'standEnd') say(480, L[480].standEnd, { prio: true });
+    else if (d.type === 'rise') {      // Azelf's ATK & SPEED stacks (shared with her sisters)
+      if (d.max) { say(482, L[482].riseMax, { prio: true }); party().filter(x => x !== 482).forEach((by, i) => say(by, L[by].riseMax, { prio: true, delay: 0.3 + i * 0.3 })); }
+      else if (Math.random() < 0.5) { if (say(482, L[482].rise) && Math.random() < 0.4 && party().includes(481)) say(481, L[481].rise, { delay: 0.2, follow: true }); } }
+    else if (d.type === 'mesprit') {   // Mesprit's 5-second pulse
+      if (Math.random() < 0.35 && say(481, L[481].pulse[d.kind]) && d.kind === 'heal') { const others = party().filter(x => x !== 481 && L[x].thanks); const by = others[Math.floor(Math.random() * others.length)]; if (by && Math.random() < 0.5) say(by, L[by].thanks, { delay: 0.2, follow: true }); } }
     else if (d.type === 'z') { const all = party(); all.forEach((by, i) => say(by, L[by].z, { prio: true, delay: i * 0.25 })); }
   }
   addEventListener('ps-lake', onLake);
