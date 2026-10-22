@@ -14,7 +14,9 @@
   'use strict';
   if (window.PS_LAKE_TALK_INSTALLED) return; window.PS_LAKE_TALK_INSTALLED = true;
   const E = () => window.PS_HOOPA_ENGINE, TAU = Math.PI * 2;
-  const NAME = { 480: 'Uxie', 481: 'Mesprit', 482: 'Azelf', 483: 'Dialga', 484: 'Palkia', 487: 'Giratina' }, COLOR = { 480: '#ffd84a', 481: '#ff8ad0', 482: '#5ab0ff', 483: '#8fd8ff', 484: '#ff9ad8', 487: '#ff4a5e' };
+  const NAME = { 480: 'Uxie', 481: 'Mesprit', 482: 'Azelf', 483: 'Dialga', 484: 'Palkia', 487: 'Giratina', 529: 'Drilbur', 530: 'Excadrill' }, COLOR = { 480: '#ffd84a', 481: '#ff8ad0', 482: '#5ab0ff', 483: '#8fd8ff', 484: '#ff9ad8', 487: '#ff4a5e', 529: '#9ad8ff', 530: '#ff6a4a' };
+  // sheets that only have some faces: the closest one they do have (Drilbur's sheet: Normal and Worried)
+  const HAS = { 529: [0, 4] }, BRAVE = ['normal', 'happy', 'joyous', 'inspired', 'determined', 'surprised'];
   const TRIO = [480, 481, 482];   // Dialga, Palkia and Giratina only speak as guests (js/creation-rift.js, js/giratina-void.js)
   const FACE = { normal: 0, happy: 1, pain: 2, angry: 3, worried: 4, sad: 5, crying: 6, shouting: 7, teary: 8, determined: 9, joyous: 10, inspired: 11, surprised: 12, dizzy: 13, sigh: 16, stunned: 17 };
   const CFG = { gap: 5, aloneEvery: [45, 75], chatEvery: [55, 90] };   // seconds between low-priority lines, lonely lines, banter
@@ -131,7 +133,7 @@
   box.innerHTML = '<div class="pf"></div><div class="tx"><div class="nm"></div><div class="ln"></div></div>';
   const pf = box.querySelector('.pf'), nm = box.querySelector('.nm'), ln = box.querySelector('.ln');
   const queue = []; let cur = null, lastLow = -1e9;
-  function face(dex, f) { const i = FACE[f] ?? 0, k = pf.offsetWidth / 40 || 2; pf.style.backgroundImage = 'url(assets/portraits/' + dex + '.png)'; pf.style.backgroundPosition = -(i % 5) * 40 * k + 'px ' + -Math.floor(i / 5) * 40 * k + 'px'; }
+  function face(dex, f) { let i = FACE[f] ?? 0; if (HAS[dex] && !HAS[dex].includes(i)) i = BRAVE.includes(f) ? HAS[dex][0] : HAS[dex][HAS[dex].length - 1]; const _ = 0, k = pf.offsetWidth / 40 || 2; pf.style.backgroundImage = 'url(assets/portraits/' + dex + '.png)'; pf.style.backgroundPosition = -(i % 5) * 40 * k + 'px ' + -Math.floor(i / 5) * 40 * k + 'px'; }
   const recent = {};
   function pick(list) { if (!list || !list.length) return null; const key = list[0][1]; const last = recent[key]; let i = Math.floor(Math.random() * list.length); if (list.length > 1 && i === last) i = (i + 1) % list.length; recent[key] = i; return list[i]; }
   // say: dex speaks one of the lines; prio lines skip the gap and cut the queue
@@ -183,7 +185,7 @@
   const live = () => (window.PS_LAKE?.allies || []).filter(a => !a.dead && !a.spawning).map(a => a.dex);
   const party = () => { const p = me(); return p ? [Number(p.dex), ...live()] : []; };
   const rnd = (a, b) => a + Math.random() * (b - a);
-  const scene = () => !!(window.PS_CREATION_RIFT?.active || window.PS_GIRATINA?.active);   // a cutscene owns the talk box
+  const scene = () => !!(window.PS_CREATION_RIFT?.active || window.PS_GIRATINA?.active || window.PS_DIGGER?.active);   // a cutscene owns the talk box
   function onLake(ev) {
     if (scene()) return;
     const d = ev.detail || {}, p = me(); if (!p) return; const P = Number(p.dex), dex = Number(d.dex);
@@ -237,10 +239,13 @@
   let last = performance.now();
   function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.1, (now - last) / 1000); last = now; try { watch(dt); tickBox(dt); for (let i = emotes.length - 1; i >= 0; i--) if ((emotes[i].t += dt) > emotes[i].life) emotes.splice(i, 1); } catch (e) { console.warn('[lake-talk]', e); } }
   let hooked = false;
-  function hook() { const N = E(); if (hooked || !N || !N.Ult || !N.Ult.drawUnits) return; hooked = true; const du = N.Ult.drawUnits; N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { if (me()) drawEmotes(ctx); } catch (e) { console.warn('[lake-talk]', e); } }; }
-  function init() { document.head.append(css); document.body.append(box); for (const d of [480, 481, 482, 483, 484, 487]) { const i = new Image(); i.src = 'assets/portraits/' + d + '.png'; } (function h() { hook(); if (!hooked) setTimeout(h, 200); })(); requestAnimationFrame(loop); }
+  function hook() { const N = E(); if (hooked || !N || !N.Ult || !N.Ult.drawUnits) return; hooked = true; const du = N.Ult.drawUnits; N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { if (me() || Object.keys(places).length) drawEmotes(ctx); } catch (e) { console.warn('[lake-talk]', e); } }; }
+  function init() { document.head.append(css); document.body.append(box); for (const d of [480, 481, 482, 483, 484, 487, 529, 530]) { const i = new Image(); i.src = 'assets/portraits/' + d + '.png'; } (function h() { hook(); if (!hooked) setTimeout(h, 200); })(); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
+  // a line from another companion (js/digger-bros.js): queued like the trio's, prio / front like say()
+  function line(dex, f, text, em, o) { o = o || {}; const now = clock(); if (scene() && !o.scene) return false; if (!o.prio && !o.follow && (cur || queue.length || now - lastLow < CFG.gap)) return false; if (!o.prio) lastLow = now;
+    const item = { dex, face: f, text, emote: em, delay: o.delay || 0, dur: o.dur }; if (o.prio && queue.length > 2) queue.splice(0, queue.length - 2); if (o.front) queue.unshift(item); else queue.push(item); return true; }
   // a cutscene line: shown right away for a fixed time (clears whatever was waiting)
   function cut(dex, f, text, em, dur) { queue.length = 0; show({ dex, face: f, text, emote: em, dur }); }
-  window.PS_LAKE_TALK = { cut, place: (dex, obj) => { if (obj) places[dex] = obj; else delete places[dex]; }, hide: () => { cur = null; queue.length = 0; box.classList.remove('on'); }, lines: L, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, cfg: CFG };
+  window.PS_LAKE_TALK = { cut, line, place: (dex, obj) => { if (obj) places[dex] = obj; else delete places[dex]; }, hide: () => { cur = null; queue.length = 0; box.classList.remove('on'); }, lines: L, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, cfg: CFG };
 })();

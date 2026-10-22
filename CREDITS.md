@@ -7,7 +7,7 @@ Los sprites estilo *Pokémon Mundo Misterioso* vienen de
 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/):
 uso **no comercial** y con atribución a sus artistas.
 
-Los retratos de Uxie, Mesprit, Azelf, Dialga, Palkia y Giratina (`assets/portraits/480.png` a `484.png` y `487.png`, usados en sus
+Los retratos de Uxie, Mesprit, Azelf, Dialga, Palkia, Giratina, Drilbur y Excadrill (`assets/portraits/480.png` a `484.png`, `487.png`, `529.png` y `530.png`, usados en sus
 diálogos) también son hojas de retratos de SpriteCollab, con la misma licencia.
 
 | Artista | Contacto | Sprites (nº de Pokédex) |

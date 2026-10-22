@@ -582,7 +582,8 @@
 
   // ================= boot =================
   (function boot() { try { register(); hookPool(); hook(); } catch (err) { console.warn('[lake]', err); } if (!(registered && hooked)) setTimeout(boot, 200); else setInterval(() => { try { hookPool(); patchMystical(); } catch (_) {} }, 1000); })();
-  window.PS_LAKE = { cfg: CFG, trio: TRIO, team, get pulling() { return !!pull; }, get allies() { return IDS.map(d => allies[d]).filter(Boolean).map(s => ({ dex: s.dex, name: s.name, hp: Math.round(s.hp), maxHp: s.maxHp, lvl: s.lvl, dead: s.dead, spawning: s.spawnT < CFG.spawnTime, x: s.x, y: s.y })); },
+  window.PS_LAKE = { kit: { freeAt, nearFree, incoming, escapePoint, chestsNear, chestRange, keyOf, itemName: ITEM_NAME, drop },   // shared with other companions (js/digger-bros.js)
+    cfg: CFG, trio: TRIO, team, get pulling() { return !!pull; }, get allies() { return IDS.map(d => allies[d]).filter(Boolean).map(s => ({ dex: s.dex, name: s.name, hp: Math.round(s.hp), maxHp: s.maxHp, lvl: s.lvl, dead: s.dead, spawning: s.spawnT < CFG.spawnTime, x: s.x, y: s.y })); },
     _ally: dex => allies[Number(dex)] || null,
     _anchor: (dex, p) => { const s = allies[Number(dex)]; return s ? anchorFor(s, p || owner) : null; },
     summon: dex => { const p = player(); if (!p || !isTrio(p.dex) || Number(dex) === Number(p.dex)) return null; if (owner !== p) { clearAll(); owner = p; } delete allies[dex]; return !!summon(Number(dex)); } };
