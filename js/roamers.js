@@ -63,7 +63,7 @@
     const g = B()?.game, p = g?.player;
     if (!p || g.state === 'ui' || g.state === 'over') { live.length = 0; runP = null; return; }
     if (p !== runP) { runP = p; live.length = 0; nextRoll = CFG.every; nextRush = CFG.rushEvery; }
-    if (g.state !== 'playing' || coop() || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) return;
+    if (g.state !== 'playing' || coop() || (window.PS_SAFEZONE && window.PS_SAFEZONE.active) || (E()?.Rift?.inArena) || (E()?.Judgment?.active) || window.PS_BIRTH_ISLAND?.active) return;   // special areas: no wild spawns
     const t = clock(), mode = window.PS_MODES?.run?.mode;
     if (mode !== 'legend' && t >= nextRoll) { nextRoll += CFG.every;
       if (Math.random() < CFG.mewChance) spawnLegend(MEW, 'roam'); else if (Math.random() < CFG.roamChance) spawnLegend(ROAMERS[Math.floor(Math.random() * ROAMERS.length)], 'roam'); }
