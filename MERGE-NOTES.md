@@ -33,12 +33,7 @@ See TEST-RESULTS.md for completed checks and their limits. No finite test pass g
 With Node.js installed, repeat the automated checks:
 
 ```
-node tests/validate.cjs
-node tests/lake-trio.cjs
-node tests/gacha-integration.cjs
-node tests/lake-integration.cjs
-node tests/dialogue-boxes.cjs
-node tests/progression.cjs
+node tests/tests.cjs
 ```
 
-All game modules are now consolidated in js/game.js (see README.md); the tests read each module straight out of that file.
+All game modules are now consolidated in js/game.js (see README.md); all tests live in one file, tests/tests.cjs, and read each module straight out of js/game.js. Add a word to run only some of them, e.g. `node tests/tests.cjs gacha`.
