@@ -120,6 +120,46 @@
       item: [['determined', 'Mine! ...What does it do? Doesn\'t matter, it\'s mine!', 'exclaim'], ['happy', 'Ha! Even stronger now!', 'spark']],
       mystic: { power: [['determined', 'Mystical Power! Faster, stronger — ALL of us!', 'spark'], ['shouting', 'Take my willpower, sisters! Hit HARDER!', 'spark'], ['joyous', 'You feel that?! That\'s us!', 'spark']] } } };
 
+
+  // Party-aware dialogue is checked at selection and again when a queued line is displayed.
+  const SOLO = {
+    480: ['I am Uxie. A clear mind will guide me through this.', 'Observe their movements. The answer is in the pattern.'],
+    481: ['I am Mesprit. I can feel the life around this place.', 'Steady now. Fear does not have to decide what comes next.'],
+    482: ['I am Azelf. My will is unbroken. Let them come.', 'One step forward. Then another. I will not yield.']
+  };
+  const PAIR = {
+    480: {481:['Mesprit, your feelings reveal what my calculations miss.', 'Mesprit, stay within my shield. I will watch our flank.'],482:['Azelf, I will find the opening. You have the strength to take it.', 'Your resolve is clear, Azelf. Let us put it to good use.']},
+    481: {480:['Uxie, I feel safer with your calm beside me.', 'Uxie, let me tend your wounds while you watch the field.'],482:['Azelf, I can feel your determination. I am with you.', 'Keep that courage, Azelf. I will help us hold our ground.']},
+    482: {480:['Uxie, show me their weakness. I will break through.', 'I trust your judgment, Uxie. Stay close.'],481:['Mesprit, keep your heart steady. I will clear a path for us.', 'I can feel your support, Mesprit. We will keep moving.']}
+  };
+  for(const d of TRIO){
+    L[d].aloneStart=SOLO[d].map(text=>['determined',text,'']);
+    L[d].alone=L[d].aloneStart;
+    L[d].aloneHurt=[['determined',d===480?'Reassess. I must preserve enough strength to recover.':d===481?'Breathe. I can still find the strength to recover.':'I am still standing. My will has not broken.','']];
+  }
+  function present(){
+    const p=E()?.Game?.player;const ids=[];
+    if(p&&!p.dead&&TRIO.includes(Number(p.dex)))ids.push(Number(p.dex));
+    for(const a of window.PS_LAKE?.allies||[])if(!a.dead&&!a.spawning&&TRIO.includes(Number(a.dex)))ids.push(Number(a.dex));
+    return [...new Set(ids)];
+  }
+  function partyAllows(dex,text){
+    if(!TRIO.includes(Number(dex)))return true;
+    const ids=present();if(!ids.includes(Number(dex)))return false;
+    if(/sisters|you two|both of you|three of us|as three|all three|all of us|knowledge, emotion, willpower/i.test(text)&&ids.length!==3)return false;
+    for(const d of TRIO)if(d!==Number(dex)&&new RegExp('\\b'+NAME[d]+'\\b','i').test(text)&&!ids.includes(d))return false;
+    return true;
+  }
+  function contextual(dex,list){
+    if(!TRIO.includes(Number(dex)))return list;
+    if(list===L[dex].chat){
+      const other=present().filter(d=>d!==Number(dex));
+      if(other.length===0)return L[dex].alone;
+      if(other.length===1)return (PAIR[dex][other[0]]||[]).map(text=>['happy',text,'']);
+    }
+    return (list||[]).filter(l=>partyAllows(dex,l[1]));
+  }
+
   // ================= talk boxes (three, stacked) =================
   const css = document.createElement('style');
   css.textContent = `
@@ -163,19 +203,35 @@
   const busy = () => order.length > 0 || queue.length > 0;
   // say: dex speaks one of the lines; prio lines skip the gap and cut the queue
   function say(dex, list, o) {
-    o = o || {}; const ln0 = pick(list); if (!ln0 || !NAME[dex]) return false; const now = clock();
+    o = o || {}; const ln0 = pick(contextual(dex,list)); if (!ln0 || !NAME[dex]) return false; const now = clock();
     if (!o.prio && !o.follow && (busy() || now - lastLow < CFG.gap)) return false;   // follow: a reply chained to the line just queued
     if (!o.prio) lastLow = now;
     const item = { dex, face: ln0[0], text: ln0[1].replace(/\{name\}/g, o.name || ''), emote: ln0[2], delay: o.delay || 0, prio: !!o.prio };
-    if (o.prio && queue.length > 2) queue.splice(0, queue.length - 2);
-    if (o.front) queue.unshift(item); else queue.push(item); return true;   // front: urgent, it plays next
+    return enqueue(item, !!o.front);
+  }
+  // One visible box and at most one pending line per Pokemon species.
+  const speakerKey = it => String(Number(it.dex));
+  const lastEnded = new Map();
+  function enqueue(item, front) {
+    const key=speakerKey(item), pending=queue.findIndex(it=>speakerKey(it)===key);
+    if(pending>=0){
+      if(queue[pending].prio&&!item.prio)return false;
+      if(queue[pending].text===item.text)return false;
+      queue.splice(pending,1);
+    }
+    if(front)queue.unshift(item);else queue.push(item);
+    if(queue.length>6)queue.shift();return true;
   }
   const clock = () => performance.now() / 1000;
   function layout() { const small = matchMedia('(max-width:700px),(max-height:520px)').matches;
     order.forEach((sl, i) => { const h = sl.el.offsetHeight || 100, off = i * (h + 6); if (small) { sl.el.style.top = 58 + off + 'px'; sl.el.style.bottom = 'auto'; } else { sl.el.style.bottom = 132 + off + 'px'; sl.el.style.top = 'auto'; } sl.el.classList.toggle('old', i > 0); }); }
-  function end(sl) { sl.cur = null; sl.el.classList.remove('on', 'old'); order = order.filter(x => x !== sl); layout(); }
+  function end(sl) { if(sl.cur)lastEnded.set(speakerKey(sl.cur.it),clock()); sl.cur = null; sl.el.classList.remove('on', 'old'); order = order.filter(x => x !== sl); layout(); }
   function show(it) {
-    let sl = slots.find(x => !x.cur); if (!sl) { sl = order[order.length - 1]; end(sl); }
+    if (!partyAllows(it.dex,it.text)) return;
+    if (!window.PS_SPEAKER_ALLOWED?.(it.dex, it.obj)) return;
+    it.name = (E()?.DEX_BY?.[Number(it.dex)]?.name || NAME[it.dex] || it.name || "Pokemon").split(" · ")[0];
+    if(order.some(sl=>speakerKey(sl.cur.it)===speakerKey(it)))return false;
+    const sl = slots.find(x => !x.cur); if (!sl)return false;
     sl.cur = { it, t: 0, dur: it.dur || Math.max(2.8, Math.min(6, 1.6 + it.text.length * 0.045)) };
     sl.nm.textContent = it.name || NAME[it.dex] || ('#' + it.dex); sl.nm.style.color = it.color || COLOR[it.dex] || '#fff';
     sl.el.classList.toggle('wild', it.kind === 'wild' || it.kind === 'ally'); sl.el.classList.toggle('foe', it.kind === 'foe'); sl.el.classList.toggle('legend', it.kind === 'legend'); sl.el.classList.toggle('player', it.kind === 'player');
@@ -187,11 +243,14 @@
     for (const sl of order.slice()) { const c = sl.cur; c.t += dt; const n = Math.min(c.it.text.length, Math.floor(c.t * 45)); if (sl.ln.textContent.length !== n) sl.ln.textContent = c.it.text.slice(0, n);
       if (!LOCAL.has(Number(c.it.dex)) && known[SC(c.it.dex, 'Normal')] === false) spriteFace(sl, c.it);
       if (c.t >= c.dur) end(sl); }
-    const nx = queue[0]; if (!nx) return; nx.delay -= dt;
-    if (nx.delay <= 0 && clock() - lastStart >= lastType + 0.35 && (slots.some(x => !x.cur) || nx.prio)) show(queue.shift());   // the next line waits for the last one to finish typing
+    for(const item of queue)item.delay-=dt;
+    if(!slots.some(sl=>!sl.cur)||clock()-lastStart<lastType+0.35)return;
+    // Skip a busy speaker instead of holding up everyone behind it.
+    const i=queue.findIndex(it=>it.delay<=0&&!order.some(sl=>speakerKey(sl.cur.it)===speakerKey(it))&&clock()-(lastEnded.get(speakerKey(it))??-Infinity)>=4);
+    if(i>=0)show(queue.splice(i,1)[0]);
   }
   function drop(fn) { for (let i = queue.length - 1; i >= 0; i--) if (fn(queue[i])) queue.splice(i, 1); for (const sl of slots) if (sl.cur && fn(sl.cur.it)) end(sl); }   // e.g. lines from an area you just left
-  function clearAll() { queue.length = 0; for (const sl of slots) if (sl.cur) end(sl); }
+  function clearAll() { queue.length = 0; for (const sl of slots) if (sl.cur) end(sl); lastEnded.clear(); }
 
   // ================= emote bubbles (world space) =================
   const emotes = [];
@@ -285,11 +344,11 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
   // a line from anyone else (js/digger-bros.js, js/wild-life.js): queued like the trio's, prio / front like say().
   // o.name / o.color / o.kind ('wild' | 'foe' | 'ally') / o.obj (the Pokemon the emote pops over) for Pokemon outside the NAME list
-  function line(dex, f, text, em, o) { o = o || {}; const now = clock(); if (scene() && !o.scene) return false;
+  function line(dex, f, text, em, o) { o = o || {}; if (!text || !window.PS_SPEAKER_ALLOWED?.(dex, o.obj)) return false; const now = clock(); if (scene() && !o.scene) return false;
     if (!o.prio && !o.follow && (busy() || now - lastLow < (o.gap ?? CFG.gap))) return false; if (!o.prio) lastLow = now;
     const item = { dex, face: f, text, emote: em, delay: o.delay || 0, dur: o.dur, prio: !!o.prio, name: o.name, color: o.color, kind: o.kind, obj: o.obj, shiny: o.shiny };
-    if (o.prio && queue.length > 4) queue.splice(0, queue.length - 4); if (o.front) queue.unshift(item); else queue.push(item); return true; }
+    return enqueue(item, !!o.front); }
   // a cutscene line: shown right away for a fixed time (clears whatever was waiting)
   function cut(dex, f, text, em, dur) { clearAll(); show({ dex, face: f, text, emote: em, dur }); }
-  window.PS_LAKE_TALK = { cut, line, place: (dex, obj) => { if (obj) places[dex] = obj; else delete places[dex]; }, hide: clearAll, drop, lines: L, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, emoteAt, busy, cfg: CFG };
+  window.PS_LAKE_TALK = { cut, line, place: (dex, obj) => { if (obj) places[dex] = obj; else delete places[dex]; }, hide: clearAll, drop, lines: L, partyAllows, contextual, present, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, emoteAt, busy, cfg: CFG };
 })();

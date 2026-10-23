@@ -16,7 +16,7 @@
   const TAU = Math.PI * 2;
   const clock = () => { try { const t = E().Game.time; return Number(typeof t === 'function' ? t() : t) || 0; } catch (_) { return 0; } };
   const solo = () => { const N = E(); return !!N && !(N.Coop && N.Coop.active) && !(window.PS_MODES && window.PS_MODES.run && window.PS_MODES.run.mode === 'legend') && !(N.Rift && N.Rift.inArena) && !N.Judgment?.active && !window.PS_BIRTH_ISLAND?.active && !(window.PS_SAFEZONE && window.PS_SAFEZONE.active); };
-  const CFG = { capStart: 10, capLate: 22, capRampEnd: 1200, early: 300, earlyMul: 1.35, fullFor: 8, overflow: 24, trickle: 2.5, staleAfter: 60, staleDist: 700 };
+  const CFG = { capStart: 10, capLate: 22, capRampEnd: 1200, early: 300, earlyMul: 1.35, fullFor: 8, overflow: 0, trickle: 2.5, staleAfter: 60, staleDist: 700 };
   const COMBO = { gap: 2.5, steps: [[15, 10], [30, 25], [60, 60], [100, 120]] };
   let runP = null, fullT = 0, trickleT = 0, combo = 0, comboT = 0, comboPaid = 0, best = 0;
   const hostile = () => (E()?.Projectiles?.all?.() || []).filter(q => q && !q.friendly && !q.orb);
@@ -33,21 +33,7 @@
       e.__lastCd = e.shotCd;
     }
   }
-  function capTick(dt) {
-    const N = E(), S = N.Spawner, p = B().game.player, all = N.EnemyMgr.all(), cap = Number(S && S.CAP) || 64, t = performance.now() / 1000;
-    const alive = all.filter(e => e && !e.dead && !e.remote);
-    if (alive.length >= cap - 1) fullT += dt; else fullT = 0;
-    // stragglers left far behind for a long time come back in front of you
-    for (const e of alive) { if (e.boss || e.legend || e.__maxRaid || e.__roamer || e.__wave) continue; if (!e.__born) e.__born = t;
-      if (t - e.__born > CFG.staleAfter && Math.hypot(e.x - p.x, e.y - p.y) > CFG.staleDist && !(e.__moved > t)) { try { if (S.ahead(e, p)) { e.__moved = t + 20; e.__born = t; } } catch (_) {} } }
-    if (fullT >= CFG.fullFor && alive.length < cap + CFG.overflow) { trickleT -= dt; if (trickleT <= 0) { trickleT = CFG.trickle; extra(alive, p); } }
-  }
-  function extra(alive, p) {
-    const N = E(), src = alive.filter(e => !e.boss && e.def && !e.__wave); const d = src[Math.floor(Math.random() * src.length)]; if (!d) return;
-    const a = Math.hypot(p._vx || 0, p._vy || 0) > 20 ? Math.atan2(p._vy, p._vx) + (Math.random() - 0.5) * 0.9 : Math.random() * TAU, r = 460 + Math.random() * 80;
-    const x = p.x + Math.cos(a) * r, y = p.y + Math.sin(a) * r * 0.8; try { const W = B().world; if (W && W.isFree && !W.isFree(x, y, 16)) return; } catch (_) {}
-    try { const sc = N.Enemies.scale(clock()); const e = new N.Enemy(Object.assign({}, d.def), x, y, sc, false); N.EnemyMgr.add(e); } catch (_) {}
-  }
+  // Population is governed centrally by encounters.js; no overflow or straggler recycling.
   // combo
   function onKill(e) { if (!e || e.remote || !solo()) return; combo++; comboT = COMBO.gap; best = Math.max(best, combo);
     for (const [n, c] of COMBO.steps) if (combo === n && comboPaid < n) { comboPaid = n; const p = B()?.game?.player; if (p) { p.coins = (Number(p.coins) || 0) + c; try { B().fx.dmgText(p.x, p.y - (p.bodyH || 40) - 26, 'Combo ×' + n + '! +' + c, '#ffd23f'); B().audio?.sfx?.('coin'); } catch (_) {} } } }
@@ -80,7 +66,7 @@
     try { wrap(); const g = B()?.game, p = g?.player;
       if (!p || g.state === 'ui' || g.state === 'over') { runP = null; combo = 0; } else {
         if (p !== runP) { runP = p; fullT = 0; combo = 0; comboPaid = 0; best = 0; }
-        if (g.state === 'playing') { comboT -= dt; if (comboT <= 0 && combo) { combo = 0; comboPaid = 0; } if (solo()) { shotsTick(dt); capTick(dt); } } }
+        if (g.state === 'playing') { comboT -= dt; if (comboT <= 0 && combo) { combo = 0; comboPaid = 0; } if (solo()) { shotsTick(dt); } } }
       ui += dt; if (ui > 0.15) { ui = 0; renderChip(); } drawShots(); } catch (e) { console.warn('[pressure]', e); } }
   function init() { document.head.append(css); document.body.append(ov, chip); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();

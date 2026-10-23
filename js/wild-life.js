@@ -56,10 +56,10 @@
   const V = () => window.PS_VOICE;   // js/wild-voice.js: every line is generated from the Pokemon's own nature, type and situation
   function speak(w, kind, sit, o) { o = o || {}; const v = V(); if (!v) return false; const l = v.line(w, sit, o); return say(w, kind, l[0], l[1], l[2], o); }
   const vb = (w, k) => (V() ? V().bubble(w, k) : '...');
-  const nat = w => { const v = V() && V().who(w); return v ? ' · ' + v.nature : ''; };
+  const nat = w => { const v = V() && V().who(w); return ''; };
   const emo = (w, k) => { try { T().emoteAt(w, k); } catch (_) {} };
   const bubbles = [];   // little speech bubbles over heads (for small talk that shouldn't fill the talk box)
-  function bubble(w, text, life) { if (!w || w.dead || !here(w)) return; for (let i = bubbles.length - 1; i >= 0; i--) if (bubbles[i].obj === w) bubbles.splice(i, 1); if (bubbles.length > 7) bubbles.shift(); bubbles.push({ obj: w, text, t: 0, life: life || 2.2 }); }
+  function bubble(w, text, life) { if (!window.PS_SPEAKER_ALLOWED?.(w?.dex,w) || !text) return; if (!w || w.dead || !here(w)) return; for (let i = bubbles.length - 1; i >= 0; i--) if (bubbles[i].obj === w) bubbles.splice(i, 1); if (bubbles.length > 7) bubbles.shift(); bubbles.push({ obj: w, text, t: 0, life: life || 2.2 }); }
 
   // ================= harmless Pokemon: roles and activities =================
   const seen = new WeakSet(), live = new Set(), fx = [];
@@ -382,7 +382,8 @@
       if (harmless(a) && harmless(b)) { a.__act = { kind: 'play', mate: b, t: 0, dur: 6, angry: true, said: true }; b.__act = { kind: 'play', mate: a, t: 0, dur: 6, angry: true, said: true }; }
       else if (!harmless(a) && !harmless(b) && solo() && !a.__feud && !b.__feud) startFeud(a, b); }
   }
-  function convoTick(dt, p, foes) {
+  function convoTick(dt, p, foes) { return; // Ambient conversations removed.
+
     const now = clock();
     if (convo) { const c = convo; if (c.a.dead || c.b.dead || c.a.gone || c.b.gone || c.a.__fleeT > 0 || c.b.__fleeT > 0) { finishConvo(c); return; }
       if ((c.wait -= dt) > 0) return; const ln = c.lines[c.i++]; if (!ln) { finishConvo(c); return; }

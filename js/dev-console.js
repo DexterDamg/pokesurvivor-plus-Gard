@@ -201,7 +201,7 @@
       '<button class="b' + (held ? ' on' : '') + '" data-r="hold">' + (held ? 'Resume' : 'Freeze game') + '</button></div>' +
       '<div class="g" style="margin-top:6px">' + [1, 2, 4, 8].map(s => '<button class="b" data-speed="' + s + '">Speed ×' + s + '</button>').join('') + '</div>' +
       '<h4>Enemies</h4><div class="g"><button class="b red" data-r="kill">Defeat all enemies</button><button class="b" data-r="shiny">Next spawns shiny</button><button class="b" data-r="burst">Spawn a burst</button></div>' +
-      '<h4>Power</h4><div class="g"><button class="b gold" data-r="dyna">Dynamax now (gives the Band)</button><button class="b" data-r="dynaCd">Recharge Dynamax</button></div>' +
+      '<h4>Power</h4><div class="g"></div>' +
       '<div class="note">Time skips and level-ups make the game mark this run as a dev run.</div>';
     live();
   }
@@ -230,7 +230,7 @@
     body.innerHTML = (r ? '' : '<div class="note" style="font-size:15px;margin:6px 0 10px">Start a run to trigger events.</div>') +
       '<div class="' + off + '"><h4>Special places</h4><div class="g"><button class="b gold" data-e="birth">Birth Island</button><button class="b" data-e="sz1">Safe Zone: Forest Shrine</button><button class="b" data-e="sz2">Safe Zone: Portal Shrine</button></div>' +
       (bi ? '<div class="row" style="margin-top:6px"><span class="note" style="margin:0">Birth Island chance per map change</span><input type="number" min="0" max="100" step="0.5" data-bichance value="' + +(bi.cfg.chance * 100).toFixed(2) + '" style="width:80px">%</div>' : '') +
-      '<h4>Legendaries & dens</h4><div class="g"><button class="b" data-e="mew">Wild Mew</button><button class="b" data-e="roamer">Random roaming Legendary</button><button class="b" data-e="lden">Legendary Den</button><button class="b" data-e="den">Dynamax Den</button><button class="b" data-e="egg">Mystery Egg</button></div>' +
+      '<h4>Legendaries & dens</h4><div class="g"><button class="b" data-e="mew">Wild Mew</button><button class="b" data-e="roamer">Random roaming Legendary</button><button class="b" data-e="egg">Mystery Egg</button></div>' +
       '<h4>World events</h4><div class="g"><button class="b gold" data-e="gold">Golden Hour</button><button class="b" data-e="horde">Type horde</button><button class="b" data-e="thief">Thief</button><button class="b" data-e="rift">Open a Rift</button><button class="b red" data-e="judge">Arceus\' Judgment</button><button class="b" data-e="crystal">Crystal event</button><button class="b" data-e="orb">Drop a Time Orb</button></div>' +
       '<h4>Weather</h4><div class="row"><select data-weather>' + weather + '</select><button class="b" data-e="weather">Start (60 s)</button><button class="b" data-e="clearWeather">Clear</button></div>' +
       '<h4>Special wave</h4><div class="row"><select data-wave>' + waves + '</select><button class="b" data-e="wave">Send it</button></div>' +

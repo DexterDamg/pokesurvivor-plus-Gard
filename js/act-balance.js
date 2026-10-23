@@ -16,7 +16,7 @@
   function ramp() {
     const p = B()?.game?.player, t = clock(), lv = Number(p?.level) || 1;
     const byTime = t / CFG.fullAt, byLevel = (lv - 1) / (CFG.fullLevel - 1);
-    return Math.min(1, CFG.startShare + (1 - CFG.startShare) * Math.max(byTime, byLevel));
+    return Math.min(1, CFG.startShare + (1 - CFG.startShare) * (window.PS_ENCOUNTERS ? byLevel : Math.max(byTime, byLevel)));
   }
   let done = false;
   function install() {

@@ -26,7 +26,8 @@
     const now = clock(); if (!o.prio && now - lastSaid < 6) return false;
     const n = nature(p); if (n) p.__nature = n; if (p.__voice && n && p.__voice.nature !== n) p.__voice = null;
     const l = o.text ? [o.face || 'determined', o.text, o.em || 'exclaim'] : v.line(p, sit, o);
-    const w = v.who(p), name = ((p.mon && p.mon.name) || w.name) + ' · ' + w.nature;
+    const w = v.who(p), name = ((p.mon && p.mon.name) || w.name);
+    if (!l || !l[1]) return false;
     const ok = t.line(Number(p.dex), l[0], l[1], l[2], { prio: !!o.prio, follow: !!o.follow, delay: o.delay || 0, name, color: '#ffe680', kind: 'player', obj: p, shiny: !!p.shiny });
     if (ok) lastSaid = now; return ok;
   }
@@ -56,7 +57,7 @@
   function watch(dt) {
     const p = me(), g = E()?.Game; if (!p || !g || g.state !== 'playing') return;
     if (p !== runP) { runP = p; idleT = rnd(...CFG.idle); lastHp = p.hp; low = false; lvl = Number(p.level) || 1; started = false; killed = 0; harmlessKills = 0; }
-    if (scripted(p)) { lastHp = p.hp; lvl = Number(p.level) || 1; return; }
+    
     if (!started && (g.st?.time ?? 99) > 3) { started = true; talk('p_start', { prio: true }); }
     bigCd -= dt; if (lastHp - p.hp > p.maxHp * 0.22 && bigCd <= 0) { bigCd = 20; talk('p_hurtBig', { prio: true }); }
     const f = p.hp / p.maxHp; if (!low && f < 0.3) { low = true; talk('p_low', { prio: true }); } if (low && f > 0.6) low = false; lastHp = p.hp;

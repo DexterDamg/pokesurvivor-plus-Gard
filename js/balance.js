@@ -19,7 +19,7 @@
     const N = E(), En = N && N.Enemies; if (done || !En || typeof En.scale !== 'function') return; done = true;
     const orig = En.scale;
     En.scale = function (t) {
-      const r = orig.call(this, t); if (!r || (N.Maps && N.Maps.endless)) return r;
+      const r = orig.call(this, t); if (!r || window.PS_ENCOUNTERS || (N.Maps && N.Maps.endless)) return r;
       const T = Number(t) || 0; const out = Object.assign({}, r);
       if (T > HP_KNEE) out.hp = 1 + HP_KNEE / 95 + (T - HP_KNEE) / HP_LATE;
       if (T > DMG_FROM) out.dmg = r.dmg + (T - DMG_FROM) / DMG_LATE;

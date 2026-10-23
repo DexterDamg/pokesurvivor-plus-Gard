@@ -15,7 +15,6 @@
     classic:  { name: 'Classic', ico: 'oranberry', icon: '🎮', color: '#5fa8ff', desc: 'The normal PokéSurvivor run.' },
     timed:    { name: 'Timed Survival', ico: 'quickclaw', icon: '⏱️', color: '#ffb13d', desc: 'Survive until the clock hits 0:00. Enemies spawn 50% faster and bosses show up early. Win the run and earn bonus PokéCoins.' },
     bossrush: { name: 'Boss Rush', ico: 'kingsrock', icon: '👑', color: '#ff5f6d', desc: 'Bosses arrive 4× sooner and there are fewer small enemies. Every boss you defeat pays +150 PokéCoins.' },
-    legend:   { name: 'Legendary Den', ico: 'shinycharm', icon: '⭐', color: '#ffd23f', desc: 'Start right inside a Legendary Den: 4 Dynamax bosses, then a Legendary. Beat it and it joins your collection! The first boss lifts you to level 20, each next one +10. Shiny: 1/150 bosses, 1/500 Legendary.' },
     hardcore: { name: 'Hardcore', ico: 'lifeorb', icon: '💀', color: '#c86bdc', desc: 'No extra hearts and enemies hit 50% harder — but PokéCoins and EXP are doubled.' },
   };
   const LENGTHS = [300, 600, 900];

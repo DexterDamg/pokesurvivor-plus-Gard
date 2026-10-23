@@ -501,18 +501,6 @@
     const H = window.PS_HOOKS || (window.PS_HOOKS = {}), take = H.take;
     H.take = function (type, who, amt) { let m = take ? take.apply(this, arguments) : 1;
       try { if (owner && (who === owner || (who && who.psLake))) { m *= 1 - team.protect; if (who.psLake && who.psLake.dex === 480) m *= TRIO[480].take; } } catch (_) {} return m; };
-    // Z-Move: 3x damage, twice the cooldown (only the Lake Guardians)
-    const P = N.Projectiles, C = N.Combat; let zScope = false;
-    const addField = C.addField;
-    if (typeof addField === 'function') C.addField = function (f) { if (zScope && f) { if (Number.isFinite(f.dmg)) f.dmg *= CFG.zDmg; if (Number.isFinite(f.dps)) f.dps *= CFG.zDmg; } return addField.apply(this, arguments); };
-    const zWrap = fn => function (actor) {
-      if (!(actor && actor === N.Game.player && isTrio(actor.dex))) return fn.apply(this, arguments);
-      const before = new Set(P.all()); zScope = true; let r;
-      try { r = fn.apply(this, arguments); } finally { zScope = false; for (const q of P.all()) if (!before.has(q) && q.friendly && !q.__lakeZ) { q.__lakeZ = true; if (Number.isFinite(q.dmg)) q.dmg *= CFG.zDmg; } }
-      return r; };
-    const ucast = N.Ult.cast, uupd = N.Ult.update;
-    const zc = zWrap(ucast); N.Ult.cast = function (actor) { const r = zc.apply(this, arguments); if (r && actor && actor === N.Game.player && isTrio(actor.dex)) { actor.ultCd = (Number(N.Ult.CD) || 90) * CFG.zCd; emit('z', { dex: Number(actor.dex) }); } return r; };
-    N.Ult.update = zWrap(uupd);
     // the sisters join the engine's depth-sorted world drawables (the same way js/catching.js adds the trainer)
     const td = N.Training && N.Training.drawables;
     if (typeof td === 'function') { sorted = true; N.Training.drawables = function () { let r = td.apply(this, arguments); if (!Array.isArray(r)) r = [];

@@ -41,8 +41,8 @@
  const special=e=>e.boss||e.legend||e.__roamer||e.__maxRaid||e.__wave||e.__legendDen;
  function assign(e){
    let kind='aggressive';
-   if(!special(e)){if(RANGED.has(e.behavior))kind='sniper';else{let r=Math.random();for(const [k,p] of AI.mix){if(r<p){kind=k;break;}r-=p;}}}
-   const s={kind,coward:!special(e)&&Math.random()<AI.cowardChance,x:e.x,y:e.y,hp:Number(e.hp)||0,wa:Math.random()*Math.PI*2,wt:0,flee:false,
+   if(!special(e)&&Number(E()?.Game?.player?.level||1)>=12){if(RANGED.has(e.behavior))kind='sniper';else{let r=Math.random();for(const [k,p] of AI.mix){if(r<p){kind=k;break;}r-=p;}}}
+   const s={kind,coward:!special(e)&&Number(E()?.Game?.player?.level||1)>=12&&Math.random()<AI.cowardChance,x:e.x,y:e.y,hp:Number(e.hp)||0,wa:Math.random()*Math.PI*2,wt:0,flee:false,
      t:0,phase:'',ph:0,tc:Number(e.touchCd)||0,mark:'',markT:0,dir:Math.random()<.5?1:-1};
    if(kind==='flanker'){s.phase='orbit';s.ph=AI.flanker.orbit*(.5+Math.random());}
    if(kind==='ambusher')s.phase='hide';
@@ -62,7 +62,7 @@
  const mark=(s,m,t)=>{s.mark=m;s.markT=t;};
  function provoke(e,s){   // cornered: stops running and turns aggressive (faster, like a berserker)
    if(s.provoked)return;s.provoked=true;s.flee=false;s.coward=false;s.kind=e.psAi='berserker';mark(s,'💢',1e9);
-   try{B().fx.dmgText(e.x,e.y-(Number(e.bodyH)||24)-14,'Provoked!','#ff5f5f');}catch(_){}
+   
  }
  let last=0,php=null,pRef=null;
  function frame(ts){
@@ -77,8 +77,8 @@
      // [Gard] provocation: keep pushing a shy / scared Pokemon around and it eventually fights back
      const P=AI.provoke,shy=s.flee||s.kind==='skittish';
      if(wasHit&&shy){s.hits=(s.hits||0)+1;if(s.hits>=P.hits)provoke(e,s);}
-     if(wasHit&&s.kind==='crybaby'&&s.phase!=='cry'&&(s.cries=(s.cries||0)+1)>P.cries){s.kind=e.psAi='berserker';s.phase='';mark(s,'💢',1e9);try{B().fx.dmgText(e.x,e.y-(Number(e.bodyH)||24)-14,'Enough!','#ff5f5f');}catch(_){}}
-     if(wasHit&&s.kind==='crybaby'&&s.phase!=='cry'){s.phase='cry';s.ph=AI.crybaby.cry;mark(s,'cry',AI.crybaby.cry);try{if(Math.random()<.5)B().fx.dmgText(e.x,e.y-(Number(e.bodyH)||24)-14,['Waaah!','*sob*','Wahh!','*sniff*'][Math.floor(Math.random()*4)],'#8fd3ff');}catch(_){}}
+     if(wasHit&&s.kind==='crybaby'&&s.phase!=='cry'&&(s.cries=(s.cries||0)+1)>P.cries){s.kind=e.psAi='berserker';s.phase='';mark(s,'💢',1e9);}
+     if(wasHit&&s.kind==='crybaby'&&s.phase!=='cry'){s.phase='cry';s.ph=AI.crybaby.cry;mark(s,'cry',AI.crybaby.cry);}
      if(wasHit&&s.kind==='passive'){s.kind=e.psAi='aggressive';mark(s,'!',.8);}          // provoked
      if(wasHit&&s.kind==='ambusher'&&s.phase==='hide'){s.phase='lunge';s.ph=AI.ambusher.lunge;mark(s,'!',.8);}
      if(s.coward&&!s.flee&&Number(e.maxHp)>0&&hp<Number(e.maxHp)*AI.cowardHp){s.flee=true;mark(s,'',0);}

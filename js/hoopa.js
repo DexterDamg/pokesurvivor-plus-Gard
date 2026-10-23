@@ -44,7 +44,7 @@
   // Match exact rarity, across every region. Legendary flags never enter an earlier pool.
   const pools = stages.map(({tier}) => roster.filter(mon => tier===5 ? mon.rarity===5 : mon.rarity===tier && !mon.leg));
   const move = {id:ID,name:'Hyperspace Hole',type:'psychic',kind:'summon',psCast:ID,
-    desc:'Summon defenders for 30 seconds (60 at final tier); 10s fixed cooldown; summons a left/right pair. Starts with 2 Common allies, ends with 4 Legendary allies. Allies spread out, intercept threats, collect loot, activate crystals, and open chests. 1 to 4 native attacks; max tier fully upgrades attacks and switches rapidly. 10s immunity (20s at final tier). Water walking, held items, and final-tier Z-Moves. Temporary shiny: 20%; collectible shiny: 0.1%.',
+    desc:'Summon defenders for 30 seconds (60 at final tier); 10s fixed cooldown; summons a left/right pair. Starts with 2 Common allies, ends with 4 Legendary allies. Allies spread out, intercept threats, collect loot, activate crystals, and open chests. 1 to 4 native attacks; max tier fully upgrades attacks and switches rapidly. 10s immunity (20s at final tier). Water walking, held items, and native attacks. Temporary shiny: 20%; collectible shiny: 0.1%.',
     cd:10,dmg:32,radius:400,count:1,maxLvl:7,ups:[
       {t:'+1 summon capacity (3 Common); 2 attacks per ally',m:{}},
       {t:'Summon tier: Uncommon (3 allies)',m:{}},
@@ -207,7 +207,7 @@
       floating:{get:()=>true},cdK:{get:()=>Math.max(.1,halfStat(1,s.owner.cdK)*a.cdMul)},
       critChance:{get:()=>(s.owner.critChance||0)*BALANCE.inherit+critBonus,set:v=>critBonus=v-(s.owner.critChance||0)*BALANCE.inherit}
     });
-    a.hurt=amount=>s.hurt(amount);a.ultCd=0;a.ultT=0;
+    a.hurt=amount=>s.hurt(amount);a.ultCd=0;a.ultT=0;a.__dialogueSummon=true;
   }
   function escapeGoal(s,enemies,dt){
     const near=enemies.filter(e=>distance(s,e)<170);
@@ -233,12 +233,6 @@
     const original=E.Rift[name];
     E.Rift[name]=function(...args){const before=E.Rift.inArena;riftTransition=true;try{return original.apply(this,args);}finally{riftTransition=false;movePartySummons(before);}};
   }
-  const nativeZCast=E.Ult.cast;
-  E.Ult.cast=function(actor){
-    if(!actor?.psHoopa)return nativeZCast.call(this,actor);
-    if(!units.some(s=>s.caster===actor&&maxed(s))||sharedZ>0||units.some(s=>s.caster.ultT>0))return false;
-    const fired=nativeZCast.call(this,actor);if(fired)sharedZ=BALANCE.zCooldown;return fired;
-  };
   for(const name of ['drawGround','drawAir']){
     const draw=E.Ult[name];
     E.Ult[name]=function(...args){const everyone=E.Game.everyone;E.Game.everyone=()=>[...everyone.call(E.Game),...units.filter(s=>!s.dead).map(s=>s.caster)];try{return draw.apply(this,args);}finally{E.Game.everyone=everyone;}};
@@ -320,7 +314,7 @@
       for(const buff of Object.values(actor.buffs))if(buff.t>0&&(buff.t-=dt)<=0){buff.n=0;buff.amount=0;}
       for(const k of ['invuln','reviveShield','shadeInv','balloonCd'])actor[k]=Math.max(0,(actor[k]||0)-dt);
       actor.berryTick(dt);s.hp=Math.min(s.maxHp,s.hp+((s.owner.regen||0)*BALANCE.inherit+actor.regen+(actor.bellHeal||0))*dt);actor.bellHeal=0;
-      if(maxed(s))E.Ult.update(actor,dt);
+      
       s.hurtCd=Math.max(0,s.hurtCd-dt);s.slowT=Math.max(0,s.slowT-dt);if(s.slowT<=0)delete s.seaSlowFactor;s.stunT=Math.max(0,s.stunT-dt);
       if (s.age>=lifetime(s)) { s.dead=true; portal(s); continue; }
       let target=null,nearest=Infinity;
@@ -395,7 +389,7 @@
         if(!E.Coop.active||E.Coop.isHost){E.Rift.enterRequest();return;}
         else if(!s.riftRequested){s.riftRequested=true;E.Coop.toHost(['re']);}
       }
-      if(maxed(s)&&target&&!s.chest&&!s.stunT&&distance(s,target)<360&&!(actor.ultCd>0)&&!(actor.ultT>0))E.Ult.cast(actor);
+      
       // Fire only inside the selected native move's effective distance.
       s.next-=dt;
       if(!s.chest && !s.stunT && target && distance(s,target)>=range.min && distance(s,target)<=range.max && s.next<=0){const fired=attack(s,target,signature,spec);s.attackIndex++;s.next=maxed(s)?Math.max(0.18,Math.min(0.3,(fired.cd||1)*0.35*actor.cdK)):Math.max(0.3,(fired.cd||1)*((s.move.lvl||1)>=5?.75:1)*actor.cdK);}

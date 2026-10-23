@@ -80,21 +80,21 @@
   let queue = [], nextMiss = 0, nextPseudo = 0, runP = null;
   function missingList() {
     const N = E(), S = N.DB.save; evoData(); const SX = storyExclusive();
-    const L = N.DEX.filter(d => !(S.owned && S.owned[d.dex]) && !isLegend(d.dex) && !UB.has(d.dex) && !PSEUDO_BASE[d.dex] && !STARTER_LINE.has(baseOf(d.dex)) && !SX.has(baseOf(d.dex)) && N.SPRITE_META[d.dex]).map(d => d.dex);   // Pseudo-Legendaries have their own rare spawn
+    const L = N.DEX.filter(d => !(S.owned && S.owned[d.dex]) && !isLegend(d.dex) && !UB.has(d.dex) && !PSEUDO_BASE[d.dex] && (!window.PS_ENCOUNTERS || window.PS_ENCOUNTERS.allowed(d.dex)) && !STARTER_LINE.has(baseOf(d.dex)) && !SX.has(baseOf(d.dex)) && N.SPRITE_META[d.dex]).map(d => d.dex);   // Pseudo-Legendaries have their own rare spawn
     for (let i = L.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [L[i], L[j]] = [L[j], L[i]]; }
     return L;
   }
   function missTick(p) {
     if (!queue.length) queue = missingList(); const S = E().DB.save;
     while (queue.length && S.owned && S.owned[queue[0]]) queue.shift();
-    const dex = queue.shift(); if (!dex) return;
+    const dex = queue.shift(); if (!dex || (window.PS_ENCOUNTERS && !window.PS_ENCOUNTERS.allowed(dex))) return;
     const at = spot(p); if (at) spawn(dex, irnd(CFG.missGroup[0], CFG.missGroup[1]), at[0], at[1], 1);
   }
   function pseudoTick(p) {
     if (Math.random() >= CFG.pseudoChance) return;
     const L = PSEUDO[Math.floor(Math.random() * PSEUDO.length)], N = E();
     const sites = Math.random() < CFG.pseudoTwoSites ? 2 : 1; let first = null;
-    for (let k = 0; k < sites; k++) { const dex = L[Math.floor(Math.random() * L.length)], stage = L.indexOf(dex), at = spot(p); if (!at) continue;
+    for (let k = 0; k < sites; k++) { const eligible=L.filter(d=>!window.PS_ENCOUNTERS||window.PS_ENCOUNTERS.allowed(d));if(!eligible.length)continue; const dex = eligible[Math.floor(Math.random() * eligible.length)], stage = L.indexOf(dex), at = spot(p); if (!at) continue;
       const n = irnd(CFG.pseudoGroup[0], CFG.pseudoGroup[1]); spawn(dex, stage === 2 ? Math.min(2, n) : n, at[0], at[1], [1.3, 1.7, 2.4][stage]); if (!first) first = dex; }
     if (first) { const nm = (N.DEX_BY[first] || {}).name; try { N.Spawner.say('Something rare is nearby... a wild ' + nm + ' appeared!', 3.5, true); } catch (_) {}
       try { window.PS_TOAST && window.PS_TOAST('Rare Pokémon nearby!', 'A wild ' + nm + ' appeared', { dex: first, gold: true, ms: 5000 }); } catch (_) {} }
