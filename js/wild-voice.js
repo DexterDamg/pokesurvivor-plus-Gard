@@ -50,7 +50,7 @@
     ground: { home: 'the deep tunnels', like: 'digging holes', fear: 'water', snack: 'crunchy roots', boast: 'my digging' },
     flying: { home: 'the treetops', like: 'riding the wind', fear: 'Electric-types', snack: 'a juicy Pinap Berry', boast: 'my wings' },
     psychic: { home: 'the quiet ruins', like: 'meditating', fear: 'Dark-types', snack: 'a Mago Berry', boast: 'my mind' },
-    bug: { home: 'under the big leaves', like: 'crawling around', fear: 'Flying-types', snack: 'tender leaves', boast: 'my shell' },
+    bug: { home: 'the leafy canopy', like: 'crawling around', fear: 'Flying-types', snack: 'a tender leaf', boast: 'my shell' },
     rock: { home: 'the rocky cliffs', like: 'standing very, very still', fear: 'water', snack: 'tasty pebbles', boast: 'my sturdiness' },
     ghost: { home: 'the old tower', like: 'spooking travelers', fear: 'Dark-types', snack: 'souls— kidding! Berries', boast: 'my curses' },
     dragon: { home: 'the mountain peak', like: 'hoarding shiny things', fear: 'Fairy-types', snack: 'a whole Sitrus Berry', boast: 'my ancient blood' },
@@ -80,7 +80,7 @@
     return 'none';
   }
   // what happened this run (for gossip)
-  const RUN = { giratina: false, rift: false, kamina: false, simon: false, kills: 0 };
+  const RUN = { giratina: false, rift: false, kamina: false, simon: false, kills: 0, harmless: 0 };
   function rumor() { const P = E()?.Game?.player, L = [];
     if (RUN.giratina) L.push('a Giratina tore open the dark itself', 'the shadows swallowed everyone near that explorer');
     if (RUN.rift) L.push('Dialga and Palkia showed up and BICKERED', 'the sky cracked open like an egg');
@@ -106,42 +106,62 @@
 
   // ================= what they say: situation → cores (per voice where it matters most) =================
   // {me} {other} {player} {home} {like} {fear} {snack} {boast} {type} {otype} {ptype} {rumor} {about} {cry}
+  // ================= generated fragments: built from who's talking, who's around and what's happening =================
+  // {pack} the nearest Pokemon on their own side · {grievance} something the pack did to them · {praise} something about the explorer
+  // {threat} {insult} {wish} {memory} {fearline} {reason} why they're switching sides · {kills} how many the explorer knocked out
+  function packOf(me) { const L = (E()?.EnemyMgr?.all?.() || []).filter(o => o && !o.dead && o !== me && !o.__role && !o.boss && Math.hypot(o.x - me.x, o.y - me.y) < 360); const o = L[Math.floor(Math.random() * L.length)]; return o ? (who(o) || {}).name : null; }
+  const RUNSTAT = () => ({ kills: RUN.kills || 0, harmless: RUN.harmless || 0 });
+  const GEN = {
+    pack: (me) => packOf(me) || pick(['the others', 'the gang', 'the big ones', 'the boss']),
+    grievance: (me, T) => { const p = packOf(me) || pick(['The others', 'The gang', 'The big ones']); return pick([p + ' took my ' + T.snack.replace(/^(a |an |some )/, ''), p + ' laughed at ' + T.boast, p + ' keeps shoving me to the front line', p + ' never lets me rest', 'nobody here even knows my name', p + ' called ' + T.home + ' a dump', 'I only came because ' + p + ' made me', p + ' blamed ME for the last loss', 'they never let me near the good berries']); },
+    praise: (me, T, X) => { const st = RUNSTAT(); return pick([(st.kills > 5 ? 'you\'ve taken down ' + st.kills + ' of us' : 'you haven\'t backed down once'), 'you fight like a real ' + cap(X.type) + '-type hero', 'you didn\'t even flinch', 'you look out for the ones beside you', 'you hit harder than our boss', (st.harmless ? 'you\'re strong... even if you\'re scary' : 'you never hurt the ones who weren\'t fighting')]); },
+    threat: (me, T) => pick(['I\'ll show you ' + T.boast, 'you\'ll go running back home', 'this is where your trip ends', 'I\'ll knock you all the way to ' + T.home, 'you\'re about to see why everyone fears ' + T.boast]),
+    insult: (me, T, X) => pick(['you look like a soggy ' + (X.name || 'explorer'), 'my grandma hits harder', 'nice moves... NOT', 'you smell like ' + pick(['wet Psyduck', 'old berries', 'a Grimer']), 'even a Magikarp could dodge that']),
+    wish: (me, T) => pick(['to go back to ' + T.home, 'a quiet day of ' + T.like, 'just one bite of ' + T.snack, 'to evolve someday', 'friends who don\'t push me around']),
+    memory: (me, T) => pick(['back in ' + T.home, 'when I was just a little hatchling', 'before the bullies came', 'the last time it rained']),
+    fearline: (me, T) => pick(['I\'m scared of ' + T.fear, 'I\'ve never been this scared', 'my legs won\'t stop shaking']),
+    reason: (me, T, X, ctx) => ({ kin: 'you\'re a ' + X.name + ' too! We should stick together', awe: 'I\'ve never seen anyone fight like that', freed: 'the boss is gone... nobody can make me fight now', convinced: (ctx.ally || 'your friend') + ' says you\'re good people', saved: 'you saved me back there', friendly: (ctx.other ? who(ctx.other).name : 'my own team') + ' attacked ME', beg: 'I don\'t want to fight anymore', heart: GEN.grievance(me, T) })[ctx.reason || 'heart'] || GEN.grievance(me, T),
+    kills: () => String(RUNSTAT().kills) };
   const S = {
     greet: { brave: ['Yo, {other}! Ready for a sparring match?', '{other}! Stay sharp out here.'], hothead: ['What are YOU looking at, {other}?', '{other}! Outta my way!'], timid: ['H-hi, {other}... you\'re not going to bite, are you?', 'Oh! {other}... you scared me.'],
-      shy: ['H-hello, {other}...', '...Hi.'], cheerful: ['{other}! Wanna be friends?!', 'Hiii {other}! What a great day!'], lazy: ['Oh... it\'s you, {other}.', 'Hey {other}... wake me up later.'], sassy: ['Oh. It\'s {other}.', '{other}, your fur is a mess.'],
+      shy: ['H-hello, {other}...', '...Hi, {other}.'], cheerful: ['{other}! Wanna be friends?!', 'Hiii {other}! What a great day!'], lazy: ['Oh... it\'s you, {other}.', 'Hey {other}... wake me up later.'], sassy: ['Oh. It\'s {other}.', '{other}, your fur is a mess.'],
       polite: ['Good day to you, {other}.', 'A pleasure, {other}.'], prankster: ['Boo! Hehe, gotcha, {other}!', '{other}! Wanna help me prank someone?'], stoic: ['{other}.', '...{other}. Hm.'], gentle: ['Hello, {other}. Are you well?', 'Oh, {other}! Lovely to see you.'], quirky: ['{other}! Did you know clouds are just sky-water?', 'Hello {other}, I\'ve been counting blades of grass.'] },
-    greetBack: { brave: ['Always ready!', 'Heh, you know it!'], hothead: ['YOUR way, you mean!', 'Watch it, pal!'], timid: ['Eek! H-hi...', 'I-I won\'t bite... promise.'], shy: ['...H-hello.', '*waves quietly*'], cheerful: ['Friends! YES!', 'Best day ever!'], lazy: ['...mhm.', 'Sure... later.'],
-      sassy: ['Excuse you.', 'At least I HAVE fur.'], polite: ['Likewise, I\'m sure.', 'The pleasure is mine.'], prankster: ['Not if I prank you first!', 'Count me in!'], stoic: ['Hm.', '...Yes.'], gentle: ['I\'m well, thank you.', 'Lovely to see you too.'], quirky: ['They are?! My whole life is a lie!', 'How many so far?'] },
-    meetPlayer: { all: ['{about}'], brave: ['{about} Don\'t think I\'ll go easy if you start something.'], timid: ['{about} P-please don\'t hurt me!'], cheerful: ['{about} Can I get your autograph?!'], lazy: ['{about} ...anyway, I\'m napping.'], sassy: ['{about} Not impressed, though.'], polite: ['{about} Welcome to {home}.'], gentle: ['{about} Be careful out there, okay?'] },
-    hurt: { brave: ['Hey! Fight fair, I wasn\'t even ready!', 'Ow! That\'s a cheap shot!'], hothead: ['YOU HIT ME?! For WHAT?!', 'OW! You\'re gonna regret that!'], timid: ['Ow ow ow! Why?! I wasn\'t doing anything!', 'P-please stop! I\'m not one of them!'], shy: ['Ow... w-why...?', 'I... I didn\'t do anything...'],
-      cheerful: ['Ow! I thought we were friends!', 'Ouch! That\'s not how you play!'], lazy: ['Ow... I was SLEEPING...', 'Ugh... rude.'], sassy: ['Excuse me?! Do you know who I AM?', 'Ugh! You scuffed me!'], polite: ['That was entirely uncalled for!', 'I beg your pardon?!'],
-      prankster: ['Hey, no fair! I\'M the one who does the surprises!', 'Ow! Okay, okay, I deserved one... but not THAT!'], stoic: ['...Why.', 'That was unnecessary.'], gentle: ['Ah! Why would you hurt me?', 'Please... I mean you no harm.'], quirky: ['Ow! Was that a hug?! It hurt like a hit!', 'Ouch! Fun fact: that hurt!'] },
-    provoked: { all: ['That\'s IT! You asked for it!', 'Fine! You want a fight?! You GOT one!', 'I was minding my own business... NOT ANYMORE!'], timid: ['I-I\'m scared... but I\'m ANGRIER!'], lazy: ['...Okay. Now I\'m awake. And mad.'], polite: ['Very well. You leave me no choice.'], gentle: ['I didn\'t want this... but I\'ll protect myself.'] },
-    die: { all: ['W-why...?', 'I just wanted to... live here...'], timid: ['Mom...? I\'m scared...'], cheerful: ['I thought... we could\'ve been... friends...'], lazy: ['Guess... I\'ll take... a really long nap...'], sassy: ['Ugh... not... my face...'], polite: ['Tell my family... I was brave...'], gentle: ['It was... such a nice day...'], brave: ['At least... I didn\'t run...'], prankster: ['Heh... last prank... I didn\'t see coming...'], stoic: ['...So this is it.'], shy: ['...nobody will even... notice...'], hothead: ['This... isn\'t... over...'], quirky: ['Fun fact... this... hurts...'] },
-    witness: { all: ['NO! Leave them alone!', 'You MONSTER!', 'Why would you DO that?!', 'They never hurt anybody!'], timid: ['Y-you... you\'re a monster! Stay away!'], brave: ['You\'ll answer for that!'], lazy: ['...Hey. That wasn\'t cool. At all.'], polite: ['That... was cruel beyond words.'], gentle: ['No... no, no... they were so kind...'], sassy: ['Oh, real classy, hero.'] },
-    witnessSame: { all: ['My friend...! NOOO!', 'Wake up! Please, WAKE UP!', 'You\'ll pay for that! They were my FAMILY!'], timid: ['B-big sibling...?! No...!'], hothead: ['MY BROTHER! YOU\'RE DONE!'], gentle: ['My little one... no...'] },
-    witnessMate: { all: ['NO! We were going to be together FOREVER!', 'My love...! Please... open your eyes...'] },
-    spotPlayer: { brave: ['An intruder! Face me!', 'You picked the wrong path, {player}!'], hothead: ['THERE you are! GET \'EM!', 'Outsider! I\'ll flatten you!'], timid: ['A-an explorer...! W-we have to attack, right?', 'I-I\'m supposed to fight you... sorry!'],
-      shy: ['I... I have to fight you... sorry...'], cheerful: ['Ooh, a challenger! Let\'s battle!', 'Battle time! Yay!'], lazy: ['Ugh... do I HAVE to fight you?', 'Fine... let\'s get this over with.'], sassy: ['You? Here? How adorable.', 'Hah! You look weak.'],
-      polite: ['I\'m afraid this is our territory. Please leave.', 'Forgive me, but I must defend my home.'], prankster: ['Fresh target! Hehehe!', 'Tag, you\'re IT! And by tag I mean ATTACK!'], stoic: ['Leave. Or fall.', '...Intruder.'], gentle: ['I\'m sorry, but you can\'t stay here.'], quirky: ['Battle! Like the ancient Unown foretold!', 'You smell like adventure. And victory. MY victory.'] },
-    lowHp: { brave: ['I\'m... not done yet!', 'Is that all you\'ve got?!'], hothead: ['ARGH! Retreat! ...For now!', 'I\'ll remember your face!'], timid: ['I-I give up! Please!', 'Too strong! Too strong!'], shy: ['I... I can\'t...'], cheerful: ['Ow ow ow! Good battle, I quit!'], lazy: ['...I\'m too tired for this.'],
-      sassy: ['Ugh! You\'ll pay for this!', 'This never happened!'], polite: ['I concede... this round.'], prankster: ['Okay okay, you win this one!', 'Running away is a valid strategy!'], stoic: ['...Retreating.'], gentle: ['Please... no more...'], quirky: ['Statistically I should flee now!', 'Plan B! Run!'] },
-    avenge: { all: ['N-no! You\'ll pay for that!', 'Buddy!! ...You MONSTER!'], stoic: ['...You will regret that.'], timid: ['Th-they were my friend...!'] },
-    playerLow: { brave: ['You\'re almost finished, {player}!'], hothead: ['You\'re DONE! Finish \'em!'], sassy: ['Look at you. Barely standing.'], prankster: ['Ooh, wobbly! Hehehe!'], stoic: ['Your end is near.'], all: ['They\'re almost down! Keep going!'] },
-    boss: { all: ['So YOU\'RE the one making all this noise...', 'This is MY domain. Leave... or be buried here.', 'Finally. A challenger worth my time.'], lazy: ['You woke me up. Big mistake.'], polite: ['Welcome, explorer. It will be your last visit.'], prankster: ['Surprise! I\'m the boss! Hehehe!'] },
-    thief: { all: ['Shiny things are MINE!', 'Ooh, what\'s in your bag? Gimme!'] },
-    traitor: { all: ['TRAITOR!', 'Hey! Get back here!', 'How COULD you?!'] },
-    turn1: { all: ['...Wait. Why am I even fighting you?', 'These guys never even share their berries with me...', 'I\'ve been watching you fight... you\'re kind of amazing.'], timid: ['I d-don\'t even like fighting...'], lazy: ['...This is so much work. Why am I doing this?'] },
-    turn2: { all: ['You know what? I\'d rather team up with YOU!', 'Forget them! Can I join your team?!', 'I\'m switching sides! Let\'s go, partner!'], polite: ['Allow me to offer my services instead.'], stoic: ['...I will follow you.'] },
-    beg: { all: ['P-please... I don\'t want to fight anymore... can I come with you instead?'] },
-    allyKill: { all: ['Got one!', 'Take that!', 'Did you see that? Did you SEE that?!'], stoic: ['Target down.'], polite: ['One less, partner.'], lazy: ['...That one\'s done. Nap time?'] },
-    allyLow: { all: ['Ow... I\'m hanging in there!', 'Th-they hit hard...'] },
-    allyIdle: { all: ['Thanks for letting me tag along!', 'Team life is SO much better!', 'Those guys were mean to me anyway...'], brave: ['I\'ll protect you, partner!'], lazy: ['Can we stop for a snack? ...No? Okay.'], cheerful: ['Adventure! Adventure! Adventure!'], polite: ['It\'s an honor to travel with you.'] },
-    allyFaint: { all: ['S-sorry... I can\'t fight anymore... Thank you for taking me in...'] },
-    win: { all: ['Hmph! And STAY down!', 'HA! That\'ll teach you!'] }, truce: { all: ['...Fine. Truce. For now.'] }, home: { all: ['Now that THAT\'s settled... I\'m going home to {home}.'] },
+    meetPlayer: { all: ['{about}', '{about} I\'m just looking for {snack}.', '{about} Have you been to {home}?'], brave: ['{about} Don\'t think I\'ll go easy if you start something.'], timid: ['{about} P-please don\'t hurt me!'], cheerful: ['{about} Can I get your autograph?!'],
+      lazy: ['{about} ...anyway, I\'m napping.'], sassy: ['{about} Not impressed, though.'], polite: ['{about} Welcome to {home}.'], gentle: ['{about} Be careful out there, okay?'], prankster: ['{about} Wanna see a trick?'] },
+    hurt: { all: ['Ow! I was just {like}!', 'Why?! I only wanted {wish}!'], brave: ['Hey! Fight fair, I wasn\'t even ready!'], hothead: ['YOU HIT ME?! For WHAT?!'], timid: ['Ow ow ow! Why?! I wasn\'t doing anything!', 'P-please stop! {fearline}!'], shy: ['Ow... w-why...?'],
+      cheerful: ['Ow! I thought we were friends!'], lazy: ['Ow... I was SLEEPING...'], sassy: ['Excuse me?! Do you know who I AM?'], polite: ['That was entirely uncalled for!'], prankster: ['Hey, no fair! I\'M the one who does the surprises!'], stoic: ['...Why.'], gentle: ['Ah! Why would you hurt me?'], quirky: ['Ow! Was that a hug?! It hurt like a hit!'] },
+    provoked: { all: ['That\'s IT! {threat}!', 'Fine! You want a fight?! {threat}!', 'I was minding my own business... NOT ANYMORE!'], timid: ['I-I\'m scared... but I\'m ANGRIER!'], lazy: ['...Okay. Now I\'m awake. And mad.'], polite: ['Very well. You leave me no choice.'], gentle: ['I didn\'t want this... but I\'ll protect myself.'] },
+    die: { all: ['I just wanted... {wish}...', 'I miss... {memory}...', 'W-why...?'], timid: ['Mom...? I\'m scared...'], cheerful: ['I thought... we could\'ve been... friends...'], lazy: ['Guess... I\'ll take... a really long nap...'], sassy: ['Ugh... not... my face...'],
+      polite: ['Tell my family... I was brave...'], gentle: ['It was... such a nice day...'], brave: ['At least... I didn\'t run...'], prankster: ['Heh... last prank... I didn\'t see coming...'], stoic: ['...So this is it.'], shy: ['...nobody will even... notice...'], hothead: ['This... isn\'t... over...'], quirky: ['Fun fact... this... hurts...'] },
+    witness: { all: ['NO! Leave them alone!', 'You MONSTER!', 'They only wanted {wish}!', 'They never hurt anybody!'], timid: ['Y-you... you\'re a monster! Stay away!'], brave: ['You\'ll answer for that!'], lazy: ['...Hey. That wasn\'t cool. At all.'], polite: ['That... was cruel beyond words.'], gentle: ['No... no, no... they were so kind...'], sassy: ['Oh, real classy, hero.'] },
+    witnessSame: { all: ['My friend...! NOOO!', 'Wake up! Please, WAKE UP!', 'You\'ll pay for that! They were my FAMILY!', 'We were going home to {home} together...!'], timid: ['B-big sibling...?! No...!'], hothead: ['MY BROTHER! YOU\'RE DONE!'], gentle: ['My little one... no...'] },
+    witnessMate: { all: ['NO! We were going to be together FOREVER!', 'My love...! Please... open your eyes...', 'We were going to see {home} together...'] },
+    spotPlayer: { all: ['{threat}!', 'Hey, {player}! {insult}!', 'This is OUR turf! {threat}!'], brave: ['An intruder! Face me!', 'You picked the wrong path, {player}!'], hothead: ['THERE you are! GET \'EM!', 'Outsider! {threat}!'], timid: ['A-an explorer...! W-we have to attack, right?', 'I-I\'m supposed to fight you... sorry!'],
+      shy: ['I... I have to fight you... sorry...'], cheerful: ['Ooh, a challenger! Let\'s battle!'], lazy: ['Ugh... do I HAVE to fight you?', 'Fine... let\'s get this over with.'], sassy: ['You? Here? How adorable.', 'Hah! {insult}.'],
+      polite: ['I\'m afraid this is our territory. Please leave.'], prankster: ['Fresh target! Hehehe!', 'Tag, you\'re IT! And by tag I mean ATTACK!'], stoic: ['Leave. Or fall.'], gentle: ['I\'m sorry, but you can\'t stay here.'], quirky: ['You smell like adventure. And victory. MY victory.'] },
+    lowHp: { all: ['I\'ll remember this!', 'Ugh... {pack}, help me!', 'I just wanted {wish}...'], brave: ['I\'m... not done yet!'], hothead: ['ARGH! Retreat! ...For now!'], timid: ['I-I give up! Please!', 'Too strong! Too strong!'], shy: ['I... I can\'t...'], cheerful: ['Ow ow ow! Good battle, I quit!'], lazy: ['...I\'m too tired for this.'],
+      sassy: ['This never happened!'], polite: ['I concede... this round.'], prankster: ['Running away is a valid strategy!'], stoic: ['...Retreating.'], gentle: ['Please... no more...'], quirky: ['Statistically I should flee now!'] },
+    avenge: { all: ['N-no! You\'ll pay for that!', 'Buddy!! ...You MONSTER!', 'They were from {home}, like me...!'], stoic: ['...You will regret that.'], timid: ['Th-they were my friend...!'] },
+    playerLow: { all: ['They\'re almost down! {pack}, now!', 'Look at you, {player}. Barely standing.'], brave: ['You\'re almost finished, {player}!'], hothead: ['You\'re DONE! Finish \'em!'], sassy: ['{insult}. And you\'re about to fall.'], prankster: ['Ooh, wobbly! Hehehe!'], stoic: ['Your end is near.'] },
+    boss: { all: ['So YOU\'RE the one making all this noise...', 'This is MY domain. {threat}.'] },
+    thief: { all: ['Shiny things are MINE!', 'Ooh, what\'s in your bag? Gimme!', 'Hand over the loot and maybe I\'ll let you pass!'] },
+    traitor: { all: ['TRAITOR!', 'Hey! Get back here!', 'How COULD you?!', 'Fine! Go with them! See if I care!'] },
+    turn1: { all: ['...Wait. Why am I even fighting you? {grievance}.', 'Hold on... {reason}...', '{grievance}... and {praise}. What am I even doing?', 'You know... {praise}.'], timid: ['I d-don\'t even like fighting... {reason}...'], lazy: ['...This is so much work. {reason}.'], brave: ['Hmph. {praise}. I respect that.'], sassy: ['Ugh. {grievance}. I\'m so done with them.'] },
+    turn2: { all: ['You know what? I\'d rather team up with YOU!', 'Forget {pack}! Can I join your team?!', 'I\'m switching sides! Let\'s go, partner!', 'From now on, I fight for YOU!'], polite: ['Allow me to offer my services instead.'], stoic: ['...I will follow you.'], prankster: ['Hehe, the ultimate prank: switching sides!'], hothead: ['{pack}! You hear that?! I QUIT!'] },
+    beg: { all: ['P-please... {reason}... can I come with you instead?', 'Please... take me with you... I only wanted {wish}...'] },
+    defect: { all: ['That\'s IT! If that\'s how you treat me, I\'m with the explorer!', '{reason}?! Fine! I\'m switching sides!'], hothead: ['YOU HIT ME?! I\'M DONE WITH ALL OF YOU!'], timid: ['Th-they hurt me... the explorer never did that...'] },
+    friendlyFire: { all: ['OW! Watch where you\'re shooting, {other}!', 'HEY! {other}! That was MY back!', '{other}, you did that on PURPOSE!'], timid: ['Ow! {other}... why...?'], hothead: ['{other}! You wanna go?! LET\'S GO!'] },
+    bump: { all: ['Quit shoving, {other}!', 'Watch it, {other}!', 'Hey! That\'s my spot, {other}!'] },
+    saved: { all: ['You... you saved me!', 'I owe you one, explorer!'], stoic: ['...I owe you.'], cheerful: ['My hero!'] },
+    recruit: { all: ['Come on, {other}! They\'re good people!', '{other}! Join us! It\'s way better over here!', 'Psst, {other}... the explorer shares their berries.'] },
+    allyKill: { all: ['Got one!', 'Take that!', 'Did you see that? Did you SEE that?!', 'That one\'s for {home}!'], stoic: ['Target down.'], polite: ['One less, partner.'], lazy: ['...That one\'s done. Nap time?'], hothead: ['WHO\'S NEXT?!'] },
+    allyLow: { all: ['Ow... I\'m hanging in there!', 'Th-they hit hard...', 'I need a breather...'] },
+    allyIdle: { all: ['Thanks for letting me tag along!', 'Team life is SO much better!', 'When this is over, let\'s go to {home}!', 'I could really go for {snack}... later!'], brave: ['I\'ll protect you, partner!'], lazy: ['Can we stop for a snack? ...No? Okay.'], cheerful: ['Adventure! Adventure! Adventure!'], polite: ['It\'s an honor to travel with you.'], sassy: ['Admit it. I\'m your best teammate.'] },
+    allyFaint: { all: ['S-sorry... I can\'t fight anymore... Thank you for taking me in...', 'I\'ll... go rest in {home}... thank you...'] },
+    win: { all: ['Hmph! And STAY down!', 'HA! That\'ll teach you!', 'Next time, keep your paws off my {snack}!'] }, truce: { all: ['...Fine. Truce. For now.', 'Ugh. Whatever. We\'re even.'] }, home: { all: ['Now that THAT\'s settled... I\'m going home to {home}.'] },
     grudge: { all: ['HEY! {other}! You stole my Gold Ball!', 'I was saving {snack} and YOU ate it, {other}!', 'You stepped on my tail AGAIN, {other}!', 'You told everyone I can\'t evolve!', 'This is MY napping spot, {other}!'] },
     grudgeSame: { all: ['Give back my Gold Ball, you copycat!', 'Mom always liked you better!'] },
-    grudgeReply: { all: ['Finders keepers! Get lost!', 'Should\'ve been faster, then!', 'Make me!', 'Prove it!'], timid: ['I-I didn\'t mean to!'], sassy: ['Oh, cry me a river.'] } };
+    grudgeReply: { all: ['Finders keepers! Get lost!', 'Should\'ve been faster, then!', 'Make me!', 'Prove it!', '{insult}!'], timid: ['I-I didn\'t mean to!'], sassy: ['Oh, cry me a river.'] } };
   // speech-bubble small talk (short)
   const B = {
     nap: ['Zzz...', '*snore*', '...five more minutes...', 'Mmh... {snack}...'], wake: ['Wha—?!', 'H-huh?! I wasn\'t sleeping!', 'Who\'s there?!'], eat: ['*munch munch*', 'Nom nom~', 'Mmm, {snack}!', 'So juicy!'], sniff: ['Mmm, flowers~', 'So pretty...', 'Smells like {home}...'],
@@ -163,14 +183,16 @@
   // ================= the voice shapes the line =================
   function fill(s, me, ctx) {
     const V = who(me), T = TYPE[V.type] || TYPE.normal, X = explorer(), O = ctx && ctx.other ? who(ctx.other) : null;
-    return s.replace(/\{(\w+)\}/g, (_, k) => ({ me: V.name, other: O ? O.name : (ctx && ctx.otherName) || 'you', player: X.name, home: T.home, like: T.like, fear: T.fear, snack: T.snack, boast: T.boast, type: cap(V.type), otype: O ? cap(O.type) : '', ptype: cap(X.type),
-      rumor: (ctx && ctx.rumor) || rumor(), about: aboutPlayer(me), cry: V.cry, n: ctx && ctx.n })[k] ?? '');
+    const base = { me: V.name, other: O ? O.name : (ctx && ctx.otherName) || 'you', player: X.name, home: T.home, like: T.like, fear: T.fear, snack: T.snack, boast: T.boast, type: cap(V.type), otype: O ? cap(O.type) : '', ptype: cap(X.type), cry: V.cry, n: ctx && ctx.n };
+    return s.replace(/\{(\w+)\}/g, (_, k) => { if (k in base) return base[k] ?? ''; if (k === 'rumor') return (ctx && ctx.rumor) || rumor(); if (k === 'about') return aboutPlayer(me); if (GEN[k]) return GEN[k](me, Object.assign({ name: V.name }, T), X, ctx || {}); return ''; })
+      .replace(/(^|(?<!\.)[.!?]\s+)([a-z])/g, (m, a, c) => a + c.toUpperCase());   // generated pieces may start a sentence (not after a '...' pause)
   }
+  let NAMES = null; const isName = w => { if (!NAMES) { NAMES = new Set(); for (const k in (E()?.DEX_BY || {})) NAMES.add(E().DEX_BY[k].name); } return NAMES.has(w); };
   function shape(text, V, short, grave) {
     const v = VOICE[V.voice] || VOICE.stoic; let t = text.trim();
     if (v.stutter && chance(v.stutter)) t = t.replace(/^([A-Za-z])(?!-)/, (m, c) => c + '-' + (c === 'I' ? c : c.toLowerCase()));
     if (grave) return t;   // pain, grief, last words: no cheery openers or sign-offs
-    if (!short && chance(0.5) && v.open.length) { const o = pick(v.open); if (o) t = o + ' ' + (/,$/.test(o) && /^[A-Z][a-z]/.test(t) && !/^(I|I'm|I'll|I've)\b/.test(t) ? t[0].toLowerCase() + t.slice(1) : t); }
+    if (!short && chance(0.5) && v.open.length) { const o = pick(v.open); if (o) t = o + ' ' + (/,$/.test(o) && /^[A-Z][a-z]/.test(t) && !/^(I|I'm|I'll|I've)\b/.test(t) && !isName(t.split(/[^A-Za-z.'-]/)[0]) ? t[0].toLowerCase() + t.slice(1) : t); }
     if (!short && /[.!]$/.test(t) && !/\.\.\.$/.test(t) && !/\?[!.]*$/.test(t) && chance(0.45)) t = t.replace(/[.!]+$/, '') + pick(v.close);
     if (v.caps && chance(0.5)) { const w = t.split(' '); const i = w.findIndex(x => x.replace(/[^a-z]/gi, '').length > 3); if (i >= 0) w[i] = w[i].toUpperCase(); t = w.join(' '); }
     if (v.slow && chance(0.4)) t = t.replace(/, /, '... ');
@@ -184,6 +206,7 @@
   function line(me, sit, ctx) {
     const V = who(me); if (!V) return ['normal', '...', 'dots']; const pool = S[sit] || P[sit] || {}; let list = pool[V.voice] || pool.all;
     if (pool[V.voice] && pool.all && chance(0.3)) list = pool.all; if (!list) list = ['...'];
+    if (sit === 'turn1' && ctx && ctx.reason && ctx.reason !== 'heart') list = ['Hold on... {reason}...', '{reason}. I want to fight beside you!', '...{reason}. I\'ve made up my mind.', 'Wait, wait... {reason}!'];   // a specific reason to switch sides
     return [faceFor(sit, V), shape(fill(pick(list), me, ctx), V, false, GRAVE.has(sit)), emoteFor(sit, V)];
   }
   function bubble(me, kind, ctx) { const V = who(me); const L = B[kind]; if (!V || !L) return '...'; return shape(fill(pick(L), me, ctx), V, true); }
