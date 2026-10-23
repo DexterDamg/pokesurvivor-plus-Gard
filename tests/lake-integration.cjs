@@ -5,7 +5,7 @@ E.Game={state:'playing',player:null,st:{time:0}};E.World.collide=noop;E.World.is
 E.EnemyMgr.all=()=>enemies;E.EnemyMgr.update=noop;E.Projectiles.all=()=>shots;E.Sprites.preload=noop;
 for(const k of ['ring','burst','dmgText'])E.FX[k]=noop;
 E.Stats.dmg=noop;E.Camera.shake=noop;E.Audio.sfx=noop;E.Audio.ultLoop=()=>0;E.Ult.drawUnits=noop;E.Combat.tick=noop;
-for(const name of ['hoopa.js','lake-trio.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js',name),'utf8'),C);
+for(const name of ['hoopa.js','lake-trio.js'])vm.runInContext(require('./module.cjs')(name),C);
 const lake=C.PS_LAKE,ids=['lake-uxie','lake-mesprit','lake-azelf'];
 for(const dex of [480,481,482]){
  const p=new E.Player(E.DEX_BY[dex],{},false);E.Game.player=p;p.level=10;
