@@ -121,7 +121,7 @@
     let regen = 0; try { regen = Number(s.caster.regen) || 0; } catch (_) {} s.hp = Math.min(s.maxHp, s.hp + regen * dt);
     try { s.caster.berryTick(dt); } catch (_) {}
     if (p.dead) return;
-    const enemies = N.EnemyMgr.all().filter(e => e && !e.dead), calm = e => !(e.__lakeConfT > 0) && !(e.__lakeFearT > 0);
+    const enemies = N.EnemyMgr.all().filter(e => e && !e.dead), calm = e => !e.__role && !(e.__lakeConfT > 0) && !(e.__lakeFearT > 0);
     const near = enemies.filter(e => calm(e) && dist(e, s) < CFG.panic).sort((a, b) => dist(a, s) - dist(b, s));
     let goal = null, stop = 0, mode = 'follow';
     s.dodgeT = Math.max(0, (s.dodgeT || 0) - dt); if (s.dodgeT <= 0) { const q = k.incoming(s); if (q) { s.dodge = q; s.dodgeT = 0.3; } }
@@ -270,13 +270,13 @@
       try { update(arguments[0]); } catch (err) { console.warn('[digger]', err); }
       const r = emu.apply(this, arguments); const s = bro;
       if (s && !s.dead && !s.thrown && s.emergeT >= CFG.emerge && N.Game.state === 'playing') {
-        for (const e of N.EnemyMgr.all()) if (e && !e.dead && dist(s, e) < s.r + (e.r || 12)) { let d = 0; try { d = typeof e.dmg === 'function' ? e.dmg() : e.dmg; } catch (_) {} hurt(Number(d) || 8, e.atkType, e); }
+        for (const e of N.EnemyMgr.all()) if (e && !e.dead && !e.__role && dist(s, e) < s.r + (e.r || 12)) { let d = 0; try { d = typeof e.dmg === 'function' ? e.dmg() : e.dmg; } catch (_) {} hurt(Number(d) || 8, e.atkType, e); }
         const shots = N.Projectiles.all(); for (let i = shots.length - 1; i >= 0; i--) { const q = shots[i]; if (!q || q.friendly || q.ghost || dist(s, q) > s.r + (q.r || 4)) continue; hurt(q.pct ? Math.max(q.dmg, s.maxHp * q.pct) : q.dmg, q.mtype); shots.splice(i, 1); } }
       return r; };
     // enemies mostly go for the loud one; Drilbur only draws them when he's much closer (or has his Spiral power)
     const eup = N.Enemy.prototype.update;
     N.Enemy.prototype.update = function (dt) { const s = bro;
-      if (s && !s.dead && !s.thrown && s.emergeT >= CFG.emerge && owner && owner === N.Game.player && !(this.__lakeConfT > 0) && !(this.__lakeFearT > 0)) {
+      if (s && !s.dead && !s.thrown && !this.__role && s.emergeT >= CFG.emerge && owner && owner === N.Game.player && !(this.__lakeConfT > 0) && !(this.__lakeFearT > 0)) {
         if (dist(this, s) + (spiral ? 0 : 80) < (owner.dead ? Infinity : dist(this, owner))) arguments[1] = s.caster; }
       return eup.apply(this, arguments); };
     // pseudo-player: he collects drops — a held item is his, the rest goes to you

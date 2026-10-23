@@ -435,7 +435,7 @@
       try { update(dt); } catch (err) { console.warn('[lake]', err); }
       const r = emu.apply(this, arguments);
       if (owner && N.Game.state === 'playing') for (const d of IDS) { const s = allies[d]; if (!s || s.dead || s.spawnT < CFG.spawnTime) continue;
-        for (const e of N.EnemyMgr.all()) if (e && !e.dead && dist(s, e) < s.r + (e.r || 12)) { let dmg = 0; try { dmg = typeof e.dmg === 'function' ? e.dmg() : e.dmg; } catch (_) {} hurt(s, Number(dmg) || 8, e.atkType, e); }
+        for (const e of N.EnemyMgr.all()) if (e && !e.dead && !e.__role && dist(s, e) < s.r + (e.r || 12)) { let dmg = 0; try { dmg = typeof e.dmg === 'function' ? e.dmg() : e.dmg; } catch (_) {} hurt(s, Number(dmg) || 8, e.atkType, e); }
         const shots = N.Projectiles.all(); for (let i = shots.length - 1; i >= 0; i--) { const q = shots[i]; if (!q || q.friendly || q.ghost || dist(s, q) > s.r + (q.r || 4)) continue; hurt(s, q.pct ? Math.max(q.dmg, s.maxHp * q.pct) : q.dmg, q.mtype); shots.splice(i, 1); } }
       return r;
     };
@@ -474,7 +474,7 @@
         const a = performance.now() / 400 + (this.x % 7); arguments[1] = { x: this.x + Math.cos(a) * 80, y: this.y + Math.sin(a) * 80, r: 1, dead: false, hp: 1, maxHp: 1, hurt() {} };   // nobody near: it staggers around
         return eup.apply(this, arguments);
       }
-      if (owner && owner === N.Game.player) { const live = IDS.map(d => allies[d]).filter(s => s && !s.dead && s.spawnT >= CFG.spawnTime);
+      if (owner && owner === N.Game.player && !this.__role) { const live = IDS.map(d => allies[d]).filter(s => s && !s.dead && s.spawnT >= CFG.spawnTime);
         if (live.length) { let a = aggro.get(this); if (!a || (a.t -= dt) <= 0 || a.c.dead) { let best = owner, bs = owner.dead ? Infinity : dist(this, owner);
             for (const s of live) { const sc = dist(this, s) - (s.dex === 480 ? 140 : 0); if (sc < bs) { bs = sc; best = s; } } a = { c: best, t: 0.75 }; aggro.set(this, a); this.__lakeAggro = best === owner ? null : best.name; }
           if (a.c !== owner) { arguments[1] = a.c.caster || a.c; target = arguments[1]; } } }

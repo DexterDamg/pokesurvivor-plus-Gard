@@ -36,6 +36,7 @@
    const g=B()?.game,p=g?.player;if(!p||g.state!=='playing')return;
    for(const e of B().enemies.all()){
      if(!e||e.dead||e.remote||e.__psCatch)continue;let s=st.get(e)||assign(e);
+     if(e.__role){s.x=e.x;s.y=e.y;s.hp=Number(e.hp)||0;continue;}   // harmless wild Pokemon move on their own (js/wild-life.js)
      const hp=Number(e.hp)||0,wasHit=hp<s.hp-.01;s.hp=hp;
      if(wasHit&&s.kind==='passive')s.kind=e.psAi='aggressive';          // provoked
      if(s.coward&&!s.flee&&Number(e.maxHp)>0&&hp<Number(e.maxHp)*AI.cowardHp)s.flee=true;
