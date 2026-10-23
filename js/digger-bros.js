@@ -1,27 +1,28 @@
-/* DIGGER BROTHERS — Excadrill and his little bro Drilbur (a Gurren Lagann nod: Excadrill is Kamina, Drilbur is
-   Simon the Digger, a shy 14-year-old kid). Portraits: assets/portraits/530.png (Excadrill), 529.png (Drilbur:
-   that sheet only has Normal and Worried, the talk box picks the closer one).
-   - Playing as Excadrill, he passively calls Drilbur, who digs his way up out of the ground beside you. If Drilbur
-     goes down, he burrows away and digs back up 25 s later.
-   - Drilbur barely fights: he sidesteps shots, runs from anything that gets close and stays tucked behind his
-     Aniki. But he is a great scavenger: he picks up drops (a held item becomes his; XP, coins and the rest go to
-     you), opens chests, waits at a big chest until it opens and activates the power-up crystals. Only when he is
-     truly cornered (an enemy right on him and nowhere left to run) does he scratch back.
-   - The two of them talk (shy little bro, loud big bro) about what happens.
-   - ONCE PER RUN, the hit that would knock Excadrill out (with Drilbur around) starts a scene instead. Drilbur
-     breaks down... and Kamina tells him not to believe in him — believe in the you who believes in yourself!
-     Then Excadrill falls for good. Drilbur awakens his Spiral power (GIGA DRILL BREAK hits every enemy) and from
-     then on YOU play as Drilbur for the rest of the run: same level, moves and items, full HP, +50% Attack and a
-     Spiral aura. Excadrill's grave (a mound with his shades) stays where he fell.
-   Solo: the battle freezes during the scene (click / Enter / Space skips to the drill). Co-op: nothing freezes.
-   Needs js/lake-trio.js (movement helpers) and js/lake-talk.js (talk box). */
+/* DIGGER BROTHERS — KAMINA (Excadrill) and his little bro SIMON (Drilbur), a Gurren Lagann nod: Simon the Digger is
+   a shy 14-year-old kid. In this mode Excadrill goes by Kamina and Drilbur by Simon (the HUD, the talk box and the
+   labels). Portraits: assets/portraits/530.png (Kamina), 529.png (Simon: that sheet only has Normal and Worried, the
+   talk box picks the closer one).
+   - Playing as Excadrill (Kamina), he passively calls Simon, who digs his way up out of the ground beside you. If
+     Simon goes down, he burrows away and digs back up 25 s later.
+   - Simon barely fights: he sidesteps shots, runs from anything that gets close and stays tucked behind Kamina.
+     But he is a great scavenger: he picks up drops (a held item becomes his; XP, coins and the rest go to you),
+     opens chests, waits at a big chest until it opens and activates the power-up crystals. Only when he is truly
+     cornered (an enemy right on him and nowhere left to run) does he scratch back.
+   - The two of them talk a lot (shy little bro, loud big bro): arriving, loot, bosses, level-ups, low HP...
+   - ONCE PER RUN, the hit that would knock Kamina out (with Simon around) starts a scene instead. Simon breaks
+     down... and Kamina tells him not to believe in him — believe in the you who believes in yourself! Then Kamina
+     dies. Simon cries... then gets up, angry and determined, with Kamina's cape on his back: "My bro is dead...
+     I'm ME! Simon the Digger!" From then on YOU play as Simon for the rest of the run: same level, moves and items,
+     full HP, +50% Attack, a Spiral aura and Kamina's red cape. Kamina's grave (a mound with his shades) stays.
+   Solo: the battle freezes during the scene (click / Enter / Space skips to Simon's last words). Co-op: nothing
+   freezes. Needs js/lake-trio.js (movement helpers) and js/lake-talk.js (talk box). */
 (() => {
   'use strict';
   if (window.PS_DIGGER_INSTALLED) return; window.PS_DIGGER_INSTALLED = true;
   const E = () => window.PS_HOOPA_ENGINE, B = () => window.PS_MEGA_BRIDGE_V5, TAU = Math.PI * 2;
   const DRIL = 529, EXCA = 530;
   const CFG = { first: 2, resummon: 25, emerge: 1.3, hp: 0.9, atk: 0.7, spd: 1.15, panic: 170, leash: 300, jobRange: 320, jobSafe: 150,
-    corner: 55, scratchCd: 1.1, spiralAtk: 3, gigaMult: 25, simonAtk: 1.5, gap: 9 };
+    corner: 55, scratchCd: 1.1, simonAtk: 1.5, gap: 9, lowHp: 0.3 };
   const K = () => window.PS_LAKE?.kit, T = () => window.PS_LAKE_TALK;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const sfx = n => { try { E().Audio.sfx(n); } catch (_) {} };
@@ -29,34 +30,46 @@
   const pick = L => L[Math.floor(Math.random() * L.length)];
 
   // ================= lines: [face, text, emote] =================
-  const D = {   // Drilbur — Simon: shy, meek, a digger who believes in his Aniki
-    arrive: [['worried', 'A-Aniki? I\'m here... I\'ll stay behind you, okay?', 'sweat'], ['normal', 'I dug my way over! ...Was that okay?', 'note']],
-    back: [['normal', 'I\'m back! I dug the long way around...', 'note'], ['worried', 'S-sorry I left. I\'m okay now.', 'sweat']],
-    scared: [['worried', 'Eek! T-too many of them...!', 'sweat'], ['worried', 'I-I\'ll just... stay over here...', 'sweat'], ['worried', 'Aniki, they\'re looking at me!', 'sweat']],
-    item: [['normal', 'I found something! ...Can I keep it?', 'note'], ['normal', 'Ooh... I\'ll hold onto this one.', 'note']],
-    chest: [['normal', 'I-I opened it! There was stuff inside!', 'note']],
-    bigchest: [['worried', 'It\'s so heavy... j-just a little longer...', 'sweat']],
-    crystal: [['normal', 'This crystal\'s humming... it\'s for you, Aniki!', 'spark']],
-    cornered: [['worried', 'S-stay back! I\'ll... I\'ll fight if I have to!', 'anger'], ['worried', 'Nowhere left to dig... okay... okay, here goes!', 'anger']],
-    faint: [['worried', 'Sorry, Aniki... I\'ll dig back up soon...', 'tear']],
-    idle: [['normal', 'Aniki... do you really think we can dig all the way to the sky?', 'dots'], ['worried', 'I\'m just a digger... but I\'ll dig for you.', 'dots'], ['normal', 'Everyone back in the village laughed at me... not you, though.', 'heart']],
-    spiral: [['normal', 'I won\'t run anymore!', 'exclaim'], ['normal', 'My drill will pierce right through!', 'spark'], ['normal', 'I believe in the me who believes in myself!', 'spark']],
-    alone: [['normal', 'Aniki... are you watching? I\'m still digging.', 'dots'], ['worried', 'I\'m scared... but I\'m not running. Not anymore.', 'sweat'], ['normal', 'Who the hell do you think I am?! ...That\'s what you\'d say, right, Aniki?', 'spark'],
-      ['normal', 'My drill is the drill that\'ll pierce the heavens!', 'spark'], ['worried', '...I miss you, Aniki.', 'tear'], ['normal', 'Kick reason to the curb... and do the impossible!', 'exclaim']],
-    boss: [['normal', 'That one\'s huge... doesn\'t matter. I\'ll drill right through it!', 'anger']] };
-  const X = {   // Excadrill — Kamina: loud, fearless, the best big bro
-    arrive: [['joyous', 'That\'s my bro! Stick close and watch your big bro work!', 'heart'], ['determined', 'Simon! Grab anything shiny — I\'ll handle the punching!', 'exclaim']],
-    back: [['happy', 'There he is! Knew you\'d dig your way back!', 'heart']],
-    scared: [['shouting', 'Don\'t flinch, Simon! Your Aniki\'s right here!', 'exclaim'], ['angry', 'Oi! Nobody scares my little bro!', 'anger']],
-    loot: [['happy', 'Ha! Great find! That\'s my digger!', 'note'], ['joyous', 'Look at him go! Best digger in the whole world!', 'heart']],
-    cornered: [['shouting', 'That\'s it, Simon! Show \'em what you\'ve got!', 'exclaim']],
-    hurt: [['angry', 'You DARE lay a claw on my brother?!', 'anger']],
+  const D = {   // Simon (Drilbur): shy, meek, a digger who believes in Kamina
+    arrive: [['worried', 'K-Kamina? I\'m here... I\'ll stay behind you, okay?', 'sweat'], ['normal', 'I dug my way over, Kamina! ...Was that okay?', 'note'], ['worried', 'Kamina! W-wait for me!', 'sweat']],
+    back: [['normal', 'I\'m back, Kamina! I dug the long way around...', 'note'], ['worried', 'S-sorry I left. I\'m okay now, Kamina.', 'sweat'], ['normal', 'Did you miss me? ...You didn\'t, did you.', 'dots']],
+    scared: [['worried', 'Eek! T-too many of them...!', 'sweat'], ['worried', 'I-I\'ll just... stay over here...', 'sweat'], ['worried', 'Kamina, they\'re looking at me!', 'sweat'], ['worried', 'Kamina! Kamina! KAMINA!', 'exclaim']],
+    item: [['normal', 'I found something! ...Can I keep it, Kamina?', 'note'], ['normal', 'Ooh... I\'ll hold onto this one.', 'note'], ['normal', 'Look, Kamina! It was buried right here!', 'spark']],
+    chest: [['normal', 'I-I opened it! There was stuff inside!', 'note'], ['normal', 'Kamina, look! Treasure!', 'spark']],
+    bigchest: [['worried', 'It\'s so heavy... j-just a little longer...', 'sweat'], ['worried', 'Kamina, c-cover me... this lid is stuck...', 'sweat']],
+    crystal: [['normal', 'This crystal\'s humming... it\'s for you, Kamina!', 'spark'], ['normal', 'I touched the shiny rock! Do you feel stronger, Kamina?', 'spark']],
+    cornered: [['worried', 'S-stay back! I\'ll... I\'ll fight if I have to!', 'anger'], ['worried', 'Nowhere left to dig... okay... okay, here goes!', 'anger'], ['worried', 'Kamina would never run... so I won\'t either!', 'anger']],
+    faint: [['worried', 'Sorry, Kamina... I\'ll dig back up soon...', 'tear'], ['worried', 'Kamina... I messed up...', 'tear']],
+    idle: [['normal', 'Kamina... do you really think we can dig all the way to the sky?', 'dots'], ['worried', 'I\'m just a digger... but I\'ll dig for you, Kamina.', 'dots'], ['normal', 'Everyone back in the village laughed at me... not you, though.', 'heart'],
+      ['normal', 'Kamina, your shades are crooked again...', 'dots'], ['normal', 'Is the surface always this big, Kamina?', 'question'], ['normal', 'Kamina... thanks for taking me with you.', 'heart'],
+      ['worried', 'Kamina, do you ever get scared? ...Of course you don\'t.', 'dots'], ['normal', 'I found a perfect little drill bit today. I\'m keeping it forever.', 'note']],
+    kamHurt: [['worried', 'Kamina! You\'re hurt!', 'sweat'], ['worried', 'K-Kamina, please be careful!', 'sweat'], ['worried', 'Kamina, you\'re bleeding! Slow down!', 'tear']],
+    boss: [['worried', 'Kamina... th-that one\'s HUGE!', 'sweat'], ['worried', 'W-we\'re fighting THAT?!', 'exclaim']],
+    levelup: [['normal', 'Kamina, you\'re getting even stronger!', 'spark'], ['normal', 'Wow... Kamina\'s shining!', 'heart']],
+    alone: [['normal', 'Kamina... are you watching? I\'m still digging.', 'dots'], ['worried', 'I\'m scared... but I\'m not running. Not anymore.', 'sweat'], ['normal', 'Who the hell do you think I am?! ...I\'m Simon the Digger!', 'spark'],
+      ['normal', 'My drill is the drill that\'ll pierce the heavens!', 'spark'], ['worried', '...I miss you, Kamina.', 'tear'], ['normal', 'Kick reason to the curb... and do the impossible!', 'exclaim'],
+      ['normal', 'I can feel his cape on my back. I\'m not alone.', 'heart'], ['normal', 'I\'m not my bro. I\'m ME!', 'exclaim'], ['normal', 'Once I\'ve dug through, it means I\'ve won!', 'spark']],
+    aloneBoss: [['normal', 'That one\'s huge... doesn\'t matter. I\'ll drill right through it!', 'anger'], ['normal', 'Kamina... watch this one!', 'spark']],
+    aloneHurt: [['worried', 'I won\'t stop... not here... not ever!', 'anger'], ['normal', 'If you\'re gonna dig, dig to the heavens!', 'spark']],
+    aloneLevel: [['normal', 'I\'m getting stronger, Kamina. Can you see it?', 'heart']] };
+  const X = {   // Kamina (Excadrill): loud, fearless, the best big bro
+    arrive: [['joyous', 'That\'s my bro! Stick close, Simon, and watch your big bro work!', 'heart'], ['determined', 'Simon! Grab anything shiny — I\'ll handle the punching!', 'exclaim'], ['happy', 'The Gurren Brigade rides again! Right, Simon?!', 'spark']],
+    back: [['happy', 'There he is! Knew you\'d dig your way back, Simon!', 'heart'], ['joyous', 'Simon! That\'s my unbreakable little bro!', 'heart']],
+    scared: [['shouting', 'Don\'t flinch, Simon! Your big bro\'s right here!', 'exclaim'], ['angry', 'Oi! Nobody scares my little bro!', 'anger'], ['shouting', 'Simon, get behind me! NOW!', 'exclaim']],
+    loot: [['happy', 'Ha! Great find, Simon! That\'s my digger!', 'note'], ['joyous', 'Look at him go! Best digger in the whole world!', 'heart'], ['happy', 'Simon\'s got the nose for treasure! I\'ve got the fists!', 'note']],
+    cornered: [['shouting', 'That\'s it, Simon! Show \'em what you\'ve got!', 'exclaim'], ['joyous', 'THAT\'S my bro! Drill \'em, Simon!', 'heart']],
+    hurt: [['angry', 'You DARE lay a claw on my brother?!', 'anger'], ['shouting', 'Hands off Simon, you punks!', 'anger']],
     faint: [['shouting', 'SIMON!! ...Tch. He\'ll dig his way back. He always does.', 'exclaim']],
-    idle: [['determined', 'Kick reason to the curb, Simon! We do the impossible!', 'spark'], ['happy', 'Who the hell do you think I am?!', 'exclaim'], ['inspired', 'One day we\'ll dig straight through to the sky, bro!', 'spark']],
-    spiral: [['joyous', 'THAT\'S my little bro! Pierce the heavens, Simon!', 'heart']] };
+    idle: [['determined', 'Kick reason to the curb, Simon! We do the impossible!', 'spark'], ['happy', 'Who the hell do you think I am?!', 'exclaim'], ['inspired', 'One day we\'ll dig straight through to the sky, Simon!', 'spark'],
+      ['shouting', 'Simon! Who the hell do you think WE are?!', 'exclaim'], ['determined', 'Don\'t look down, Simon! Look UP!', 'spark'], ['happy', 'If your drill ever stops spinning, Simon, I\'ll spin it for ya!', 'heart'],
+      ['inspired', 'Listen up, Simon! Our drill is the drill that\'ll pierce the heavens!', 'spark'], ['joyous', 'These shades? Pure style, Simon. You\'ll get it when you\'re older.', 'note']],
+    lowHp: [['happy', 'This? Just a scratch, Simon! Ha!', 'note'], ['determined', 'Don\'t worry about me, Simon! I\'ve had worse!', 'exclaim'], ['shouting', 'A man doesn\'t go down to THIS!', 'anger']],
+    boss: [['joyous', 'Ha! The bigger they are, the harder they fall! Right, Simon?!', 'exclaim'], ['determined', 'Simon! Watch your big bro bring THAT one down!', 'spark'], ['shouting', 'Bring it on, big guy! The Gurren Brigade fears NOTHING!', 'anger']],
+    levelup: [['joyous', 'Feel that, Simon?! I\'m getting stronger by the second!', 'spark'], ['happy', 'Level up! The Gurren Brigade\'s legend grows!', 'note']] };
 
   // ================= the bro =================
-  let owner = null, bro = null, nextAt = 0, usedRun = null, spiral = false, lastLine = -1e9, idleT = 60, cs = null, simon = null, grave = null;
+  let owner = null, bro = null, nextAt = 0, usedRun = null, spiral = false, lastLine = -1e9, idleT = 60, cs = null, simon = null, grave = null, watch = { lvl: 0, low: false, bosses: new WeakSet(), lowAt: -1e9 };
+  const named = (dex, name) => Object.assign({}, E().DEX_BY[dex], { name });   // this Excadrill is Kamina, this Drilbur is Simon
   const clock = () => performance.now() / 1000;
   function talk(dex, list, o) { if (!list) return false; const l = pick(list); try { return T().line(dex, l[0], l[1], l[2], o); } catch (_) { return false; } }
   function both(first, a, b, chance) {   // a line, then (sometimes) the other brother answers
@@ -67,7 +80,7 @@
     for (const k of ['x', 'y', 'r', 'bodyH', 'anim', 'dead', 'hp', 'maxHp', 'aim', 'target']) Object.defineProperty(a, k, { configurable: true, get: () => s[k], set: v => { s[k] = v; } });
     for (const k of SHARE) Object.defineProperty(a, k, { configurable: true, get: () => s.owner[k], set: () => {} });
     Object.defineProperty(a, 'item', { configurable: true, get: () => s.ownItem || s.owner.item, set: v => { s.ownItem = v; } });
-    Object.defineProperty(a, 'baseAtk', { configurable: true, get: () => (Number(s.owner.baseAtk) || 1) * CFG.atk * (spiral ? CFG.spiralAtk : 1) });
+    Object.defineProperty(a, 'baseAtk', { configurable: true, get: () => (Number(s.owner.baseAtk) || 1) * CFG.atk });
     Object.defineProperty(a, 'baseSpd', { configurable: true, get: () => Number(s.owner.baseSpd) || 100 });
     Object.defineProperty(a, 'floating', { configurable: true, get: () => false });
     a.hurt = (amt, type) => hurt(amt, type); a.ultCd = Infinity; a.ultT = 0;
@@ -83,7 +96,7 @@
   function hurt(amt, type, by) {
     const s = bro; if (!s || s.dead || s.thrown || s.emergeT < CFG.emerge || s.hurtCd > 0 || !Number.isFinite(amt) || amt <= 0) return;
     s.hurtCd = 0.35; const h = s.hp; try { E().Player.prototype.hurt.call(s.caster, amt, type); } catch (_) { s.hp -= amt; }
-    if (s.hp <= 0 || s.dead) { s.hp = 0; s.dead = true; s.sink = 0; nextAt = (E().Game.st?.time ?? 0) + CFG.resummon; txt(s.x, s.y - 40, 'Drilbur burrowed away!', '#9ad8ff'); both(DRIL, D.faint, X.faint, 1); return; }
+    if (s.hp <= 0 || s.dead) { s.hp = 0; s.dead = true; s.sink = 0; nextAt = (E().Game.st?.time ?? 0) + CFG.resummon; txt(s.x, s.y - 40, 'Simon burrowed away!', '#9ad8ff'); both(DRIL, D.faint, X.faint, 1); return; }
     if (h >= s.maxHp * 0.5 && s.hp < s.maxHp * 0.5) both(EXCA, X.hurt, null);
   }
   function clear() { bro = null; owner = null; spiral = false; }
@@ -94,7 +107,8 @@
     if (simon && p !== simon) { simon = null; grave = null; }
     if (simon) { if (N.Game.state === 'playing' && !cs) simonUpdate(p, dt); return; }
     if (!p || Number(p.dex) !== EXCA || !k) { if (owner) clear(); return; }
-    if (p !== owner) { clear(); owner = p; nextAt = (N.Game.st?.time ?? 0) + CFG.first; idleT = 50 + Math.random() * 30; }
+    if (p !== owner) { clear(); owner = p; nextAt = (N.Game.st?.time ?? 0) + CFG.first; idleT = 50 + Math.random() * 30; watch = { lvl: Number(p.level) || 1, low: false, bosses: new WeakSet(), lowAt: -1e9 }; }
+    if (!p.mon || p.mon.name !== 'Kamina') p.mon = named(EXCA, 'Kamina');
     if (N.Game.state !== 'playing' || cs) return;
     const now = N.Game.st?.time ?? 0;
     if (!bro || (bro.dead && bro.sink > 1.2)) { if (now >= nextAt && !p.dead) summon(!!bro); if (!bro) return; }
@@ -111,10 +125,7 @@
     const near = enemies.filter(e => calm(e) && dist(e, s) < CFG.panic).sort((a, b) => dist(a, s) - dist(b, s));
     let goal = null, stop = 0, mode = 'follow';
     s.dodgeT = Math.max(0, (s.dodgeT || 0) - dt); if (s.dodgeT <= 0) { const q = k.incoming(s); if (q) { s.dodge = q; s.dodgeT = 0.3; } }
-    if (spiral) {   // Spiral Drilbur: no more running — he drills into the nearest enemy near his Aniki
-      const tg = enemies.filter(e => dist(e, p) < 360).sort((a, b) => dist(a, s) - dist(b, s))[0];
-      if (tg) { const a = Math.atan2(s.y - tg.y, s.x - tg.x); goal = { x: tg.x + Math.cos(a) * 30, y: tg.y + Math.sin(a) * 30 }; mode = 'fight'; if (dist(s, tg) < 60 && s.scratchT <= 0) drillHit(s, tg, 2.2); } }
-    else if (near.length) {
+    if (near.length) {
       const esc = k.escapePoint(s, enemies, p), stuck = dist(esc, s) < 40 || (s.lastEsc && dist(s, s.lastEsc) < 6 && near[0] && dist(near[0], s) < CFG.corner);
       s.lastEsc = { x: s.x, y: s.y };
       if (near[0] && dist(near[0], s) < CFG.corner && stuck) { mode = 'cornered'; if (s.scratchT <= 0) { drillHit(s, near[0], 1); if (!s.saidCorner) { s.saidCorner = true; both(DRIL, D.cornered, X.cornered, 0.7); } } }
@@ -136,8 +147,15 @@
     s.okX = s.x; s.okY = s.y;
     try { doJob(s, dt); } catch (err) { console.warn('[digger]', err); }
     if (s.anim) { s.anim.loop(moved ? 'Walk' : mode === 'cornered' || mode === 'fight' ? 'Attack' : 'Idle'); const look = goal || p; if (dist(look, s) > 2) s.anim.dir = N.Sprites.dirFromAngle(Math.atan2(look.y - s.y, look.x - s.x)); s.anim.update(dt); }
-    if ((idleT -= dt) <= 0) { idleT = 50 + Math.random() * 35; if (!near.length) { if (spiral) both(DRIL, D.spiral, X.spiral, 0.7); else if (Math.random() < 0.5) both(DRIL, D.idle, X.idle, 0.7); else both(EXCA, X.idle, D.idle, 0.6); } }
+    events(p, enemies);
+    if ((idleT -= dt) <= 0) { idleT = 40 + Math.random() * 30; if (!near.length) { if (Math.random() < 0.5) both(DRIL, D.idle, X.idle, 0.7); else both(EXCA, X.idle, D.idle, 0.6); } }
     try { T().place(DRIL, s); T().place(EXCA, p); } catch (_) {}
+  }
+  // things worth a word: a level-up, Kamina low on HP, a boss showing up
+  function events(p, enemies) {
+    const lv = Number(p.level) || 1; if (lv > watch.lvl) { const up = watch.lvl > 0; watch.lvl = lv; if (up && Math.random() < 0.5) both(EXCA, X.levelup, D.levelup, 0.6); }
+    const low = p.hp < p.maxHp * CFG.lowHp, now = clock(); if (low && !watch.low && now - watch.lowAt > 40) { watch.lowAt = now; lastLine = -1e9; both(DRIL, D.kamHurt, X.lowHp, 0.9); } watch.low = low;
+    const bs = enemies.find(e => (e.boss || e.legend) && !watch.bosses.has(e) && dist(e, p) < 460); if (bs) { watch.bosses.add(bs); lastLine = -1e9; both(EXCA, X.boss, D.boss, 0.8); }
   }
   function drillHit(s, e, mult) {
     const N = E(), dmg = 12 * mult * (Number(s.caster.atk) || 1) * N.Types.mult('ground', e.types || ['normal']);
@@ -170,44 +188,45 @@
 
   // ================= KAMINA'S WORDS (once per run) =================
   const SCRIPT = [
-    [EXCA, 'stunned', 'Heh... looks like I... dug a little too deep this time, bro...', 'dots', 'fall'],
-    [DRIL, 'worried', 'A-Aniki?! No... no, no, no! Get up! You never stay down!', 'tear', 'run'],
-    [DRIL, 'worried', 'I can\'t do this without you... I\'m just a digger... I only got this far because I believed in YOU!', 'tear'],
+    [EXCA, 'stunned', 'Heh... looks like I... dug a little too deep this time, Simon...', 'dots', 'fall'],
+    [DRIL, 'worried', 'K-Kamina?! No... no, no, no! Get up! You never stay down!', 'tear', 'run'],
+    [DRIL, 'worried', 'I can\'t do this without you... I\'m just a digger... I only got this far because I believed in YOU, Kamina!', 'tear'],
     [EXCA, 'angry', 'Simon! Don\'t believe in me — that\'s STUPID!', 'anger'],
     [EXCA, 'shouting', 'Don\'t believe in the me who believes in you... Have faith in the YOU who believes in YOURSELF!', 'exclaim'],
     [EXCA, 'happy', 'Your drill... is the drill that\'ll pierce the heavens...', 'heart'],
     [EXCA, 'sigh', 'Go on, Simon... who the hell... do you think... you are...', 'dots', 'gone'],
-    [DRIL, 'worried', '...Aniki? ...Aniki...? ...ANIKIIIIII!!!', 'tear'],
-    [DRIL, 'worried', '..........', 'dots'],
-    [DRIL, 'normal', '...I won\'t cry anymore. I\'ll dig. For you. Through ANYTHING!', 'spark', 'awaken'],
-    'GIGA',
-    [DRIL, 'normal', 'Who the hell do you think I am?! I\'m Simon — Aniki\'s little bro!', 'exclaim', 'swap'],
-    [DRIL, 'normal', '...Watch me, Aniki. My drill is gonna pierce the heavens.', 'heart']];
+    [DRIL, 'worried', '...Kamina? ...Kamina...? ...KAMINAAAAAAA!!!', 'tear', 'cry'],
+    [DRIL, 'crying', '..........', 'tear'],
+    [DRIL, 'worried', 'I can\'t... I\'m just a digger... Without you I\'m nothing...', 'tear'],
+    [DRIL, 'worried', '...', 'dots', 'rise'],
+    [DRIL, 'angry', 'My bro is dead. He\'s gone.', 'anger', 'stand'],
+    [DRIL, 'determined', 'But he\'s right there on my back... and here in my heart.', 'heart', 'cape'],
+    [DRIL, 'determined', 'He lives on as a part of me!', 'spark', 'aura'],
+    [DRIL, 'determined', 'If you\'re gonna dig, dig to the heavens.', 'spark'],
+    [DRIL, 'angry', 'No matter what\'s in my way, I won\'t stop.', 'anger'],
+    [DRIL, 'shouting', 'Once I\'ve dug through, it means that I\'ve won!', 'exclaim'],
+    [DRIL, 'shouting', 'Just who the hell do you think I am?', 'exclaim'],
+    [DRIL, 'determined', 'I\'m Simon. I\'m not my bro.', 'spark'],
+    [DRIL, 'shouting', 'I\'m ME! Simon the Digger!', 'exclaim', 'swap']];
   function start(p) {
     const N = E(), solo = !(N.Coop && N.Coop.active); usedRun = p;
-    cs = { p, i: -1, next: 0, solo, aura: 0, giga: null, noGiga: !!window.PS_DIGGER.noGigaNext }; window.PS_DIGGER.noGigaNext = false;   // after his own Giga Drill Break (js/kamina-moves.js) Drilbur skips his
+    cs = { p, i: -1, next: 0, solo, aura: 0, dim: 0 };
     if (solo) { try { B().game.soloHold(true); } catch (_) {} }
     window.PS_DIGGER.active = true;
   }
   const dur = t => Math.max(2.2, Math.min(4.8, 1.1 + t.length * 0.038));
   function advance() {
     const c = cs; c.i++; const st = SCRIPT[c.i]; if (st === undefined) return finish();
-    if (st === 'GIGA' && c.noGiga) { c.aura = c.aura || 0.5; c.next = 0.05; return; }
-    if (st === 'GIGA') { c.giga = { t: 0, done: false }; try { T().cut(DRIL, 'normal', 'GIGAAA... DRILL... BREAAAK!!', 'spark', 2.0); } catch (_) {} sfx('judge'); c.next = 2.6; return; }
     const [who, face, text, em, act] = st;
-    if (act === 'awaken') { c.aura = 0.01; sfx('legend'); }
     if (act === 'fall' || act === 'gone') { c.fallen = true; try { c.p.anim.play('Faint'); } catch (_) {} if (act === 'gone') { c.gone = true; sfx('faint'); } }
     if (act === 'run') c.run = true;
-    if (act === 'swap') becomeSimon(c);
-    const d = dur(text); try { T().cut(who, face, text, em, d); } catch (_) {} c.next = d;
-  }
-  function giga() {
-    const N = E(), c = cs, s = bro; c.giga.done = true;   // the freeze holds until the last line
-    spiral = true; const dmg = 40 * (Number(c.p.atk) || 1) * CFG.gigaMult; let n = 0;
-    for (const e of N.EnemyMgr.all()) { if (!e || e.dead) continue; try { e.hurt(dmg, '#7dff6a', e.x - c.p.x, e.y - c.p.y, 260); N.Stats.dmg(c.p, 'drill-run', dmg); n++; } catch (_) {} }
-    try { B().camera?.kick?.(1.5); } catch (_) {} sfx('boss'); setTimeout(() => sfx('quake'), 120); c.hits = n; c.flash = 1;
-    if (s) { s.hp = s.maxHp; }
-    if (!SCRIPT.slice(c.i + 1).some(x => x[4] === 'swap')) becomeSimon(c);
+    if (act === 'cry') c.cry = true;
+    if (act === 'rise') { c.cry = false; c.rise = true; sfx('charge'); }
+    if (act === 'stand') { c.stand = true; sfx('quake'); try { B().camera?.kick?.(0.4); } catch (_) {} }
+    if (act === 'cape') { c.cape = true; sfx('shield'); }
+    if (act === 'aura') { c.aura = 0.01; sfx('legend'); }
+    if (act === 'swap') { becomeSimon(c); c.title = 1; c.flash = 1; sfx('boss'); try { B().camera?.kick?.(1); } catch (_) {} }
+    const d = act === 'swap' ? 3.2 : dur(text); try { T().cut(who, face, text, em, d); } catch (_) {} c.next = d;
   }
   // Excadrill is gone: the player now IS Drilbur (level, moves, items and run progress all carry over)
   function becomeSimon(c) {
@@ -217,23 +236,28 @@
     grave = { x: p.x, y: p.y, t: 0, anim: old.anim };
     let fresh = null, was = null; try { fresh = new N.Player(N.DEX_BY[DRIL], {}, !!(s && s.shiny)); was = new N.Player(N.DEX_BY[EXCA], {}, false); } catch (_) {}
     const ratio = fresh && was ? fresh.maxHp / was.maxHp : 0.8;
-    p.mon = N.DEX_BY[DRIL]; p.dex = DRIL; p.shiny = !!(s && s.shiny); p.__skin = undefined;
+    p.mon = named(DRIL, 'Simon'); p.dex = DRIL; p.shiny = !!(s && s.shiny); p.__skin = undefined;
     if (fresh) { p.r = fresh.r; p.bodyH = fresh.bodyH; p.baseSpd = fresh.baseSpd; p.baseAtk = fresh.baseAtk; }
     try { N.Sprites.preload([DRIL], 4000, p.shiny); p.anim = new N.Sprites.Animator(DRIL, 1, p.shiny); } catch (_) {}
     p.maxHp = Math.max(1, Math.round(p.maxHp * ratio)); p.hp = p.maxHp; p.dead = false; c.up = true;
     p.atkPerm = (Number(p.atkPerm) || 1) * CFG.simonAtk;
     if (s) { p.x = s.x; p.y = s.y; if (s.ownItem && !p.item) { try { p.equip(s.ownItem); } catch (_) {} } }
-    bro = null; owner = null; spiral = true; simon = p; idleT = 40;
+    bro = null; owner = null; spiral = true; simon = p; idleT = 40; watch = { lvl: Number(p.level) || 1, low: false, bosses: new WeakSet(), lowAt: -1e9 };
+    // his determination knocks back everything around him (no damage — he just won't be stopped)
+    try { for (const e of N.EnemyMgr.all()) { if (!e || e.dead) continue; const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < 260) { const k = K(), a = Math.atan2(e.y - p.y, e.x - p.x), nx = e.x + Math.cos(a) * (260 - d) * 0.6, ny = e.y + Math.sin(a) * (260 - d) * 0.6; if (!k || k.freeAt(nx, ny, e.r || 12)) { e.x = nx; e.y = ny; } } } } catch (_) {}
     try { T().place(DRIL, p); T().place(EXCA, grave); } catch (_) {}
     window.dispatchEvent(new CustomEvent('ps-digger', { detail: { type: 'simon' } }));
   }
-  // playing as Simon: now and then he talks to his Aniki
+  // playing as Simon: now and then he talks to Kamina
   function simonUpdate(p, dt) {
     if (grave) grave.t += dt;
+    if (!p.mon || p.mon.name !== 'Simon') p.mon = named(DRIL, 'Simon');
     try { T().place(DRIL, p); } catch (_) {}
-    let boss = false; try { boss = E().EnemyMgr.all().some(e => e && !e.dead && e.boss && Math.hypot(e.x - p.x, e.y - p.y) < 420); } catch (_) {}
-    if (boss && !simon.__bossSaid) { simon.__bossSaid = true; talk(DRIL, D.boss, { prio: true }); } else if (!boss) simon.__bossSaid = false;
-    if ((idleT -= dt) <= 0) { idleT = 55 + Math.random() * 40; talk(DRIL, D.alone, { prio: true }); }
+    const enemies = E().EnemyMgr.all().filter(e => e && !e.dead);
+    const bs = enemies.find(e => (e.boss || e.legend) && !watch.bosses.has(e) && dist(e, p) < 460); if (bs) { watch.bosses.add(bs); talk(DRIL, D.aloneBoss, { prio: true }); }
+    const low = p.hp < p.maxHp * CFG.lowHp, now = clock(); if (low && !watch.low && now - watch.lowAt > 40) { watch.lowAt = now; talk(DRIL, D.aloneHurt, { prio: true }); } watch.low = low;
+    const lv = Number(p.level) || 1; if (lv > watch.lvl) { watch.lvl = lv; if (Math.random() < 0.4) talk(DRIL, D.aloneLevel, { prio: true }); }
+    if ((idleT -= dt) <= 0) { idleT = 45 + Math.random() * 35; talk(DRIL, D.alone, { prio: true }); }
   }
   function finish() { const c = cs; if (!c) return; if (!c.swapped && c.p === E()?.Game?.player && !c.p.dead) becomeSimon(c); cs = null; window.PS_DIGGER.active = false; if (c.solo) { try { B().game.soloHold(false); } catch (_) {} } if (c.swapped) { c.p.dead = false; c.p.hp = Math.max(c.p.hp, 1); c.p.invuln = Math.max(Number(c.p.invuln) || 0, 2.5); } }
 
@@ -261,7 +285,7 @@
       if (!s || s.dead || s.emergeT < CFG.emerge || !owner || owner !== N.Game.player || typeof onCollect !== 'function') return pu.apply(this, arguments);
       const col = Array.isArray(players) ? players.slice() : [players]; col.push(s);
       return pu.call(this, dt, col, (drop, c) => { if (c === s) { if (drop && drop.kind === 'item' && N.Items.BY && N.Items.BY[drop.value]) { try { s.caster.equip(drop.value); } catch (_) { s.ownItem = drop.value; } if (!s.ownItem) s.ownItem = drop.value;
-          txt(s.x, s.y - 44, 'Drilbur kept ' + (K()?.itemName ? K().itemName(drop.value) : drop.value), '#9ad8ff'); both(DRIL, D.item, X.loot, 0.6); return; } return onCollect(drop, owner); } return onCollect(drop, c); }); };
+          txt(s.x, s.y - 44, 'Simon kept ' + (K()?.itemName ? K().itemName(drop.value) : drop.value), '#9ad8ff'); both(DRIL, D.item, X.loot, 0.6); return; } return onCollect(drop, owner); } return onCollect(drop, c); }); };
     const iu = N.Interact.update;
     N.Interact.update = function () { const s = bro, held = s && s.mode === 'bigchest' && s.job && s.chestTime > 0 ? { c: s.job.ref, open: s.chestTime } : null; const r = iu.apply(this, arguments); if (held && !held.c.hoopaOpened) held.c.open = Math.max(held.c.open || 0, held.open); return r; };
     // Kamina's words: the hit that would end Excadrill (with Drilbur around), once per run
@@ -272,7 +296,7 @@
       return r; };
     // depth-sorted drawing (with trees, rocks, enemies, players)
     const td = N.Training && N.Training.drawables;
-    if (typeof td === 'function') N.Training.drawables = function () { let r = td.apply(this, arguments); if (!Array.isArray(r)) r = []; const s = bro; if (s && owner && owner === N.Game.player) r.push({ y: s.y, draw: g => drawBody(g, s) }); const gv = grave; if (gv && simon && simon === N.Game.player) r.push({ y: gv.y - 1, draw: g => drawGrave(g, gv) }); return r; };
+    if (typeof td === 'function') N.Training.drawables = function () { let r = td.apply(this, arguments); if (!Array.isArray(r)) r = []; const s = bro; if (s && owner && owner === N.Game.player) r.push({ y: s.y, draw: g => drawBody(g, s) }); const gv = grave; if (gv && simon && simon === N.Game.player) { r.push({ y: gv.y - 1, draw: g => drawGrave(g, gv) }); if (!simon.dead) r.push({ y: simon.y - 0.01, draw: g => cape(g, simon, simon.anim) }); } return r; };
     const du = N.Ult.drawUnits;
     N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { drawTop(ctx); } catch (err) { console.warn('[digger]', err); } };
   }
@@ -286,6 +310,7 @@
     if (s.emergeT < CFG.emerge) { const u = s.emergeT / CFG.emerge; mound(ctx, s.x, s.y, u); if (s.anim && u > 0.35) { const up = (u - 0.35) / 0.65; ctx.save(); ctx.beginPath(); ctx.rect(s.x - 40, s.y - 80, 80, 82); ctx.clip(); s.anim.draw(ctx, s.x, s.y + (1 - up) * 34); ctx.restore(); } return; }
     if (spiral) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(125,255,106,.6)'; ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < 40; i++) { const a = i * 0.5 + now * 6, r = 4 + i * 0.6; ctx.lineTo(s.x + Math.cos(a) * r, s.y - 14 + Math.sin(a) * r * 0.5); } ctx.stroke(); ctx.restore(); }
     ctx.save(); ctx.strokeStyle = spiral ? '#7dff6a' : '#9ad8ff'; ctx.lineWidth = 2.2; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.ellipse(s.x, s.y, 17, 6.5, 0, 0, TAU); ctx.stroke(); ctx.restore();
+    if (cs && cs.cape) cape(ctx, s, s.anim);
     if (s.anim) s.anim.draw(ctx, s.x, s.y);
   }
   // where Excadrill fell: his body sinks into a mound of earth, and his pointed shades stay on top of it
@@ -297,16 +322,27 @@
       for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sd * 2, -2); ctx.lineTo(sd * 15, -7); ctx.lineTo(sd * 11, 2); ctx.lineTo(sd * 3, 1); ctx.closePath(); ctx.fill(); ctx.stroke(); }
       ctx.fillStyle = '#2a0a0a'; ctx.fillRect(-3, -2, 6, 2); ctx.restore(); }
   }
+  // Kamina's red cape, now on Simon's back (drawn just behind him)
+  function cape(ctx, s, anim) {
+    const now = clock(), dir = anim && Number.isFinite(anim.dir) ? anim.dir : 0, side = [0, -1, -1, -1, 0, 1, 1, 1][dir & 7] || 0, up = dir === 4 || dir === 3 || dir === 5;
+    const x = s.x - side * 3, top = s.y - 24, bot = s.y + 1, w1 = 8, w2 = 15 + Math.sin(now * 5) * 1.5, sway = Math.sin(now * 3.2) * 3 - side * 4;
+    ctx.save(); if (up) ctx.globalAlpha = 1; ctx.fillStyle = '#c81e1e'; ctx.strokeStyle = '#5a0606'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x - w1, top); ctx.lineTo(x + w1, top);
+    ctx.quadraticCurveTo(x + w2 + sway * 0.5, (top + bot) / 2, x + w2 + sway, bot);
+    for (let i = 3; i >= 0; i--) { const fx = x - w2 + sway + (2 * w2) * (i / 3), fy = bot + Math.sin(now * 8 + i) * 2; ctx.lineTo(fx, fy); }
+    ctx.quadraticCurveTo(x - w2 + sway * 0.5, (top + bot) / 2, x - w1, top); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,120,120,.35)'; ctx.fillRect(x - w1 + 2, top + 1, 2 * w1 - 4, 2); ctx.restore();
+  }
   function drawSimonAura(ctx, p) { const now = clock(); ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(125,255,106,.55)'; ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < 44; i++) { const a = i * 0.5 + now * 6, r = 5 + i * 0.65; ctx.lineTo(p.x + Math.cos(a) * r, p.y - 14 + Math.sin(a) * r * 0.5); } ctx.stroke(); ctx.restore(); }
   function drawTop(ctx) {
     if (simon && simon === E().Game.player && !simon.dead) { drawSimonAura(ctx, simon); return; }
     const s = bro; if (!s || !owner || owner !== E().Game.player || s.dead || s.thrown || s.emergeT < CFG.emerge) return;
     ctx.save(); ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030'; ctx.fillStyle = spiral ? '#7dff6a' : '#fff';
-    const label = (s.shiny ? '★ ' : '') + 'Drilbur · ' + (spiral ? 'Spiral' : s.mode === 'escape' ? 'Hiding' : s.mode === 'cornered' ? 'Cornered!' : 'Digger') + (s.ownItem ? ' · ' + (K()?.itemName ? K().itemName(s.ownItem) : s.ownItem) : '');
+    const label = (s.shiny ? '★ ' : '') + 'Simon · ' + (s.mode === 'escape' ? 'Hiding' : s.mode === 'cornered' ? 'Cornered!' : 'Digger') + (s.ownItem ? ' · ' + (K()?.itemName ? K().itemName(s.ownItem) : s.ownItem) : '');
     ctx.strokeText(label, s.x, s.y - 44); ctx.fillText(label, s.x, s.y - 44);
     ctx.fillStyle = '#25152f'; ctx.fillRect(s.x - 20, s.y - 38, 40, 4); ctx.fillStyle = spiral ? '#7dff6a' : '#9ad8ff'; ctx.fillRect(s.x - 20, s.y - 38, 40 * Math.max(0, s.hp / s.maxHp), 4); ctx.restore();
   }
-  // the scene overlay: Drilbur's spiral awakening and GIGA DRILL BREAK
+  // the scene overlay: the world dims while Kamina is down; Simon's resolve blooms as a green spiral
   const ov = document.createElement('canvas'); ov.id = 'ps-digger'; ov.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:56;display:none';
   function gameCanvas() { let b = null, ar = 0; for (const c of document.querySelectorAll('canvas')) { if (c.id && c.id.startsWith('ps-')) continue; const r = c.getBoundingClientRect(), a = r.width * r.height; if (a > ar) { ar = a; b = { c, r }; } } return b; }
   function drawScene(dt) {
@@ -316,24 +352,25 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
     const cam = B()?.camera, g = gameCanvas(); if (!cam || !g || typeof cam.left !== 'function') return;
     const k = cam.scale * (Number(cam._cw) > 0 ? g.r.width / cam._cw : 1), sx = x => g.r.left + (x - cam.left()) * k, sy = y => g.r.top + (y - cam.top()) * k;
-    if (!c.aura) { ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.45, (c.i + 1) * 0.08) + ')'; ctx.fillRect(0, 0, W, H); }   // the world dims while Aniki is down
-    const s = bro; if (c.aura && s) { c.aura = Math.min(1, c.aura + dt * 0.8); const X = sx(s.x), Y = sy(s.y - 14);   // the Spiral: a green spiral blooming around Drilbur
+    const want = c.aura ? 0.25 : c.rise ? 0.45 : c.gone ? 0.65 : Math.min(0.45, (c.i + 1) * 0.08); c.dim += (want - c.dim) * Math.min(1, dt * 2);
+    ctx.fillStyle = 'rgba(0,0,8,' + c.dim + ')'; ctx.fillRect(0, 0, W, H);
+    const s = simon || bro, who = simon ? simon : s;
+    if (c.cry && who) { const X = sx(who.x), Y = sy(who.y - 20);   // tears
+      if (!c.tears) c.tears = []; if (Math.random() < dt * 18) c.tears.push({ x: X + (Math.random() < 0.5 ? -6 : 6) * k, y: Y, vx: (Math.random() - 0.5) * 40, vy: -20, t: 0 });
+      ctx.fillStyle = '#8fd0ff'; for (const t of c.tears) { t.t += dt; t.vy += 260 * dt; t.x += t.vx * dt; t.y += t.vy * dt; ctx.globalAlpha = Math.max(0, 1 - t.t / 0.9); ctx.beginPath(); ctx.arc(t.x, t.y, 2.5 * k, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1; c.tears = c.tears.filter(t => t.t < 0.9); }
+    if (c.rise && who) { const X = sx(who.x), Y = sy(who.y - 14), u = Math.min(1, (c.riseT = (c.riseT || 0) + dt) / 2);   // light gathers into him
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; for (let i = 0; i < 24; i++) { const a = i / 24 * TAU + now * 0.6, r = (1 - ((now * 0.8 + i * 0.37) % 1)) * 220 * k; ctx.fillStyle = `rgba(150,255,140,${0.5 * u})`; ctx.beginPath(); ctx.arc(X + Math.cos(a) * r, Y + Math.sin(a) * r * 0.7, 2.4 * k, 0, TAU); ctx.fill(); } ctx.restore(); }
+    if (c.aura && who) { c.aura = Math.min(1, c.aura + dt * 0.8); const X = sx(who.x), Y = sy(who.y - 14);   // the Spiral: a green spiral blooming around Simon
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; for (let arm = 0; arm < 3; arm++) { ctx.strokeStyle = 'rgba(125,255,106,' + (0.8 * c.aura) + ')'; ctx.lineWidth = 4; ctx.beginPath();
         for (let i = 0; i < 70; i++) { const a = i * 0.22 + now * 5 + arm * TAU / 3, r = i * 2.4 * c.aura * k; ctx.lineTo(X + Math.cos(a) * r, Y + Math.sin(a) * r); } ctx.stroke(); }
       const gr = ctx.createRadialGradient(X, Y, 2, X, Y, 120 * k * c.aura); gr.addColorStop(0, 'rgba(180,255,160,.6)'); gr.addColorStop(1, 'rgba(60,200,60,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(X, Y, 120 * k * c.aura, 0, TAU); ctx.fill(); ctx.restore(); }
-    const gd = c.giga; if (gd && s) { gd.t += dt; if (!gd.done && gd.t >= 0.9) giga();   // GIGA DRILL BREAK: a colossal spiral drill pierces across the screen
-      const X = sx(s.x), Y = sy(s.y - 14), u = Math.min(1, gd.t / 0.9), len = Math.hypot(W, H) * u, a = -0.35;
-      ctx.save(); ctx.translate(X, Y); ctx.rotate(a); ctx.globalAlpha = gd.t < 1.6 ? 1 : Math.max(0, 1 - (gd.t - 1.6) / 0.8);
-      const gr = ctx.createLinearGradient(0, 0, len, 0); gr.addColorStop(0, '#d8ffd0'); gr.addColorStop(0.6, '#5aff4a'); gr.addColorStop(1, '#1a8a1a');
-      ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(0, -70 * k); ctx.lineTo(len, 0); ctx.lineTo(0, 70 * k); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; for (let i = 0; i < 12; i++) { const off = ((now * 900 + i * len / 12) % len); const h = 70 * k * (1 - off / len); ctx.beginPath(); ctx.moveTo(off, -h); ctx.lineTo(off + 30, h); ctx.stroke(); }
-      ctx.restore();
-      if (gd.done && gd.t < 2.6) { ctx.save(); ctx.globalAlpha = Math.min(1, (2.6 - gd.t) / 0.5); ctx.font = '900 ' + Math.round(Math.min(W / 14, 66)) + 'px Pixelify, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 8; ctx.strokeStyle = '#0a2a0a';
-        const t = 'GIGA DRILL BREAK!'; ctx.strokeText(t, W / 2, H * 0.3); ctx.fillStyle = '#7dff6a'; ctx.fillText(t, W / 2, H * 0.3); ctx.restore(); } }
     if (c.flash > 0) { ctx.fillStyle = 'rgba(220,255,210,' + c.flash * 0.8 + ')'; ctx.fillRect(0, 0, W, H); c.flash = Math.max(0, c.flash - dt * 1.5); }
-    if (c.solo && !c.giga) { ctx.font = '13px Pixelify, system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillText('Click / Enter: skip', W - 14, H - 14); }
+    if (c.title) { c.titleT = (c.titleT || 0) + dt; const u = Math.min(1, c.titleT / 0.3), size = Math.round(Math.min(W / 11, 72) * (1.4 - 0.4 * u));
+      ctx.save(); ctx.globalAlpha = c.titleT > 2.6 ? Math.max(0, 1 - (c.titleT - 2.6) / 0.5) : 1; ctx.font = '900 ' + size + 'px Pixelify, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 9; ctx.strokeStyle = '#062a06';
+      const t = 'SIMON THE DIGGER!', y = H * 0.28; ctx.strokeText(t, W / 2, y); const gr = ctx.createLinearGradient(0, y - size, 0, y); gr.addColorStop(0, '#e8ffd8'); gr.addColorStop(1, '#3ad83a'); ctx.fillStyle = gr; ctx.fillText(t, W / 2, y); ctx.restore(); }
+    if (c.solo && !c.swapped) { ctx.font = '13px Pixelify, system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillText('Click / Enter: skip', W - 14, H - 14); }
   }
-  function skip() { const c = cs; if (!c || c.giga) return; c.aura = c.aura || 0.5; c.fallen = c.gone = true; try { c.p.anim.play('Faint'); } catch (_) {} c.i = SCRIPT.indexOf('GIGA') - 1; c.next = 0; }
+  function skip() { const c = cs; if (!c || c.swapped) return; c.fallen = c.gone = c.rise = c.stand = c.cape = true; c.cry = false; c.aura = c.aura || 0.5; try { c.p.anim.play('Faint'); } catch (_) {} c.i = SCRIPT.length - 2; c.next = 0; }
   addEventListener('keydown', e => { if (!cs || !cs.solo) return; const k = (e.key || '').toLowerCase(); if (k === 'enter' || k === ' ' || k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); skip(); } }, true);
   addEventListener('pointerdown', () => { if (cs && cs.solo) skip(); }, true);
 
@@ -349,5 +386,5 @@
   function init() { document.body.append(ov); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
   window.PS_DIGGER = { active: false, cfg: CFG, get bro() { return bro && { hp: Math.round(bro.hp), maxHp: bro.maxHp, dead: bro.dead, emerging: bro.emergeT < CFG.emerge, mode: bro.mode, item: bro.ownItem || null, spiral, x: bro.x, y: bro.y }; },
-    _bro: () => bro, get simon() { return !!simon && simon === E()?.Game?.player; }, get grave() { return grave && { x: grave.x, y: grave.y }; }, get used() { return usedRun === E()?.Game?.player; }, get scene() { return cs && { step: cs.i, giga: !!(cs.giga && cs.giga.done), hits: cs.hits }; } };
+    _bro: () => bro, get simon() { return !!simon && simon === E()?.Game?.player; }, get grave() { return grave && { x: grave.x, y: grave.y }; }, get used() { return usedRun === E()?.Game?.player; }, get scene() { return cs && { step: cs.i, swapped: !!cs.swapped }; } };
 })();

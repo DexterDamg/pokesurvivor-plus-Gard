@@ -14,7 +14,7 @@
   'use strict';
   if (window.PS_LAKE_TALK_INSTALLED) return; window.PS_LAKE_TALK_INSTALLED = true;
   const E = () => window.PS_HOOPA_ENGINE, TAU = Math.PI * 2;
-  const NAME = { 480: 'Uxie', 481: 'Mesprit', 482: 'Azelf', 483: 'Dialga', 484: 'Palkia', 487: 'Giratina', 529: 'Drilbur', 530: 'Excadrill' }, COLOR = { 480: '#ffd84a', 481: '#ff8ad0', 482: '#5ab0ff', 483: '#8fd8ff', 484: '#ff9ad8', 487: '#ff4a5e', 529: '#9ad8ff', 530: '#ff6a4a' };
+  const NAME = { 480: 'Uxie', 481: 'Mesprit', 482: 'Azelf', 483: 'Dialga', 484: 'Palkia', 487: 'Giratina', 529: 'Simon', 530: 'Kamina' }, COLOR = { 480: '#ffd84a', 481: '#ff8ad0', 482: '#5ab0ff', 483: '#8fd8ff', 484: '#ff9ad8', 487: '#ff4a5e', 529: '#9ad8ff', 530: '#ff6a4a' };
   // sheets that only have some faces: the closest one they do have (Drilbur's sheet: Normal and Worried)
   const HAS = { 529: [0, 4] }, BRAVE = ['normal', 'happy', 'joyous', 'inspired', 'determined', 'surprised'];
   const TRIO = [480, 481, 482];   // Dialga, Palkia and Giratina only speak as guests (js/creation-rift.js, js/giratina-void.js)
