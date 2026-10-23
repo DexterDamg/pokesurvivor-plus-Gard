@@ -179,7 +179,7 @@
     if (p !== runP) { runP = p; nextAt = CFG.first; dens.length = 0; ldens.length = 0; raid = null; lden = null; }
     wrapDyn(); if (g.state === 'playing') legendTick(dt);
     for (let i = ldens.length - 1; i >= 0; i--) { const d = ldens[i]; d.t += dt; if (d.t >= d.life) { ldens.splice(i, 1); continue; } if (!lden && playing() && d.t > 0.8 && Math.hypot(p.x - d.x, p.y - d.y) < 34) { if (startLegendDen('battle')) ldens.splice(i, 1); else { d.t = Math.min(d.t, d.life - 10); } } }
-    if (!playing() || coop() || (window.PS_SAFEZONE && window.PS_SAFEZONE.active)) return;
+    if (!playing() || coop() || (window.PS_SAFEZONE && window.PS_SAFEZONE.active) || (E()?.Rift?.inArena) || (E()?.Judgment?.active) || window.PS_BIRTH_ISLAND?.active) return;   // special areas: no wild spawns
     if (!raid && clock() >= nextAt) { nextAt += CFG.every; if (!dens.length && !ldens.length && !lden) { if (Math.random() < LCFG.chance) spawnLegendDen(); else if (Math.random() < CFG.chance) spawnDen(false); } }   // a quarter as often as the game's rifts (they come every 3 min)
     for (let i = dens.length - 1; i >= 0; i--) { const d = dens[i]; d.t += dt; if (d.t >= d.life) { dens.splice(i, 1); continue; }
       if (!raid && d.t > 0.8 && Math.hypot(p.x - d.x, p.y - d.y) < 34) { dens.splice(i, 1); startRaid(d); } }

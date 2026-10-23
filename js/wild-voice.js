@@ -65,11 +65,11 @@
   // ================= who is this Pokemon =================
   const NAT = Object.keys(NATURES);
   function who(w) {
-    if (!w) return null; if (w.__voice) return w.__voice;
+    if (!w) return null; if (w.__voice && w.__voice.dex === Number(w.dex)) return w.__voice;   // (your Pokemon can change species mid-run)
     const dex = Number(w.dex), d = (E()?.DEX_BY || {})[dex] || {}, types = (d.types || ['normal']).map(t => String(t).toLowerCase()).filter(t => TYPE[t]);
-    const nature = w.__nature || pick(NAT), name = w.name || d.name || ('#' + dex), clean = name.replace(/[^A-Za-z]/g, '');
+    const nature = w.__nature || (w === E()?.Game?.player ? NAT[(dex * 7 + 3) % NAT.length] : pick(NAT)), name = w.name || d.name || ('#' + dex), clean = name.replace(/[^A-Za-z]/g, '');
     const cry = clean.length > 5 ? clean.slice(0, Math.min(5, Math.ceil(clean.length * 0.6))) : clean;   // "Rattata" → "Ratta"
-    return (w.__voice = { nature, voice: NATURES[nature], type: types[0] || 'normal', types: types.length ? types : ['normal'], name, cry: cry || name, g: w.__g || w.g || null, bst: d.bst || 300 });
+    return (w.__voice = { dex, nature, voice: NATURES[nature], type: types[0] || 'normal', types: types.length ? types : ['normal'], name, cry: cry || name, g: w.__g || w.g || null, bst: d.bst || 300 });
   }
   function relation(a, b) {
     const A = who(a), Bv = who(b); if (!A || !Bv) return 'none';
@@ -164,7 +164,7 @@
   function fill(s, me, ctx) {
     const V = who(me), T = TYPE[V.type] || TYPE.normal, X = explorer(), O = ctx && ctx.other ? who(ctx.other) : null;
     return s.replace(/\{(\w+)\}/g, (_, k) => ({ me: V.name, other: O ? O.name : (ctx && ctx.otherName) || 'you', player: X.name, home: T.home, like: T.like, fear: T.fear, snack: T.snack, boast: T.boast, type: cap(V.type), otype: O ? cap(O.type) : '', ptype: cap(X.type),
-      rumor: (ctx && ctx.rumor) || rumor(), about: aboutPlayer(me), cry: V.cry })[k] ?? '');
+      rumor: (ctx && ctx.rumor) || rumor(), about: aboutPlayer(me), cry: V.cry, n: ctx && ctx.n })[k] ?? '');
   }
   function shape(text, V, short, grave) {
     const v = VOICE[V.voice] || VOICE.stoic; let t = text.trim();
@@ -182,7 +182,7 @@
   function faceFor(sit, V) { const v = VOICE[V.voice] || VOICE.stoic;
     return ({ hurt: SOFT.has(V.voice) ? 'crying' : 'pain', die: 'crying', witness: BOLD.has(V.voice) ? 'shouting' : 'crying', witnessSame: 'crying', witnessMate: 'crying', provoked: 'angry', lowHp: 'pain', traitor: 'angry', turn1: 'worried', turn2: 'joyous', beg: 'teary', allyFaint: 'crying', grudge: 'angry', avenge: 'angry' })[sit] || v.face; }
   function line(me, sit, ctx) {
-    const V = who(me); if (!V) return ['normal', '...', 'dots']; const pool = S[sit] || {}; let list = pool[V.voice] || pool.all;
+    const V = who(me); if (!V) return ['normal', '...', 'dots']; const pool = S[sit] || P[sit] || {}; let list = pool[V.voice] || pool.all;
     if (pool[V.voice] && pool.all && chance(0.3)) list = pool.all; if (!list) list = ['...'];
     return [faceFor(sit, V), shape(fill(pick(list), me, ctx), V, false, GRAVE.has(sit)), emoteFor(sit, V)];
   }
@@ -236,5 +236,92 @@
     return { lines: out, outcome };
   }
 
-  window.PS_VOICE = { who, line, bubble, reply, chat, relation, run: RUN, natures: NATURES, voices: Object.keys(VOICE), label: w => { const V = who(w); return V ? V.nature : ''; } };
+
+  // ================= YOUR Pokemon: whoever you play as has a voice too =================
+  const P = {
+    p_start: { brave: ['Alright, let\'s do this!', 'Nobody\'s stopping me today!'], hothead: ['LET\'S GOOO! Who wants some?!'], timid: ['O-okay... I can do this... I think.'], shy: ['...Here goes.'], cheerful: ['Adventure time! Yay!'], lazy: ['...Fine. Let\'s get this over with.'],
+      sassy: ['Try to keep up, wild ones.'], polite: ['Let us begin, then.'], prankster: ['Hehe, time to cause some trouble~'], stoic: ['...Begin.'], gentle: ['Let\'s all stay safe out there.'], quirky: ['Today\'s forecast: 100% chance of me!'] },
+    p_hurtBig: { all: ['Ugh! That one hurt!', 'Gah—! Okay, okay, I felt that.'], timid: ['Ow ow ow! Too much!'], stoic: ['...Tch.'], sassy: ['Did you just— the NERVE!'] },
+    p_low: { brave: ['I\'m not going down here!'], hothead: ['Is that ALL you\'ve got?!'], timid: ['I-I need to get out of here...!'], shy: ['...I can\'t lose... not yet...'], cheerful: ['Hehe... I\'m fine! Totally fine!'], lazy: ['...Can I just lie down for a bit?'],
+      sassy: ['This is NOT how my story ends.'], polite: ['I must... retreat and regroup.'], prankster: ['Okay, okay, maybe I\'m in a little trouble.'], stoic: ['...Still standing.'], gentle: ['I need to be careful now...'], quirky: ['HP is just a number! A very low number!'] },
+    p_level: { all: ['I feel stronger!', 'Level up! Hehe.'], stoic: ['...Growing.'], lazy: ['Neat. Stronger. Nap now?'], hothead: ['STRONGER! YEAH!'], polite: ['My training bears fruit.'] },
+    p_boss: { brave: ['A big one! Finally, a real fight!'], hothead: ['You think you\'re tough?! Prove it!'], timid: ['Th-that thing is HUGE...'], cheerful: ['Whoa! Big battle time!'], lazy: ['...Oh great. A big one.'], sassy: ['Big doesn\'t mean scary.'], polite: ['A formidable foe. Very well.'], stoic: ['...So you\'re the boss.'], all: ['Here comes a big one...'] },
+    p_legend: { brave: ['A legendary?! I\'m not backing down!'], hothead: ['Legendary or not, I\'ll knock you OUT!'], timid: ['A-a real legendary...?! I\'m doomed...'], cheerful: ['A LEGENDARY! Can I get a picture first?!'], lazy: ['...A legendary. Of course. Today of all days.'], sassy: ['Legendary? We\'ll see about that.'],
+      polite: ['An honor to face you... truly.'], stoic: ['...So the legends are real.'], gentle: ['Please... we don\'t have to fight.'], prankster: ['Ooh, a legendary! Bet I can make it trip!'], quirky: ['Fun fact: I\'m about to fight a legend!'], shy: ['...H-hello, legend...'] },
+    p_bossDown: { all: ['Got it! The big one\'s down!', 'Phew! That was close!'], brave: ['HA! Who\'s next?!'], timid: ['I-I actually did it...!'], sassy: ['Was there ever any doubt?'], stoic: ['...Done.'], lazy: ['Can I nap now?'], cheerful: ['WE WON! Yay!'] },
+    p_killHarmless: { gentle: ['No... I\'m so sorry... I didn\'t mean to...'], timid: ['Oh no, oh no... I didn\'t mean it!'], shy: ['...I\'m sorry.'], cheerful: ['Wait— were they friendly?! Oh no...'], brave: ['...I didn\'t mean to. I\'m sorry.'], polite: ['That was... regrettable.'],
+      sassy: ['They got in my way.'], hothead: ['They shouldn\'t have been in the way!'], lazy: ['...Oops.'], stoic: ['...It happens.'], prankster: ['Eh... sorry. That wasn\'t a prank.'], quirky: ['Oh no. Oh no no no.'] },
+    p_feud: { all: ['Are they... fighting each other?', 'Wow, they hate each other more than me!'], prankster: ['Ooh, drama! Hehe~'], polite: ['Let them settle it themselves.'] },
+    p_allyJoin: { all: ['Welcome aboard!', 'Glad to have you with me!'], stoic: ['...Stay close.'], sassy: ['Fine. Try not to slow me down.'], cheerful: ['A new friend! YAY!'] },
+    p_allyFaint: { all: ['No! Hang in there!', 'Thank you for fighting with me...'], hothead: ['Who did that?! YOU\'RE DONE!'] },
+    p_scene: { all: ['Aww...', 'Heh. Life goes on out here.'], cheerful: ['Aww, congrats you two!'], sassy: ['Cute. Disgusting, but cute.'], gentle: ['How lovely...'], stoic: ['...Hm.'] },
+    p_shiny: { all: ['Whoa, a shiny one!', 'Is that... SPARKLING?!'] },
+    p_arena: { all: ['A rift... something big is in here.', 'This place feels... different.'], timid: ['I-I don\'t like this place...'], brave: ['Show yourself!'] },
+    p_idle: { all: ['I miss {home} sometimes.', 'I could really go for {snack} right now.', 'One day I\'ll be legendary too.', 'So many Pokemon out here...'], lazy: ['*yawn*... is it nap time yet?'], cheerful: ['This is the best adventure EVER!'], stoic: ['...'], quirky: ['What if the berries are watching US?'], hothead: ['Come on! Where are the tough ones?!'] },
+    p_replyMeet: { all: ['Hi there!', 'Nice to meet you too!', 'Don\'t worry, I won\'t hurt you.'], sassy: ['Sure, whatever.'], stoic: ['...Hello.'], timid: ['H-hi...'], hothead: ['Stay out of my way and we\'re good!'], prankster: ['Boo! Hehe, kidding!'] },
+    p_replyHurt: { gentle: ['I\'m so sorry! That was an accident!'], timid: ['S-sorry! My moves just go everywhere!'], sassy: ['Then don\'t stand there.'], hothead: ['Then MOVE!'], all: ['Sorry! I didn\'t see you there!'] },
+    p_replyTaunt: { brave: ['Bring it!'], hothead: ['Say that to my FACE!'], timid: ['Eep! P-please go away!'], sassy: ['Cute. Really.'], lazy: ['...Yeah, yeah.'], stoic: ['...'], all: ['We\'ll see about that!'] },
+    p_replyLegendDown: { all: ['...Thank you for the battle.', 'You were incredible.'], sassy: ['Not so legendary now, huh?'], hothead: ['WHO\'S LEGENDARY NOW?!'], gentle: ['Rest well...'], stoic: ['...Respect.'] },
+    p_kills: { all: ['That\'s {n} down!', '{n} knocked out... and counting!'], timid: ['{n}...?! Wow, did I do that?'], stoic: ['{n}.'] } };
+
+  // ================= legendaries: a title, a manner, and a signature line =================
+  const LEG = {
+    144: ['the Freezing Wings', 'serene', 'The wind itself freezes where I fly.'], 145: ['the Thunder Wings', 'fierce', 'Feel the storm in your bones!'], 146: ['the Flame Wings', 'regal', 'My wings are the dawn on fire.'],
+    150: ['the Genetic Pokemon', 'cold', 'I was not born. I was MADE. And I will not lose.'], 151: ['the New Species', 'playful', 'Mew~! Wanna play? I play rough~'],
+    243: ['the Thunder Beast', 'fierce', 'Lightning answers my roar!'], 244: ['the Volcano Beast', 'fierce', 'A volcano erupts when I roar!'], 245: ['the Aurora Beast', 'serene', 'I am the north wind that purifies.'],
+    249: ['the Guardian of the Seas', 'ancient', 'Your storm stirs the deep, little one.'], 250: ['the Rainbow Guardian', 'regal', 'Only the pure of heart may see my rainbow.'], 251: ['the Time Travel Pokemon', 'playful', 'I\'ve seen how this ends~ Wanna know?'],
+    377: ['the Rock Peak', 'mechanical', '...RE-GI... ROCK... DEFEND.'], 378: ['the Iceberg', 'mechanical', '...RE-GI... ICE... FREEZE.'], 379: ['the Iron', 'mechanical', '...RE-GI... STEEL... CRUSH.'],
+    380: ['the Eon Pokemon', 'serene', 'Please... I don\'t want to hurt you. Stop.'], 381: ['the Eon Pokemon', 'regal', 'For my sister, I will not hold back.'],
+    382: ['the Sea Basin', 'wrathful', 'The oceans will swallow the land... and YOU.'], 383: ['the Continent', 'wrathful', 'The land will burn dry under my sun!'], 384: ['the Sky High', 'ancient', 'I rule the sky. Fall from it.'],
+    385: ['the Wish Pokemon', 'playful', '*yawn*... You woke me. Make a wish... that you\'d stayed away.'], 386: ['the DNA Pokemon', 'mechanical', 'Specimen detected. Commencing analysis.'],
+    480: ['the Being of Knowledge', 'serene', 'I already know how you\'ll move.'], 481: ['the Being of Emotion', 'playful', 'I can feel your heart racing~'], 482: ['the Being of Willpower', 'fierce', 'My will is stronger than yours!'],
+    483: ['the Temporal Pokemon', 'ancient', 'Your time ends here.'], 484: ['the Spatial Pokemon', 'regal', 'There is no space left for you to run.'], 485: ['the Lava Dome', 'fierce', 'Magma flows in my veins!'], 486: ['the Colossal', 'ancient', '...The continents moved for me once.'],
+    487: ['the Renegade Pokemon', 'cold', 'The Distortion World is always hungry.'], 488: ['the Lunar Pokemon', 'serene', 'Sleep... and dream of better days.'], 491: ['the Pitch-Black Pokemon', 'cold', 'Your nightmares have already begun.'], 492: ['the Gratitude Pokemon', 'playful', 'Flowers bloom where I fight~'],
+    493: ['the Alpha Pokemon', 'ancient', 'I shaped this world. I can unshape you.'], 494: ['the Victory Pokemon', 'playful', 'Victory is MY thing! V for Victini!'],
+    643: ['the Vast White', 'regal', 'Show me your truth!'], 644: ['the Deep Black', 'fierce', 'Show me your ideals!'], 646: ['the Boundary', 'cold', 'I am the empty half. Fill me with your despair.'],
+    716: ['the Life Pokemon', 'serene', 'All life returns to the tree.'], 717: ['the Destruction Pokemon', 'wrathful', 'All life ends beneath my wings.'], 718: ['the Order Pokemon', 'cold', 'You disturb the ecosystem. You will be corrected.'],
+    720: ['the Mischief Pokemon', 'playful', 'Surprise! Hehe, where\'d you come from?'], 791: ['the Sunne', 'regal', 'Behold the blazing sun!'], 792: ['the Moone', 'serene', 'The moon watches. The moon judges.'], 800: ['the Prism Pokemon', 'wrathful', 'LIGHT... GIVE ME... LIGHT!'],
+    801: ['the Artificial Pokemon', 'mechanical', 'Soul-Heart online. Hostility... confirmed.'], 888: ['the Warrior', 'regal', 'My sword answers to no one!'], 889: ['the Warrior', 'fierce', 'My shield will not break!'], 890: ['the Gigantic', 'wrathful', 'THE DARKEST DAY BEGINS.'] };
+  const RIVAL = { 150: { 151: 'Mew... the original. I will prove I am the greater.' }, 151: { 150: 'Mewtwo~! You still mad at me? Hehe~' }, 382: { 383: 'GROUDON. The sea will drown your sun!' }, 383: { 382: 'KYOGRE! I will boil your oceans dry!' },
+    384: { 382: 'Enough, both of you. I will end this.', 383: 'Enough, both of you. I will end this.' }, 483: { 484: 'Palkia... why are you ALWAYS in my way?!', 487: 'Giratina... return to your exile.' }, 484: { 483: 'Dialga! Out of my space!', 487: 'The renegade dares show itself?' },
+    487: { 483: 'Dialga... I remember what you did.', 484: 'Palkia... you never visit.', 480: 'The Lake\'s little Knowledge... how quaint.', 481: 'Little Emotion... feel your fear.', 482: 'Little Willpower... bend.' },
+    643: { 644: 'Zekrom... my other half. Our ideals clash again!' }, 644: { 643: 'Reshiram! Your truth is nothing against my ideals!' }, 249: { 250: 'Ho-Oh... the skies remember our old bond.' }, 250: { 249: 'Lugia. The tower burned, but I remember you.' },
+    380: { 381: 'Brother?! W-what are you doing here?!' }, 381: { 380: 'Latias! Stay behind me— wait, you\'re the explorer?' }, 488: { 491: 'Darkrai! Your nightmares end tonight!' }, 491: { 488: 'Cresselia... always chasing me.' },
+    716: { 717: 'Yveltal. Life always returns.' }, 717: { 716: 'Xerneas. And death always follows.' }, 791: { 792: 'Lunala! The sun and moon meet at last.' }, 792: { 791: 'Solgaleo... the moon greets the sun.' }, 888: { 889: 'Brother! Raise your shield beside me— oh. You\'re the enemy.' }, 889: { 888: 'Sister... why do you point your sword at me?' } };
+  const LS = {   // legendary manners: intro, at 75/50/25% HP, defeat, the explorer nearly down, their companions, after a big event
+    regal: { intro: ['I am {name}, {title}. Kneel... or fall.', 'You stand before {title}. Choose your next breath wisely.'], hp75: ['A scratch. Nothing more.', 'You have some courage, {player}.'], hp50: ['Impressive... for a mortal.', 'You dare wound {title}?!'], hp25: ['This... cannot be!', 'I will NOT be humbled by you!'],
+      defeat: ['...You have earned my respect, {player}.', 'Remember this day... you defeated {title}.'], playerLow: ['Bow now, and I may spare you.'], companion: ['You travel with {comp}? A worthy company.'], event: ['Even that power... did not frighten me.'] },
+    fierce: { intro: ['RAAAH! I am {name}! FIGHT ME!', 'You smell like a challenge, {player}!'], hp75: ['Good! GOOD! More!', 'Is that all?!'], hp50: ['Now I\'m angry!', 'You hit hard... I hit HARDER!'], hp25: ['I won\'t fall! NOT TO YOU!', 'RAAAAAAGH!'],
+      defeat: ['Heh... a good fight... the best...', 'Strong... you\'re... strong...'], playerLow: ['STAY DOWN!'], companion: ['Bring {comp} too! I\'ll take you ALL!'], event: ['HA! That was something! But I\'m still here!'] },
+    cold: { intro: ['{name}. Remember the name. It will be the last you hear.', 'You are a curiosity, {player}. Nothing more.'], hp75: ['Predictable.', '...Noted.'], hp50: ['You are... more than I calculated.', 'Interesting. You bleed me.'], hp25: ['No. NO. This is not the outcome.', 'Impossible...!'],
+      defeat: ['...So. This is what losing feels like.', 'You... are stronger than I was made to be.'], playerLow: ['Your heart is slowing. I can hear it.'], companion: ['{comp}? Your attachments make you weak.'], event: ['Such power... I want it.'] },
+    playful: { intro: ['Hiii~ I\'m {name}! Let\'s play!', 'Ooh, a new toy! I mean... friend!'], hp75: ['Hehe, that tickled!', 'Ooh, you\'re fun!'], hp50: ['Hey! Ow! No fair~', 'Okay, now I\'m playing for real!'], hp25: ['Waaah! I don\'t wanna lose!', 'Time out! TIME OUT!'],
+      defeat: ['Aww... you win! Play again sometime?', 'Hehe... you\'re really strong... I like you~'], playerLow: ['Tag, you\'re almost OUT~!'], companion: ['Ooh, {comp}! Can they play too?'], event: ['WHOA! Do it again! Do it again!'] },
+    ancient: { intro: ['I have slept for a thousand years. You woke me, {player}.', 'I am {name}, {title}. I was old when the mountains were young.'], hp75: ['Time does not fear you.', 'A single grain of sand.'], hp50: ['The ages... stir.', 'You remind me of one I fought long ago.'], hp25: ['Is this... how eras end?', 'The world trembles... with me.'],
+      defeat: ['A new age... begins with you.', 'Rest now, {name}... the young have won.'], playerLow: ['Return to the dust, little one.'], companion: ['{comp}... I have seen your kind before.'], event: ['That power... it shakes even the oldest bones.'] },
+    serene: { intro: ['Peace, traveler. Why have you come to {title}?', 'I am {name}. I do not wish to fight... but I will.'], hp75: ['Please... we can stop this.', 'Calm yourself.'], hp50: ['You leave me no choice.', 'The wind grows cold.'], hp25: ['Is violence... truly your answer?', 'I... must not fall here.'],
+      defeat: ['Go in peace... you\'ve proven your heart.', 'Thank you... for ending it gently.'], playerLow: ['Rest now. You need not suffer.'], companion: ['{comp} walks beside you... you are not alone. Good.'], event: ['What a terrible power... be careful with it.'] },
+    wrathful: { intro: ['FALL BEFORE {name}!', 'The world will END, and you with it!'], hp75: ['INSECT!', 'You only make me ANGRIER!'], hp50: ['ENOUGH!', 'I WILL UNMAKE YOU!'], hp25: ['NO! NOOO!', 'MY WRATH... IS... ENDLESS!'],
+      defeat: ['This... is not... the end...', 'The world... is spared... for now...'], playerLow: ['BREAK!'], companion: ['{comp} TOO?! I WILL CRUSH YOU BOTH!'], event: ['THAT is your power?! It is NOTHING to mine!'] },
+    mechanical: { intro: ['TARGET ACQUIRED: {player}.', '...{name}... ONLINE.'], hp75: ['DAMAGE: MINIMAL.', '...RECALCULATING.'], hp50: ['WARNING. INTEGRITY: FIFTY PERCENT.', 'ERROR... ERROR...'], hp25: ['CRITICAL. CRITICAL.', 'SYSTEMS... FAILING...'],
+      defeat: ['...SHUTTING... DOWN...', '...GOOD... BYE...'], playerLow: ['TARGET VITALS: CRITICAL.'], companion: ['ADDITIONAL UNIT DETECTED: {comp}.'], event: ['UNKNOWN ENERGY SIGNATURE. LOGGED.'] } };
+  const LTITLE = { fire: 'Lord of Flames', water: 'Sovereign of the Seas', grass: 'Heart of the Forest', electric: 'Master of Storms', ice: 'Queen of Winter', fighting: 'Undefeated Champion', poison: 'Plague of the Swamp', ground: 'King of the Earth', flying: 'Ruler of the Skies',
+    psychic: 'Mind Beyond Minds', bug: 'Monarch of the Swarm', rock: 'Mountain That Walks', ghost: 'Lord of the Dead', dragon: 'Ancient Dragon', dark: 'Shadow Sovereign', steel: 'Iron Titan', fairy: 'Moonlit Majesty', normal: 'the One Who Rules Here' };
+  // legendaries and bosses speak in a grander voice (the regular bosses pick a manner from their own Nature)
+  function isLegend(e) { const d = (E()?.DEX_BY || {})[Number(e && e.dex)] || {}; return !!(e && (LEG[Number(e.dex)] || e.legend || e.arceus || e.boss || d.rarity >= 5)); }
+  function faceOf(style, sit) { if (sit === 'defeat') return 'sad'; if (sit === 'hp25') return 'pain'; return ({ regal: 'determined', fierce: 'shouting', cold: 'normal', playful: 'joyous', ancient: 'determined', serene: 'normal', wrathful: 'angry', mechanical: 'normal' })[style] || 'determined'; }
+  function legendLine(e, sit, ctx) {
+    const V = who(e), L = LEG[Number(e.dex)], style = L ? L[1] : (V.voice === 'polite' || V.voice === 'stoic' ? 'regal' : V.voice === 'cheerful' || V.voice === 'prankster' || V.voice === 'quirky' ? 'playful' : SOFT.has(V.voice) ? 'serene' : 'fierce');
+    const ttl = L ? L[0] : LTITLE[V.type] || LTITLE.normal, X = explorer(); ctx = ctx || {};
+    if (sit === 'intro') { const r = RIVAL[Number(e.dex)] && RIVAL[Number(e.dex)][X.dex]; if (r) return ['angry', r, 'anger']; if (Number(e.dex) === 493 && LEG[X.dex]) return ['determined', 'You... are one of my creations. Return to me, ' + X.name + '.', 'exclaim'];
+      if (L && chance(0.5)) return [faceOf(style), L[2], 'exclaim']; }
+    const list = (LS[style] || LS.regal)[sit] || ['...'];
+    const t = pick(list).replace(/\{(\w+)\}/g, (_, k) => ({ name: V.name, title: ttl, player: X.name, comp: ctx.comp || 'friends' })[k] ?? '');
+    return [faceOf(style, sit), t, sit === 'defeat' ? 'dots' : sit === 'hp25' ? 'sweat' : style === 'playful' ? 'note' : 'anger'];
+  }
+  function title(e) { const L = LEG[Number(e.dex)]; return L ? L[0] : LTITLE[(who(e) || {}).type] || ''; }
+  const rivalOf = (a, b) => !!(RIVAL[Number(a)] && RIVAL[Number(a)][Number(b)]);
+  const rivalLine = (a, b) => (RIVAL[Number(a)] && RIVAL[Number(a)][Number(b)]) || null;
+
+  window.PS_VOICE = { isLegend, legendLine, title, rivalOf, rivalLine, explorer, who, line, bubble, reply, chat, relation, run: RUN, natures: NATURES, voices: Object.keys(VOICE), label: w => { const V = who(w); return V ? V.nature : ''; } };
 })();

@@ -129,6 +129,8 @@
   .ps-talk.on{opacity:1;transform:none}
   .ps-talk.old{opacity:.9;transform:scale(.95)}
   .ps-talk.wild{background:linear-gradient(180deg,#3d6b33,#24461f);box-shadow:inset 0 0 0 2px #7fb36a,0 4px 0 rgba(0,0,0,.35)}
+  .ps-talk.legend{background:linear-gradient(180deg,#4a2a6a,#24103a);border-color:#ffe08a;box-shadow:inset 0 0 0 2px #d8b04a,0 0 14px rgba(255,210,110,.45),0 4px 0 rgba(0,0,0,.35)}
+  .ps-talk.player{background:linear-gradient(180deg,#2c6a9f,#173e6e);box-shadow:inset 0 0 0 2px #7ac0ff,0 4px 0 rgba(0,0,0,.35)}
   .ps-talk.foe{background:linear-gradient(180deg,#8a2f35,#561a20);box-shadow:inset 0 0 0 2px #d06a6a,0 4px 0 rgba(0,0,0,.35)}
   .ps-talk .pf{position:relative;flex:none;width:80px;height:80px;border-radius:6px;border:3px solid #f4f8ff;box-shadow:0 0 0 2px #0b1838;background-repeat:no-repeat;background-size:400px 320px;image-rendering:pixelated;background-color:#0b1838;overflow:hidden}
   .ps-talk .pf canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:none}
@@ -176,7 +178,7 @@
     let sl = slots.find(x => !x.cur); if (!sl) { sl = order[order.length - 1]; end(sl); }
     sl.cur = { it, t: 0, dur: it.dur || Math.max(2.8, Math.min(6, 1.6 + it.text.length * 0.045)) };
     sl.nm.textContent = it.name || NAME[it.dex] || ('#' + it.dex); sl.nm.style.color = it.color || COLOR[it.dex] || '#fff';
-    sl.el.classList.toggle('wild', it.kind === 'wild' || it.kind === 'ally'); sl.el.classList.toggle('foe', it.kind === 'foe');
+    sl.el.classList.toggle('wild', it.kind === 'wild' || it.kind === 'ally'); sl.el.classList.toggle('foe', it.kind === 'foe'); sl.el.classList.toggle('legend', it.kind === 'legend'); sl.el.classList.toggle('player', it.kind === 'player');
     face(sl, it); sl.ln.textContent = ''; order.unshift(sl); sl.el.classList.add('on'); layout();
     lastStart = clock(); lastType = it.text.length / 45;
     if (it.emote) { if (it.obj) emoteAt(it.obj, it.emote); else emote(it.dex, it.emote); }
@@ -188,6 +190,7 @@
     const nx = queue[0]; if (!nx) return; nx.delay -= dt;
     if (nx.delay <= 0 && clock() - lastStart >= lastType + 0.35 && (slots.some(x => !x.cur) || nx.prio)) show(queue.shift());   // the next line waits for the last one to finish typing
   }
+  function drop(fn) { for (let i = queue.length - 1; i >= 0; i--) if (fn(queue[i])) queue.splice(i, 1); for (const sl of slots) if (sl.cur && fn(sl.cur.it)) end(sl); }   // e.g. lines from an area you just left
   function clearAll() { queue.length = 0; for (const sl of slots) if (sl.cur) end(sl); }
 
   // ================= emote bubbles (world space) =================
@@ -288,5 +291,5 @@
     if (o.prio && queue.length > 4) queue.splice(0, queue.length - 4); if (o.front) queue.unshift(item); else queue.push(item); return true; }
   // a cutscene line: shown right away for a fixed time (clears whatever was waiting)
   function cut(dex, f, text, em, dur) { clearAll(); show({ dex, face: f, text, emote: em, dur }); }
-  window.PS_LAKE_TALK = { cut, line, place: (dex, obj) => { if (obj) places[dex] = obj; else delete places[dex]; }, hide: clearAll, lines: L, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, emoteAt, busy, cfg: CFG };
+  window.PS_LAKE_TALK = { cut, line, place: (dex, obj) => { if (obj) places[dex] = obj; else delete places[dex]; }, hide: clearAll, drop, lines: L, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, emoteAt, busy, cfg: CFG };
 })();
