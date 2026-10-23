@@ -1,1 +1,0 @@
-require('./lake-integration.cjs');
