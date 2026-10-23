@@ -35,8 +35,15 @@
  };
  const imgs={};for(const [k,v] of Object.entries({...BALLS,...ITEMS})){const i=new Image();i.src=v.img+'?v=1';imgs[k]=i;}
  // Trainer sprites: 4x4 sheets, 64px frames, rows facing down, left, right, up
- const sheets={girl:new Image(),boy:new Image()};sheets.girl.src='assets/trainer/girl.png?v=1';sheets.boy.src='assets/trainer/boy.png?v=1';
- const sheet=()=>sheets[E()?.DB?.save?.psTrainer==='boy'?'boy':'girl'];
+ // [Gard] more Trainers (same 4x4 sheet layout: rows down, left, right, up; 4 walk frames each).
+ // Girl / Boy are your friend's. tr* and Iono are walking sheets you sent (Iono by Mid117); chibi* are front-only.
+ // To rename one, just change its label here.
+ const TRAINERS=[['girl','Girl'],['boy','Boy'],['tr1','Midnight'],['tr2a','Gold Band'],['tr2b','Blue Hair'],['iono','Iono'],['tr5','Green Streak'],['tr6','Black Hat'],['tr7','White Hat'],
+   ...Array.from({length:13},(_,i)=>['chibi'+(i+1),'Chibi '+(i+1)])];
+ const TR_KEYS=new Set(TRAINERS.map(t=>t[0]));
+ const trKey=()=>{const k=E()?.DB?.save?.psTrainer;return TR_KEYS.has(k)?k:'girl';};
+ const sheets={};
+ const sheet=()=>{const k=trKey();if(!sheets[k]){const i=new Image();i.src='assets/trainer/'+k+'.png?v=1';sheets[k]=i;}return sheets[k];};
 
  // ---- the bag (saved with your profile) ----
  function bag(){const S=E()?.DB?.save;if(!S)return null;if(!S.psBag){S.psBag=Object.assign({},TUNE.start);save();}for(const k in TUNE.start)if(!Number.isFinite(S.psBag[k]))S.psBag[k]=0;return S.psBag;}
@@ -83,12 +90,13 @@
      tr.dir=Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0);}
    else tr.moving=false;
    if(tr.act){tr.act.t+=dt;if(tr.act.t>tr.act.dur)tr.act=null;else{const tx=tr.act.x-tr.x,ty=tr.act.y-tr.y;tr.dir=Math.abs(tx)>Math.abs(ty)?(tx<0?1:2):(ty<0?3:0);}}
-   tr.ft+=dt;if(tr.ft>.14){tr.ft=0;tr.frame=(tr.frame+1)%4;}
+   tr.ft+=dt;if(tr.ft>(tr.moving?.12:.14)){tr.ft=0;tr.frame=(tr.frame+1)%4;}
  }
  function drawTrainer(g){
    const girl=sheet();if(!girl.complete||!girl.naturalWidth)return;const s=.85,W=64*s,H=64*s,f=tr.moving||tr.act?tr.frame:0;
    g.save();g.imageSmoothingEnabled=false;g.fillStyle='rgba(0,0,0,.22)';g.beginPath();g.ellipse(tr.x,tr.y,13,5,0,0,Math.PI*2);g.fill();
-   g.drawImage(girl,f*64,tr.dir*64,64,64,tr.x-W/2,tr.y-H*.93,W,H);g.restore();
+   const bob=(tr.moving||tr.act)?((f%2)?-1.2:0):(Math.sin(performance.now()/380)>0.6?-0.6:0);   // [Gard] step bounce / idle breathing
+   g.drawImage(girl,f*64,tr.dir*64,64,64,tr.x-W/2,tr.y-H*.93+bob,W,H);g.restore();
  }
 
  // ---- throwing ----
@@ -126,7 +134,7 @@
  function caught(e,ball){
    const X=E(),dex=Number(e.dex),name=e.name||'Pokémon',shiny=!!(e.shiny===true||e.anim?.shiny);
    let isNew=false;const size=e.psSize||'normal',hadSize=!!sizesOf(dex)[size];
-   try{isNew=!X.DB.owns(dex);grantSize(dex,size,!isNew);X.DB.grant(dex,'catch');if(shiny)X.DB.grantShiny(dex,'catch');}catch(_){}
+   try{isNew=!X.DB.owns(dex);grantSize(dex,size,!isNew);try{const bs=window.PS_PARTNER?window.PS_PARTNER.base(dex):dex;if(bs!==dex&&size!=='normal')grantSize(bs,size,true);}catch(_){}X.DB.grant(dex,'catch');if(shiny)X.DB.grantShiny(dex,'catch');}catch(_){}
    if(!isNew&&hadSize){try{X.DB.save.coins=(Number(X.DB.save.coins)||0)+50;}catch(_){}}
    save();
    // gone from the field (it counts as defeated, so you still get its experience)
@@ -224,17 +232,35 @@
    normal:{name:'Normal',scale:1,hp:1,dmg:1,spd:1,def:0,chance:.64},
    big:{name:'Big',scale:1.3,hp:1.35,dmg:1.2,spd:.88,def:.12,chance:.18}};
  const SIZE_ORDER=['small','normal','big'];
- function sizesOf(dex){const S=E()?.DB?.save;if(!S)return {};S.psSizes=S.psSizes||{};const r=S.psSizes[dex];
+ function sizesOf(dex){const S=E()?.DB?.save;if(!S)return {};if(String(B()?.user||'').trim().toLowerCase()==='lovergare')return {small:true,normal:true,big:true};   // [Gard] the owner has every size
+ S.psSizes=S.psSizes||{};const r=S.psSizes[dex];
    if(r)return r;return S.owned&&S.owned[dex]?{normal:true}:{};}      // owned before sizes existed / from the Gacha: Normal
  function grantSize(dex,size,wasOwned){const S=E().DB.save;S.psSizes=S.psSizes||{};const cur=S.psSizes[dex]||(wasOwned?{normal:true}:{});cur[size]=true;S.psSizes[dex]=cur;}
  function chosenSize(dex){const S=E()?.DB?.save,have=sizesOf(dex);let s=S?.psSizeSel?.[dex];if(!s||!have[s])s=have.normal?'normal':SIZE_ORDER.find(k=>have[k])||'normal';return s;}
  function scaleBody(o,f){if(o.anim&&Number.isFinite(o.anim.scale))o.anim.scale*=f;if(Number.isFinite(o.r))o.r*=f;if(Number.isFinite(o.bodyH))o.bodyH*=f;}
  // wild Pokemon: a size is rolled as each one appears (bosses stay Normal)
+ // [Gard] Scarlet/Violet-style sizes (both modes): every wild Pokemon gets its own size (a little smaller or bigger,
+ // looks only). Very rarely one is TINY (1 in 256) or JUMBO (1 in 256) - those are the marked ones: catching one
+ // (Story) or defeating one (Original) unlocks Small / Big for its first form. Bosses stay normal.
+ const MARK={tiny:{chance:1/256,size:'small',scale:.6,label:'TINY',col:'#9ae6ff'},jumbo:{chance:1/256,size:'big',scale:1.5,label:'JUMBO',col:'#ffd23f'}};
  const sized=new WeakSet();
- function sizeEnemies(){for(const e of B()?.enemies?.all?.()||[]){if(!e||sized.has(e))continue;sized.add(e);if(e.dead||e.remote)continue;
-   let size='normal';if(!e.boss){const r=Math.random();size=r<SIZES.small.chance?'small':r<SIZES.small.chance+SIZES.big.chance?'big':'normal';}
-   e.psSize=size;if(size==='normal')continue;const z=SIZES[size];scaleBody(e,z.scale);
+ function sizeEnemies(){for(const e of B()?.enemies?.all?.()||[]){if(!e||sized.has(e))continue;sized.add(e);if(e.dead||e.remote||e.boss||e.legend||e.__roamer||e.__maxRaid)continue;
+   const r=Math.random();let mark=null;if(r<MARK.tiny.chance)mark='tiny';else if(r<MARK.tiny.chance+MARK.jumbo.chance)mark='jumbo';
+   if(!mark){const v=(Math.random()+Math.random())/2;e.psSize='normal';scaleBody(e,.88+.24*v);continue;}   // XS..XL, looks only
+   const m=MARK[mark],z=SIZES[m.size];e.psMark=mark;e.psSize=m.size;scaleBody(e,m.scale);
    if(Number.isFinite(e.maxHp)){e.maxHp*=z.hp;e.hp*=z.hp;}if(Number.isFinite(e.spd))e.spd*=z.spd;if(Number.isFinite(e._dmg))e._dmg*=z.dmg;if(Number.isFinite(e.shotDmg))e.shotDmg*=z.dmg;}}
+ // Original mode: defeating a Tiny / Jumbo unlocks that size for its first form
+ let killWrapped=false;
+ function wrapKill(){const P=E()?.Progress;if(killWrapped||!P||typeof P.kill!=='function')return;killWrapped=true;const k=P.kill;
+   P.kill=function(e,...a){try{if(e&&e.psMark&&!e.remote&&!e.__psCaughtGone&&!STORY()){const base=window.PS_PARTNER?window.PS_PARTNER.base(e.dex):Number(e.dex),sz=MARK[e.psMark].size,had=!!sizesOf(base)[sz];
+       if(!had){grantSize(base,sz,!!E().DB.owns(base));save();const nm=(E().DEX_BY[base]||{}).name||'it';toast((e.psMark==='jumbo'?'JUMBO ':'TINY ')+(e.name||'Pokémon')+' defeated! '+SIZES[sz].name+' size unlocked for '+nm+'!',3.2);}}}catch(_){}
+     return k.call(this,e,...a);};}
+ // the TINY / JUMBO tag over marked Pokemon
+ let markHooked=false;
+ function hookMarks(){const T=E()?.Training;if(markHooked||!T||typeof T.drawables!=='function')return;markHooked=true;const orig=T.drawables;
+   T.drawables=function(){const r=orig.apply(this,arguments),extra=[];for(const e of B()?.enemies?.all?.()||[]){if(!e||e.dead||!e.psMark)continue;const m=MARK[e.psMark];
+     extra.push({y:e.y+.2,draw(g){const h=Number(e.bodyH)||24;g.save();g.font='bold 9px monospace';g.textAlign='center';g.lineWidth=3;g.strokeStyle='#1a1a2e';g.strokeText(m.label,e.x,e.y-h-14);g.fillStyle=m.col;g.fillText(m.label,e.x,e.y-h-14);g.restore();}});}
+     return extra.length?[...(r||[]),...extra]:r;};}
  // your Pokemon: the size chosen in the Trainer menu, applied when the run starts (and kept through Mega Evolution)
  let sizedPlayer=null;
  function sizePlayer(p){
@@ -250,11 +276,11 @@
  function trainerButton(){
    const list=document.querySelector('.menu-box .menu-list');if(!list||list.querySelector('[data-go="pstrainer"]'))return;
    const btn=document.createElement('button');btn.className='menu-item';btn.dataset.go='pstrainer';
-   btn.innerHTML=`<span class="mi-ico"><span class="ps-tr-ico" style="display:block;width:32px;height:32px;background:url(${trainerSrc()}) 0 0/128px 128px;image-rendering:pixelated"></span></span>Trainer<small>Boy or Girl · your Pokémon's size</small>`;
+   btn.innerHTML=`<span class="mi-ico"><span class="ps-tr-ico" style="display:block;width:32px;height:32px;background:url(${trainerSrc()}) 0 0/128px 128px;image-rendering:pixelated"></span></span>Trainer<small>Pick your Trainer · your Pokémon's size</small>`;
    btn.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();openTrainer();},true);
    const mart=list.querySelector('[data-go="psmart"]');mart?mart.after(btn):list.append(btn);
  }
- const trainerSrc=()=>'assets/trainer/'+(E()?.DB?.save?.psTrainer==='boy'?'boy':'girl')+'.png?v=1';
+ const trainerSrc=()=>'assets/trainer/'+trKey()+'.png?v=1';
  function openTrainer(first){
    let m=document.getElementById('ps-trainer-menu');
    if(!m){m=document.createElement('div');m.id='ps-trainer-menu';m.style.cssText='position:fixed;inset:0;z-index:2147483100;display:flex;align-items:center;justify-content:center;background:rgba(6,8,16,.6)';document.body.append(m);
@@ -268,15 +294,48 @@
  function renderTrainer(){
    const m=document.getElementById('ps-trainer-menu'),S=E()?.DB?.save;if(!m||!S)return;
    const dex=Number(S.partner),mon=(E().DEX||[]).find(d=>d.dex===dex),have=sizesOf(dex),cur=chosenSize(dex);
-   const card=(g,label)=>`<button data-g="${g}" style="flex:1;padding:10px;border-radius:12px;border:3px solid ${S.psTrainer===g?'#ffd23f':'#3b3f5c'};background:#1b2238;color:#fff;cursor:pointer;font:800 14px Pixelify,Fredoka,system-ui,sans-serif">
-     <div style="width:64px;height:64px;margin:0 auto 6px;background:url(assets/trainer/${g}.png?v=1) 0 0/256px 256px;image-rendering:pixelated;transform:scale(1.3)"></div>${label}</button>`;
+   const card=(g,label)=>`<button data-g="${g}" style="padding:4px 2px 6px;border-radius:12px;border:3px solid ${S.psTrainer===g?'#ffd23f':'#3b3f5c'};background:#1b2238;color:#fff;cursor:pointer;font:800 12px Pixelify,Fredoka,system-ui,sans-serif">
+     <div style="width:64px;height:64px;margin:0 auto 2px;background:url(assets/trainer/${g}.png?v=1) 0 0/256px 256px;image-rendering:pixelated"></div>${label}</button>`;
    const sz=k=>{const ok=!!have[k];return `<button data-s="${k}" ${ok?'':'disabled'} style="flex:1;padding:8px;border-radius:10px;border:3px solid ${cur===k?'#ffd23f':'#3b3f5c'};background:${ok?'#1b2238':'#151a28'};color:${ok?'#fff':'#666'};cursor:${ok?'pointer':'not-allowed'};font:800 13px Pixelify,Fredoka,system-ui,sans-serif">${SIZES[k].name}${ok?'':' 🔒'}<br><small style="opacity:.75;font-weight:600">${k==='small'?'faster · less damage':k==='big'?'more damage & defense · slower':'balanced'}</small></button>`;};
    const btn='padding:6px 10px;border-radius:8px;border:2px solid #3b3f5c;background:#3b3f5c;color:#fff;font:800 12px Pixelify,Fredoka,system-ui,sans-serif;cursor:pointer';
-   m.innerHTML=`<div style="width:min(460px,calc(100vw - 32px));padding:16px;border-radius:14px;background:#101824;border:3px solid #b89a60;color:#f7e4bc;font:600 13px Pixelify,Fredoka,system-ui,sans-serif">
-     <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:20px">${S.psTrainer?'Trainer':'Are you a boy or a girl?'}</b>${S.psTrainer?`<button data-close style="${btn}">✕</button>`:''}</div>
-     <div style="display:flex;gap:10px;margin:12px 0">${card('girl','Girl')}${card('boy','Boy')}</div>
-     ${S.psTrainer?`<div style="margin-top:6px"><b>${mon?mon.name:'Your Pokémon'}'s size</b><div style="display:flex;gap:8px;margin-top:6px">${SIZE_ORDER.map(sz).join('')}</div>
-     <small style="opacity:.7;display:block;margin-top:8px">Catch a Small or Big ${mon?mon.name:'one'} in a run to unlock that size.</small></div>`:''}</div>`;
+   m.innerHTML=`<div style="width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 40px);overflow:auto;padding:16px;border-radius:14px;background:#101824;border:3px solid #b89a60;color:#f7e4bc;font:600 13px Pixelify,Fredoka,system-ui,sans-serif">
+     <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:20px">${S.psTrainer?'Trainer':'Choose your Trainer'}</b>${S.psTrainer?`<button data-close style="${btn}">✕</button>`:''}</div>
+     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px;margin:12px 0;max-height:min(330px,46vh);overflow-y:auto;padding-right:4px">${TRAINERS.map(t=>card(t[0],t[1])).join('')}</div>
+     <small style="opacity:.7;display:block">Your Pokémon's size is under its Upgrades button on the main menu.</small></div>`;
+ }
+ // ---- [Gard] Pokemon size: its own button right under the partner's Upgrades button (both modes) ----
+ function sizeMenu(){
+   let m=document.getElementById('ps-size-menu');
+   if(!m){m=document.createElement('div');m.id='ps-size-menu';m.style.cssText='position:fixed;inset:0;z-index:2147483100;display:flex;align-items:center;justify-content:center;background:rgba(6,8,16,.6)';document.body.append(m);
+     m.addEventListener('click',ev=>{const t=ev.target.closest('[data-s],[data-close]');if(ev.target===m||t?.dataset.close!==undefined){m.style.display='none';return;}if(!t||t.disabled)return;
+       const S=E().DB.save;S.psSizeSel=S.psSizeSel||{};S.psSizeSel[S.partner]=t.dataset.s;save();renderSize();sizeButton(true);});}
+   m.style.display='flex';renderSize();
+ }
+ function renderSize(){
+   const m=document.getElementById('ps-size-menu'),S=E()?.DB?.save;if(!m||!S)return;
+   const dex=Number(S.partner),mon=(E().DEX||[]).find(d=>d.dex===dex),have=sizesOf(dex),cur=chosenSize(dex);
+   const sz=k=>{const ok=!!have[k],z=SIZES[k];return `<button data-s="${k}" ${ok?'':'disabled'} style="flex:1;padding:8px;border-radius:10px;border:3px solid ${cur===k?'#ffd23f':'#3b3f5c'};background:${ok?'#1b2238':'#151a28'};color:${ok?'#fff':'#666'};cursor:${ok?'pointer':'not-allowed'};font:800 14px Pixelify,Fredoka,system-ui,sans-serif">${z.name}${ok?'':' 🔒'}<br><small style="opacity:.75;font-weight:600">${k==='small'?'Faster, weaker hits':k==='big'?'Stronger, bulkier, slower':'Balanced'}</small></button>`;};
+   const btn='padding:6px 10px;border-radius:8px;border:2px solid #3b3f5c;background:#3b3f5c;color:#fff;font:800 12px Pixelify,Fredoka,system-ui,sans-serif;cursor:pointer';
+   m.innerHTML=`<div style="width:min(420px,calc(100vw - 32px));padding:16px;border-radius:14px;background:#101824;border:3px solid #b89a60;color:#f7e4bc;font:600 13px Pixelify,Fredoka,system-ui,sans-serif">
+     <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:20px">${mon?mon.name:'Your Pokémon'}'s size</b><button data-close style="${btn}">✕</button></div>
+     <div style="display:flex;gap:8px;margin-top:12px">${SIZE_ORDER.map(sz).join('')}</div>
+     <small style="opacity:.7;display:block;margin-top:10px">Catch a Small or Big ${mon?mon.name:'one'} in a Story run to unlock that size.</small></div>`;
+ }
+ function sizeButton(force){
+   const up=document.getElementById('menu-partner-upg');let b=document.getElementById('ps-size-btn');
+   if(!up){if(b)b.style.display='none';return;}
+   const S=E()?.DB?.save;if(!S)return;
+   if(!document.getElementById('ps-pc-css')){const st=document.createElement('style');st.id='ps-pc-css';st.textContent='#ps-pc-tools .pp-upg{margin:0 !important;font-size:12px;padding:2px 9px}';document.head.append(st);}
+   // Upgrades, the skin toggle and Size share one row under the partner (they used to stack and get cut off)
+   let row=document.getElementById('ps-pc-tools');
+   if(!row||!row.isConnected){row=document.createElement('div');row.id='ps-pc-tools';row.style.cssText='display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px 6px;margin-top:4px;max-width:100%';}
+   if(up.parentElement!==row){up.insertAdjacentElement('beforebegin',row);row.appendChild(up);}
+   const sk=document.getElementById('ps-skin-toggle');if(sk&&sk.parentElement!==row)up.insertAdjacentElement('afterend',sk);
+   if(!b){b=document.createElement('button');b.type='button';b.className='pp-upg';b.id='ps-size-btn';b.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();sizeMenu();});}
+   if(b.parentElement!==row||b!==row.lastElementChild)row.appendChild(b);
+   b.style.display='';const z=SIZES[chosenSize(Number(S.partner))]||SIZES.normal,t='📏 '+z.name;b.title='Your Pokémon\'s size';
+   if(force||b.textContent!==t)b.textContent=t;
+   const old=document.getElementById('ps-size-row');if(old)old.remove();
  }
  // New save: ask Boy or Girl once the main menu is really on screen (not behind the intro / personality quiz)
  function firstTime(){const S=E()?.DB?.save,g=B()?.game;if(!S||S.psTrainer||!g||g.state!=='ui'||document.getElementById('ps-trainer-menu')?.offsetParent)return;
@@ -301,7 +360,7 @@
  function closeBag(){bagOpen=false;const m=document.getElementById('ps-bag');if(m)m.style.display='none';try{E().Game.soloHold(false);}catch(e){}}
  function renderBag(){
    const m=document.getElementById('ps-bag'),b=bag(),p=B()?.game?.player,S=E()?.DB?.save;if(!m||!b)return;
-   const boy=S?.psTrainer==='boy',btn='padding:5px 10px;border-radius:8px;border:2px solid #3b3f5c;font:800 12px Pixelify,Fredoka,system-ui,sans-serif;cursor:pointer';
+   const trk=trKey(),btn='padding:5px 10px;border-radius:8px;border:2px solid #3b3f5c;font:800 12px Pixelify,Fredoka,system-ui,sans-serif;cursor:pointer';
    const ballRow=k=>`<div style="display:flex;align-items:center;gap:10px;padding:7px;border-radius:10px;background:${sel===k?'#2a3354':'#1b2238'};margin:5px 0;border:2px solid ${sel===k?'#ffd23f':'transparent'}">
      <img src="${BALLS[k].img}?v=1" width="28" height="28" style="image-rendering:pixelated"><div style="flex:1"><b>${BALLS[k].name}</b> ×${b[k]||0}<br><small style="opacity:.7">${k==='master'?'Always catches':'Catch bonus ×'+BALLS[k].bonus}</small></div>
      ${b[k]>0?`<button data-ball="${k}" style="${btn};background:${sel===k?'#3b3f5c':'#ffd23f'};color:${sel===k?'#fff':'#2a1d00'}">${sel===k?'Selected':'Use this ball'}</button>`:''}</div>`;
@@ -309,7 +368,7 @@
      <img src="${ITEMS[k].img}?v=1" width="28" height="28" style="image-rendering:pixelated"><div style="flex:1"><b>${ITEMS[k].name}</b> ×${b[k]||0}<br><small style="opacity:.7">Restores ${Math.round(ITEMS[k].heal*100)}% HP</small></div>
      ${b[k]>0&&p&&p.hp<p.maxHp?`<button data-use="${k}" style="${btn};background:#7dff9a;color:#0b2a14">Use</button>`:''}</div>`;
    m.innerHTML=`<div style="width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 40px);overflow:auto;padding:16px;border-radius:14px;background:#101824;border:3px solid #b89a60;color:#f7e4bc;font:600 13px Pixelify,Fredoka,system-ui,sans-serif">
-     <div style="display:flex;align-items:center;gap:10px"><div style="width:48px;height:48px;background:url(assets/trainer/${boy?'boy':'girl'}.png?v=1) 0 0/192px 192px;image-rendering:pixelated"></div>
+     <div style="display:flex;align-items:center;gap:10px"><div style="width:48px;height:48px;background:url(assets/trainer/${trk}.png?v=1) 0 0/192px 192px;image-rendering:pixelated"></div>
        <div style="flex:1"><b style="font-size:20px">Trainer's Bag</b><br><small style="opacity:.75">Game paused · ${p?Math.round(p.hp)+' / '+Math.round(p.maxHp)+' HP':''}</small></div><button data-close style="${btn};background:#3b3f5c;color:#fff">✕</button></div>
      <div style="margin-top:10px;font-size:11px;letter-spacing:2px;opacity:.7">POKÉ BALLS</div>${BALL_ORDER.map(ballRow).join('')}
      <div style="margin-top:8px;font-size:11px;letter-spacing:2px;opacity:.7">MEDICINE</div>${Object.keys(ITEMS).map(itemRow).join('')}
@@ -363,16 +422,18 @@
  // ---- main loop ----
  let last=0,hudT=0;
  function frame(ts){
-   requestAnimationFrame(frame);const dt=Math.min(.05,last?(ts-last)/1000:0);last=ts;hookDraws();hookCombat();if(STORY()){martButton();trainerButton();firstTime();}else{for(const k of ['psmart','pstrainer']){const b=document.querySelector('[data-go="'+k+'"]');if(b)b.remove();}}
+   requestAnimationFrame(frame);const dt=Math.min(.05,last?(ts-last)/1000:0);last=ts;hookDraws();hookCombat();sizeButton();if(STORY()){martButton();trainerButton();firstTime();}else{for(const k of ['psmart','pstrainer']){const b=document.querySelector('[data-go="'+k+'"]');if(b)b.remove();}}
    if(toastT>0){toastT-=dt;if(toastT<=0&&toastEl)toastEl.style.display='none';}
    const p=B()?.game?.player;
    if(running()){const tm=document.getElementById('ps-trainer-menu');if(tm&&tm.style.display!=='none')tm.style.display='none';}   // menus never stay over a run
+   wrapKill();hookMarks();
+   if(p){const st=B()?.game?.state;if(st&&st!=='ui'&&st!=='over'){sizeEnemies();if(!STORY())sizePlayer(p);}}   // [Gard] sizes work in Original too
    if(!p||!running()){holdFire=false;if(bagOpen)closeBag();if(hudEl)hudEl.style.display='none';throws.length=0;target=null;alive.clear();return;}
-   sizeEnemies();sizePlayer(p);
+   sizePlayer(p);
    if(B().game.state==='playing'){updateTrainer(dt,p);updateThrows(dt);drops();potionCd=Math.max(0,potionCd-dt);for(const h of heals)h.t+=dt;while(heals.length&&heals[0].t>.9)heals.shift();}
    if(target&&!catchable(target)&&!throws.some(t=>t.e===target))target=null;
    hudT-=dt;if(hudT<=0){hudT=.25;hud();}
  }
  requestAnimationFrame(frame);
- window.PS_CATCH={bag,throwBall,usePotion,chance:(e,b)=>chance(e,b||sel),RATES,SIZES,sizesOf,chosenSize,trainer:()=>({x:tr.x,y:tr.y}),bagOpen:()=>bagOpen,holdFire:()=>holdFire};
+ window.PS_CATCH={bag,throwBall,usePotion,chance:(e,b)=>chance(e,b||sel),RATES,SIZES,MARK,sizesOf,chosenSize,trainer:()=>({x:tr.x,y:tr.y}),bagOpen:()=>bagOpen,holdFire:()=>holdFire};
 })();

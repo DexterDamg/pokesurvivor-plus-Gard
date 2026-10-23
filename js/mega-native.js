@@ -227,7 +227,8 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  function deltaHolder(){
    const list=[];try{list.push(...(getBridge()?.game?.everyone?.()||[]));}catch(e){}
    const p=getPlayer();if(p&&!list.includes(p))list.push(p);
-   return list.find(q=>q&&!q.dead&&(q.megaForm===DELTA.form||q.mon?.mega===DELTA.form))||null;
+   // co-op: a teammate's Delta Stream only reaches you inside its domain (430 units around that Mega Rayquaza)
+   return list.find(q=>q&&!q.dead&&(q.megaForm===DELTA.form||q.mon?.mega===DELTA.form)&&(q===p||!p||Math.hypot((q.x||0)-(p.x||0),(q.y||0)-(p.y||0))<430))||null;
  }
  window.PS_DELTA_STREAM={active:()=>!!deltaHolder(),holder:deltaHolder,cfg:DELTA};
  let weatherHooked=false;
@@ -918,7 +919,23 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
  }
  // J's Will (LoverGare's Gardevoir only): level 50+, not Mega yet, out of hearts -> revive with 2 hearts and instantly Mega Evolve. Once per run.
  const JWILL={level:50,lives:2,line:"We're not done yet, Echo!... Show them our bond!..",after:'Echo refused to give up!'};
+ // Our Bond (LoverGare's Mega Gardevoir only): Mega Gardevoir out of hearts -> Echo's cut-in (js/echo-cutscene.js):
+ // she turns white, back to Gardevoir, faints, gets up, roars and Mega Evolves again -> back at full HP. Once per run.
+ function ourBond(p){
+   if(!p||p!==getPlayer()||!echoOn(p)||p.__echoBondUsed||String(p.megaForm||'')!=='282-mega'||(Number(p.lives)||0)>0)return false;
+   const C=window.PS_ECHO_CUTSCENE;if(!C||C.playing)return false;
+   // the game's own Mega Evolution plays again in the middle of the cut-in (she's still Mega underneath: same stats)
+   const replay=()=>{const megaAnim=p.anim,base=p.__psBaseAnim;
+     try{window.PS_MUSIC&&window.PS_MUSIC.mega&&window.PS_MUSIC.mega();}catch(_){}
+     if(!base||!window.PS_FX||!window.PS_FX.has('megaevo'))return;
+     p.anim=base;p.invuln=Math.max(Number(p.invuln)||0,3);
+     window.PS_FX.cast('megaevo',p,{id:'mega-evolution',type:'normal',dmg:0,fx:{newAnim:megaAnim,form:p.megaForm,cry:'assets/cries/282.mp3'}},null,true);};
+   if(!C.play(p,{mode:'bond',mega:replay}))return false;
+   p.__echoBondUsed=true;p.lives=1;   // the game's own revive uses it right after this: full HP, still Mega
+   return true;
+ }
  window.PS_LASTSTAND=function(p){
+   try{if(ourBond(p))return true;}catch(e){console.warn('Our Bond',e);}
    try{if(!p||p!==getPlayer()||!echoOn(p)||p.__jWillUsed||p.megaForm||used||(Number(p.level)||1)<JWILL.level||(Number(p.lives)||0)>0)return false;
      p.__jWillUsed=true;p.lives=JWILL.lives+1;   // the game's own revive uses one right after this -> 2 hearts left
      window.__psJWill=true;
@@ -937,7 +954,8 @@ const getBridge=()=>window.PS_MEGA_BRIDGE_V5;
      "\u{1F496} Echo's Love: +25% crit · -15% dmg taken",
      "\u{1F496} J and Echo's Bond (Mega, <50% HP): regen, ×10 dmg, speed, defense"+(bd&&now<bd.take?' — ACTIVE':''),
      "\u{1F496} Friends For Life: +"+(fflBonus(p,'deal')*100).toFixed(0)+"% dmg/def · +"+(fflBonus(p,'xp')*100).toFixed(0)+"% EXP · +"+(fflBonus(p,'crit')*100).toFixed(0)+"% crit",
-     "\u{1F496} J's Will: Lv 50+, out of hearts → revive & Mega"+(p.__jWillUsed?' (used)':'')];
+     "\u{1F496} J's Will: Lv 50+, out of hearts → revive & Mega"+(p.__jWillUsed?' (used)':''),
+     "\u{1F496} Our Bond (Mega): out of hearts → Echo rises again at full HP"+(p.__echoBondUsed?' (used)':'')];
    return '\n\n'+l.join('\n');}
  function passiveLines(title,abilityId,types,deal,inScope){
    const A=ABIL[abilityId],out=[];
@@ -1096,6 +1114,7 @@ function start(){
        window.PS_FX.cast('megaevo',p,{id:'mega-evolution',type:'normal',dmg:0,fx:{newAnim,form:f.key,cry}},null,true);}catch(e){console.warn('mega fx',e);}
      try{const nm=String(f.en||f.name||'').replace(/^Mega[- ]?/i,'').replace(/\s+[XYZ]$/,'').trim()||'partner';setTimeout(()=>{if(!window.__psJWill)trainerLine(nm);},1150);}catch(e){}
    }
+   p.__psBaseAnim=baseline.anim;   /* Our Bond replays the Mega Evolution from this look */
    restore=()=>{if(undoSignature)undoSignature();delete p.megaKit;clearPrimal();p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;if(Number.isFinite(baseline.baseSpa))p.baseSpa=baseline.baseSpa;p.maxHp=baseline.maxHp;p.hp=Math.min(p.hp,baseline.maxHp);p.r=baseline.r;p.bodyH=baseline.bodyH;delete p.megaForm;};
    hint.textContent=WEATHER[f.key]?'Primal Reversion! '+WEATHER[f.key].name+' is active.'+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':''):'Mega Evolution activated!'+(kit&&ABIL[kit.passive.ability]?' Ability: '+ABIL[kit.passive.ability].name+'.':'')+(undoSignature?' Learned '+SIGNATURE_MOVES[f.key].name+'!':'');
  }catch(err){clearPrimal();console.error('Mega Evolution:',err);p.mon=baseline.mon;p.anim=baseline.anim;p.baseAtk=baseline.baseAtk;p.baseSpd=baseline.baseSpd;p.maxHp=baseline.maxHp;p.hp=baseline.hp;p.r=baseline.r;p.bodyH=baseline.bodyH;hint.textContent='Mega error: '+err.message;}
