@@ -1,7 +1,7 @@
 const fs=require('fs'),assert=require('assert/strict');const {context:c,engine:n,vm}=require('./lake-runtime.cjs');
 c.PS_HOOPA_ENGINE=n;c.PS_MEGA_BRIDGE_V5={game:n.Game,camera:n.Camera,world:{isFree:()=>true}};
 Object.defineProperty(n.Game,'player',{value:{dex:482,level:1,x:0,y:0},configurable:true,writable:true});Object.defineProperty(n.Game,'state',{value:'playing',configurable:true,writable:true});n.Camera.resize(960,640,1);n.Camera.x=n.Camera.y=0;
-vm.runInContext(fs.readFileSync(require('path').join(__dirname,'../js/encounters.js'),'utf8'),c);const P=c.PS_ENCOUNTERS;P.install();
+vm.runInContext(require('./module.cjs')('encounters.js'),c);const P=c.PS_ENCOUNTERS;P.install();
 assert.equal(P.required(445),48);assert.equal(P.required(444),24);assert.equal(P.required(17),18);assert(!P.allowed(445));assert(P.allowed(16));assert.equal(P.cap(),16);
 let pool=P.pool();assert(pool.length);assert(pool.every(d=>P.allowed(d.dex)));assert(pool.some(d=>d.dex===16));assert(!pool.some(d=>d.dex===445));
 const def={dex:445,name:'Garchomp',behavior:'chase',hp:14,spd:50,dmg:5,xp:4};
@@ -14,7 +14,7 @@ n.Game.player.level=47;assert(!P.allowed(445));assert(P.allowed(444));n.Game.pla
 pool=P.pool();assert(pool.some(d=>d.dex===445));assert(pool.some(d=>d.dex===16));assert(pool.filter(d=>d.dex===16).length<pool.filter(d=>d.dex===445).length);
 console.log('PASS actual engine: Garchomp 48, Gabite 24, Pidgeotto 18; rookie pool; 1,000 spawn cap stress; visible edge spawn; boss reserve; reward-free culling; retained lower-weight rookies.');
 // Load the real dialogue module with lightweight UI stubs; exercise the exported selection gates.
-c.document.readyState='loading';vm.runInContext(fs.readFileSync(require('path').join(__dirname,'../js/lake-talk.js'),'utf8'),c);const T=c.PS_LAKE_TALK;let allies=[];c.PS_LAKE={get allies(){return allies;}};
+c.document.readyState='loading';vm.runInContext(require('./module.cjs')('lake-talk.js'),c);const T=c.PS_LAKE_TALK;let allies=[];c.PS_LAKE={get allies(){return allies;}};
 const row=text=>[['happy',text,'']];const sel=text=>T.contextual(482,row(text));
 assert.equal(sel('Uxie, Mesprit, my sisters!').length,0);assert.equal(sel('My will is unbroken.').length,1);
 assert.equal(T.contextual(482,T.lines[482].chat).length,2);assert(T.contextual(482,T.lines[482].chat).every(x=>!x[1].includes('Uxie')));

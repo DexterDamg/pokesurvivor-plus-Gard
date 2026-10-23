@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('fs'),path=require('path');
 const {engine:E,context:C,vm}=require('./lake-runtime.cjs');
 C.PS_GACHA_SINGLE=true;
-vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/special-gacha.js'),'utf8'),C);
+vm.runInContext(require('./module.cjs')('special-gacha.js'),C);
 for(const n of [1,10,100]){
  const saved={at:123,from:'catch'},s={owned:{19:saved},shiny:{19:saved},coins:100,tickets:{t1:1000,t10:100},pity:{},shinyPity:{},stats:{}};
  const before=JSON.stringify(s);

@@ -36,4 +36,9 @@ With Node.js installed, repeat the automated checks:
 node tests/validate.cjs
 node tests/lake-trio.cjs
 node tests/gacha-integration.cjs
+node tests/lake-integration.cjs
+node tests/dialogue-boxes.cjs
+node tests/progression.cjs
 ```
+
+All game modules are now consolidated in js/game.js (see README.md); the tests read each module straight out of that file.
