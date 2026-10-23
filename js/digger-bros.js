@@ -289,6 +289,9 @@
     const iu = N.Interact.update;
     N.Interact.update = function () { const s = bro, held = s && s.mode === 'bigchest' && s.job && s.chestTime > 0 ? { c: s.job.ref, open: s.chestTime } : null; const r = iu.apply(this, arguments); if (held && !held.c.hoopaOpened) held.c.open = Math.max(held.c.open || 0, held.open); return r; };
     // Kamina's words: the hit that would end Excadrill (with Drilbur around), once per run
+    // Simon stays Simon: once he carries on alone, the in-run evolution (js/partner-rules.js, js/evo-upgrades.js) can't turn him into Excadrill
+    const P = N.Player.prototype, isSimon = pl => !!simon && pl === simon;
+    for (const k of ['evoOptions', 'startEvo', 'evolveTo']) { const f = P[k]; if (typeof f !== 'function') continue; P[k] = function () { if (isSimon(this)) return k === 'evoOptions' ? [] : false; return f.apply(this, arguments); }; }
     const ph = N.Player.prototype.hurt;
     N.Player.prototype.hurt = function () { const me = this === N.Game.player && !this.psDigger && !this.psLake && Number(this.dex) === EXCA, up = !this.dead && this.hp > 0;
       const r = ph.apply(this, arguments);

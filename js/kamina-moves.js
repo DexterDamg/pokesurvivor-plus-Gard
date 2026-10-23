@@ -66,7 +66,7 @@
         if (p && isSimon(p) && Number(mon && mon.dex) === DRIL) return [...r, ...['gurren-boomerang', 'super-blazing-kick', 'giga-drill-maximum'].filter(id => !has(id))];   // Simon carries on Kamina's moves
         if (Number(mon && mon.dex) !== EXCA) return r;
         const un = IDS.filter(id => !BY[id].simon && !has(id));
-        if (p && Number(p.dex) === EXCA && un.length && CFG.forceAt.includes(Number(p.level))) return [un[0], ...r.slice(0, 1)];   // a short pool: the card reliably shows up
+        if (p && Number(p.dex) === EXCA && un.length && (CFG.forceAt.includes(Number(p.level)) || [1, 3, 5].includes(Number(p.level) - (p.__kaminaLvl ?? -99)))) return [un[0], ...r.slice(0, 1)];   // also right after evolving into Excadrill mid-run   // a short pool: the card reliably shows up
         return [...r, ...un]; };
       f.__lake = orig.__lake; M.poolFor = f; }
   }
@@ -359,6 +359,7 @@
     txt(p.x, p.y - 70, 'Super Bowling Ball → GIGA DRILL MAXIMUM!', '#5affe0'); }
   // Kamina's Z-move button is Giga Drill Break, ready from the start
   function ultButton() { const p = E().Game.player; if (!p || Number(p.dex) !== EXCA || p.psDigger) return;
+    if (p.__kaminaLvl == null) p.__kaminaLvl = Number(p.level) || 1;   // the level you became Excadrill at (you may start as Drilbur and evolve)
     if (p.ultDef !== ULT_DEF) p.ultDef = ULT_DEF; p.ult = E().Ult.MAX || 300; p.ultCd = 0; p.ultT = 0; }
 
   // ================= drawing (world space, under the HUD) =================
