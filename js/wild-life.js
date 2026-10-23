@@ -47,7 +47,9 @@
   const label = w => w.name + (w.__g === 'm' || w.g === 'm' ? ' ♂' : w.__g === 'f' || w.g === 'f' ? ' ♀' : '');
   const harmless = e => !!(e && e.__role);
   const COL = { wild: '#c8ffaa', foe: '#ffb0a0', ally: '#9ad8ff' };
-  function say(w, kind, face, text, em, o) { o = o || {}; if (!here(w) || area() === 'birth') return false; try { return T().line(w.dex, face, text.replace(/\{(\w+)\}/g, (_, k) => o[k] || ''), em, Object.assign({ name: label(w) + nat(w), color: COL[kind], kind, obj: w, shiny: w.shiny }, o)); } catch (_) { return false; } }
+  // only your summons (allies) and bosses ever speak: ordinary wild and hostile Pokemon stay silent (emotes only)
+  const voiced = (w, kind) => kind === 'ally' || kind === 'legend' || !!(w && (w.kind === 'ally' || w.boss || w.legend || w.arceus || w.judge));
+  function say(w, kind, face, text, em, o) { o = o || {}; if (!voiced(w, kind) || !here(w) || area() === 'birth') return false; try { return T().line(w.dex, face, text.replace(/\{(\w+)\}/g, (_, k) => o[k] || ''), em, Object.assign({ name: label(w) + nat(w), color: COL[kind], kind, obj: w, shiny: w.shiny }, o)); } catch (_) { return false; } }
   // where you are: the open field, a boss rift, Arceus's Judgment, a safe zone, Birth Island... Pokemon only talk in their own area
   function area() { const N = E(); if (window.PS_BIRTH_ISLAND?.active) return 'birth'; if (N?.Judgment?.active) return 'judgment'; if (N?.Rift?.inArena) return 'arena'; if (window.PS_SAFEZONE?.active) return 'safe';
     if (window.PS_MODES?.run?.mode === 'legend') return 'legendmode'; if (window.PS_DENS?.legend) return 'den'; return 'field'; }
@@ -59,7 +61,7 @@
   const nat = w => { const v = V() && V().who(w); return v ? ' · ' + v.nature : ''; };
   const emo = (w, k) => { try { T().emoteAt(w, k); } catch (_) {} };
   const bubbles = [];   // little speech bubbles over heads (for small talk that shouldn't fill the talk box)
-  function bubble(w, text, life) { if (!w || w.dead || !here(w)) return; for (let i = bubbles.length - 1; i >= 0; i--) if (bubbles[i].obj === w) bubbles.splice(i, 1); if (bubbles.length > 7) bubbles.shift(); bubbles.push({ obj: w, text, t: 0, life: life || 2.2 }); }
+  function bubble(w, text, life) { if (!w || w.dead || !here(w) || !voiced(w)) return; for (let i = bubbles.length - 1; i >= 0; i--) if (bubbles[i].obj === w) bubbles.splice(i, 1); if (bubbles.length > 7) bubbles.shift(); bubbles.push({ obj: w, text, t: 0, life: life || 2.2 }); }
 
   // ================= harmless Pokemon: roles and activities =================
   const seen = new WeakSet(), live = new Set(), fx = [];
@@ -119,7 +121,7 @@
         if (a.ph === 0) { goal(e, a.foot.x, a.foot.y); if (near(e, a.foot, 14) || a.t > 6) { a.ph = 1; a.t0 = a.t; bubble(e, vb(e, 'climbTry')); } }
         else if (a.ph === 1) { const k = Math.sin((a.t - a.t0) * 9); e.__goal = { x: a.tree.x, y: a.tree.y }; e.__lift = Math.max(0, k) * 10 + (a.t - a.t0) * 4;
           if (Math.random() < dt * 5) fx.push({ kind: 'dust', x: a.foot.x + (a.tree.x - a.foot.x) * 0.4 + rnd(-6, 6), y: a.foot.y - H * 0.5, vx: rnd(-30, 30), vy: rnd(10, 40), t: 0, life: 0.5, g: 200, c: '120,170,80' });
-          if (a.t - a.t0 > 3.2) { a.ph = 2; e.__lift = 0; e.__goal = null; emo(e, 'sweat'); bubble(e, vb(e, 'climbFall')); fx.push({ kind: 'stars', obj: e, t: 0, life: 2.2 }); txt(e.x, e.y - H - 6, 'Oof!', '#ffe27a'); a.dur = a.t + 2.5; } }
+          if (a.t - a.t0 > 3.2) { a.ph = 2; e.__lift = 0; e.__goal = null; emo(e, 'sweat'); bubble(e, vb(e, 'climbFall')); fx.push({ kind: 'stars', obj: e, t: 0, life: 2.2 }); a.dur = a.t + 2.5; } }
         break;
       case 'play': { const m = a.mate; if (!m || m.dead) { a.dur = 0; break; } const s = a.t * 2 + (m.__act === a ? 0 : Math.PI); goal(e, m.x + Math.cos(s) * 60, m.y + Math.sin(s) * 40); e.__spdMul = 0.9;
         if (!a.said) { a.said = true; bubble(e, vb(e, 'play')); } if (Math.random() < dt * 0.6) emo(e, a.angry ? 'anger' : pick(['note', 'heart'])); break; }
@@ -368,6 +370,7 @@
   // two harmless Pokemon near each other stop and chat (a sweetheart, a rival type, small talk...); hostile ones banter on the march
   let convo = null, convoCd = rnd(4, 8);
   function startConvo(a, b, p, hostile) {
+    if (!voiced(a) || !voiced(b)) return;   // wild Pokemon don't chat with each other any more
     const v = V(); if (!v) return; const c = v.chat(a, b, { hostile }); if (!c || !c.lines.length) return;
     const now = clock(); a.__chatAt = b.__chatAt = now + rnd(25, 40);
     convo = { a, b, lines: c.lines, outcome: c.outcome, i: 0, wait: 0.2, hostile, box: dist(a, p) < 260 && !(T() && T().busy && T().busy()) };
