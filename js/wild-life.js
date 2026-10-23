@@ -16,7 +16,12 @@
      Pokemon too: you can interrupt the scene... at a price.
    - GRUDGES: some hostile Pokemon hate each other more than they hate you (a Rattata attacking another Rattata
      because it stole its Gold Ball!). They brawl until one drops or they call a truce.
-   - CHANGE OF HEART: some hostile Pokemon realize they'd rather be on your side and JOIN you as an ally (up to 2).
+   - JOINING YOU (up to 3 allies), for many reasons: fed up with its own pack; begging when badly hurt; one of your own
+     species; awed by your knockout streak; freed when its boss falls; talked into it by one of your allies; grateful
+     when you win its brawl for it; or hit by its own side (a stray shot: it lashes out at the shooter in a brawl, or
+     quits on the spot and defects to you). Shoves between enemies can start brawls too.
+   - ALLIES fight like real summons (the Lake sisters, Hoopa's summons): real moves of their own type, levelled with
+     you; smart targets; the right range; dodging shots; escaping crowds; regrouping; never walking into walls.
    - Hostile Pokemon taunt you, panic at low HP, bosses introduce themselves.
    Talk-box lines go through js/lake-talk.js (up to three speakers at once), with each Pokemon's portrait.
    The roles (harmless, grudges, allies) only happen in solo, where your game owns the enemies; in co-op you still
@@ -25,7 +30,7 @@
   'use strict';
   if (window.PS_WILD_INSTALLED) return; window.PS_WILD_INSTALLED = true;
   const E = () => window.PS_HOOPA_ENGINE, TAU = Math.PI * 2;
-  const CFG = { idle: 0.25, grudge: 0.035, turn: 0.02, lowTurn: 0.03, maxAllies: 2, sceneFirst: [25, 40], sceneEvery: [50, 80], despawn: 1300,
+  const CFG = { idle: 0.25, grudge: 0.035, turn: 0.02, lowTurn: 0.03, maxAllies: 3, sceneFirst: [25, 40], sceneEvery: [50, 80], despawn: 1300,
     taunt: 0.06, spotEmote: 0.14, feudTime: 20, allyCd: 1.1, allyRange: 280, idleSpd: 0.5 };
   const T = () => window.PS_LAKE_TALK, K = () => window.PS_LAKE?.kit;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -242,16 +247,17 @@
     else if (r < CFG.idle + CFG.grudge && calm) e.__wantFeud = clock() + 12;
     else if (r < CFG.idle + CFG.grudge + CFG.turn && calm) e.__turnAt = clock() + rnd(4, 12);
   }
-  function startFeud(a, b) {
-    const same = Number(a.dex) === Number(b.dex);
+  function startFeud(a, b, opener) {
+    const same = Number(a.dex) === Number(b.dex); if (a.__feud || b.__feud || a.__turning || b.__turning) return;
     feuds.push({ a, b, t: CFG.feudTime, bFights: Math.random() < 0.75 }); emit('feud', { a, b }); a.__feud = b; b.__feud = a; a.__wantFeud = 0;
-    speak(a, 'foe', same && Math.random() < 0.7 ? 'grudgeSame' : 'grudge', { prio: true, other: b }); speak(b, 'foe', 'grudgeReply', { prio: true, delay: 0.3, other: a });
+    speak(a, 'foe', opener || (same && Math.random() < 0.7 ? 'grudgeSame' : 'grudge'), { prio: true, other: b }); speak(b, 'foe', 'grudgeReply', { prio: true, delay: 0.3, other: a });
     emo(a, 'anger'); setTimeout(() => emo(b, 'anger'), 500);
   }
   function endFeud(f, why) {
     feuds.splice(feuds.indexOf(f), 1); const { a, b } = f; a.__feud = null; b.__feud = null;
     const w = !a.dead ? (!b.dead ? null : a) : (!b.dead ? b : null);
     if (why === 'time' && w == null && !a.dead && !b.dead) { speak(a, 'foe', 'truce'); return; }
+    const P = E().Game.player; if (w && !w.gone && why === 'ko' && P && dist(w, P) < 320 && Math.random() < 0.35 && startTurn(w, 'saved')) return;
     if (w && !w.gone) { if (Math.random() < 0.3 && solo()) { speak(w, 'wild', 'home', { prio: true }); setRole(w, 'idle', { kind: 'leave', t: 0, dur: 999 }); } else speak(w, 'foe', 'win', { prio: true }); }
   }
   function updateFeuds(dt, foes) {
@@ -262,11 +268,35 @@
           try { y.hurt(Math.max(4, d * 2), '#ff7a3a', y.x - x.x, y.y - x.y, 60); } catch (_) {} if (Math.random() < 0.3) emo(x, 'anger'); } }
       for (const o of foes) if (harmless(o) && !o.__cheered && dist(o, a) < 220) { o.__cheered = true; if (Math.random() < 0.4) { bubble(o, vb(o, 'cheer')); emo(o, 'note'); } else { emo(o, 'sweat'); o.__fleeT = 2; o.__fleeFrom = a; } } }
   }
-  function startTurn(e, beg) { if (!e || e.__feud || e.__turning || e.dead || harmless(e)) return; e.__turning = { t: 0, said: 0, beg }; e.__turnAt = 0; speak(e, 'foe', beg ? 'beg' : 'turn1', { prio: true }); emo(e, beg ? 'tear' : 'question'); }
+  // a change of heart, for a reason: 'heart' (fed up with its pack), 'beg' (badly hurt), 'kin' (same species as you), 'awe' (your kill streak),
+  // 'freed' (its boss fell), 'convinced' (one of your allies talked it over), 'saved' (you won its fight for it), 'friendly' (its own side hit it)
+  function startTurn(e, reason, ctx) { if (!e || e.__feud || e.__turning || e.dead || harmless(e) || special(e) || allies.length >= CFG.maxAllies || !solo()) return false; reason = reason || 'heart';
+    const quick = reason === 'friendly' || reason === 'saved'; e.__turning = { t: quick ? 2.4 : 0, said: 0, beg: reason === 'beg', reason }; e.__turnAt = 0;
+    speak(e, 'foe', reason === 'beg' ? 'beg' : reason === 'friendly' ? 'defect' : reason === 'saved' ? 'saved' : 'turn1', Object.assign({ prio: true, reason }, ctx || {})); emo(e, reason === 'beg' ? 'tear' : quick ? 'anger' : 'question'); return true; }
   function updateTurns(dt) {
     for (const e of live) { const tn = e.__turning; if (!tn) continue; if (e.dead) { e.__turning = null; continue; } tn.t += dt;
       if (tn.said === 0 && tn.t > 2.4) { tn.said = 1; if (!tn.beg) speak(e, 'ally', 'turn2', { prio: true }); emo(e, 'exclaim'); }
-      if (tn.t > 4.2) { e.__turning = null; toAlly(e); } }
+      if (tn.t > 4.2) { e.__turning = null; toAlly(e, tn.reason); } }
+  }
+  // ---- accidents between enemies: a stray shot or a shove — the victim lashes out at the attacker... or quits and joins you
+  let bumpT = 0;
+  function accidents(dt, p, foes) {
+    if (!solo() || area() !== 'field') return; const N = E(), hostile = foes.filter(e => !harmless(e) && !special(e) && !e.__turning && dist(e, p) < 520);
+    try { for (const q of N.Projectiles.all()) { if (!q || q.friendly || q.ghost) continue; const seenQ = q.__ff || (q.__ff = new Set());
+      for (const v of hostile) { if (seenQ.has(v) || Math.hypot(q.x - v.x, q.y - (v.y - 10)) > (v.r || 12) + (q.r || 4)) continue; seenQ.add(v); if (Math.random() > 0.06) continue;
+        const vx = Number(q.vx) || 0, vy = Number(q.vy) || 0, m = Math.hypot(vx, vy) || 1;   // who fired it: the one behind the shot
+        const shooter = hostile.filter(o => o !== v).map(o => ({ o, s: ((o.x - q.x) * -vx + (o.y - q.y) * -vy) / m / Math.max(1, dist(o, q)) })).filter(c => c.s > 0.8).sort((x, y) => dist(x.o, q) - dist(y.o, q))[0]?.o;
+        if (!shooter) continue; try { v.hurt(Math.max(3, q.dmg || 6), '#ff9a6a', vx, vy, 40); } catch (_) {} emo(v, 'anger');
+        if (Math.random() < 0.4 && allies.length < CFG.maxAllies) startTurn(v, 'friendly', { other: shooter }); else startFeud(v, shooter, 'friendlyFire'); } } } catch (_) {}
+    if ((bumpT -= dt) > 0) return; bumpT = 0.5;
+    for (const a of hostile) for (const b of hostile) { if (a === b || a.__feud || b.__feud || dist(a, b) > ((a.r || 12) + (b.r || 12)) * 0.6) continue; if (Math.random() < 0.004) { startFeud(a, b, 'bump'); return; } }
+  }
+  const streak = [];
+  function recruitOnKill(e, p, foes) {   // a hostile one went down: awe at your streak, or freedom when the boss falls
+    const now = clock(); streak.push(now); while (streak.length && now - streak[0] > 10) streak.shift();
+    const pickNear = r => foes.filter(o => !o.dead && !harmless(o) && !special(o) && !o.__turning && dist(o, p) < r);
+    if (streak.length >= 15 && now > (recruitOnKill.aweCd || 0)) { recruitOnKill.aweCd = now + 30; const o = pickNear(260).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; if (o && Math.random() < 0.4) startTurn(o, 'awe'); }
+    if (e.boss || e.legend) for (const o of pickNear(450)) if (Math.random() < 0.25) startTurn(o, 'freed');
   }
   // legendaries and bosses: their own grand voice (js/wild-voice.js), at every turn of the fight
   function legendSays(e, sit, o) { const v = V(); if (!v) return false; const l = v.legendLine(e, sit, o || {}); return say(e, 'legend', l[0], l[1], l[2], Object.assign({ prio: true }, o || {}, { name: label(e) + ' · ' + v.title(e) })); }
@@ -288,11 +318,12 @@
       if (harmless(e)) { if (!e.__met && dist(e, p) < 150) { e.__met = true; if (Math.random() < 0.35 && chatCd <= 0) { chatCd = 5; (speak(e, 'wild', 'meetPlayer') && emit('meet', { e })); } else emo(e, 'question'); } continue; }
       if (!st.spot && dist(e, p) < (V() && V().isLegend(e) ? 460 : 230)) { st.spot = true;
         if (V() && V().isLegend(e)) { legendSays(e, 'intro', { prio: true }); emit('legend', { e }); }
+        else if (Number(e.dex) === Number(p.dex) && Math.random() < 0.25 && startTurn(e, 'kin')) {}
         else if ((e.behavior === 'thief' || e.golden) && Math.random() < 0.4) speak(e, 'foe', 'thief');
         else if (Math.random() < CFG.taunt && chatCd <= 0) { chatCd = 6; (speak(e, 'foe', 'spotPlayer') && emit('taunt', { e })); }
         else if (Math.random() < CFG.spotEmote) emo(e, pick(['exclaim', 'exclaim', 'anger'])); }
       if (!st.low && e.hp < e.maxHp * 0.3 && !e.boss) { st.low = true;
-        if (solo() && !e.__turning && !special(e) && allies.length < CFG.maxAllies && Math.random() < CFG.lowTurn && dist(e, p) < 320) startTurn(e, true);
+        if (solo() && !e.__turning && !special(e) && allies.length < CFG.maxAllies && Math.random() < CFG.lowTurn && dist(e, p) < 320) startTurn(e, 'beg');
         else if (Math.random() < 0.08 && chatCd <= 0) { chatCd = 6; speak(e, 'foe', 'lowHp'); } else if (Math.random() < 0.35) emo(e, 'sweat'); }
     }
   }
@@ -300,7 +331,7 @@
   let lvl0 = 0;
   function reactions(p, foes) {
     for (const e of [...live]) { if (!e.dead) continue; live.delete(e); if (e.gone) continue;
-      if (e.__role) { onHarmlessDeath(e, p); emit('killHarmless', { e }); continue; } if (V()) V().run.kills++; emit('kill', { e });
+      if (e.__role) { onHarmlessDeath(e, p); emit('killHarmless', { e }); if (V()) V().run.harmless++; continue; } if (V()) V().run.kills++; emit('kill', { e }); recruitOnKill(e, p, foes);
       if (V() && V().isLegend(e) && e.__wl && e.__wl.spot && here(e)) { legendSays(e, 'defeat'); emit('legendDown', { e }); }
       for (const o of foes) if (harmless(o) && dist(o, e) < 180) { emo(o, 'sweat'); if (Math.random() < 0.4) { o.__fleeT = 3; o.__fleeFrom = e; if (Math.random() < 0.3) bubble(o, vb(o, 'scared'), 1.4); } }
       if (dist(e, p) < 500 && Math.random() < 0.05 && chatCd <= 0) { const pal = foes.find(o => o !== e && !harmless(o) && Number(o.dex) === Number(e.dex) && dist(o, e) < 220); if (pal) { chatCd = 6; speak(pal, 'foe', 'avenge'); } } }
@@ -367,57 +398,102 @@
   }
 
   // ================= allies =================
-  const allies = [], shots = [];
+  // An enemy that switched sides fights for you like a real summon (the Lake sisters, Hoopa's summons): it casts real moves of
+  // its own type through the game's combat (levelled with you), picks smart targets (whatever is on you, your own target, the
+  // weakened, the ones its type beats), keeps the right range for its move, sidesteps shots, gets out of crowds when hurt,
+  // regroups when you run off, finds its way around obstacles and never walks into walls.
+  const allies = [];
   const TYPE_COL = { normal: '#e8e0c8', fire: '#ff7a2a', water: '#4aa8ff', grass: '#6ad05a', electric: '#ffe04a', ice: '#9ae8ff', fighting: '#d0503a', poison: '#b05ad0', ground: '#d0a860', flying: '#a8c0ff', psychic: '#ff6ab0', bug: '#a8c83a', rock: '#b8a058', ghost: '#7a6ab0', dragon: '#7a5aff', dark: '#6a5848', steel: '#b8b8d0', fairy: '#ffa8d8' };
-  const RANGED = new Set(['ranged', 'fan', 'beamer', 'zoner', 'sniper']);
-  function toAlly(e) {
+  const KINDS = ['projectile', 'beam', 'cone', 'melee', 'dash', 'chain', 'nova', 'meteor', 'boomerang'];
+  const SHARE = ['atkMul', 'atkPerm', 'spdMul', 'spdPerm', 'cdMul', 'cdPerm', 'critChance', 'critPerm', 'buffs', 'powers', 'level', 'xpMul', 'coinMul', 'atkItemK'];
+  function movesFor(a, p) {   // two real moves of its own type(s), levelled with you
+    const M = E().Moves, types = (V() && V().who(a).types) || [a.type || 'normal'], ok = m => m && !m.psCast && KINDS.includes(m.kind) && !m.simon && (m.maxLvl || 1) > 1;
+    let L = M.ALL.filter(m => ok(m) && types.includes(String(m.type).toLowerCase()));
+    if (L.length < 2) L = L.concat(M.ALL.filter(m => ok(m) && String(m.type).toLowerCase() === 'normal'));
+    L = L.sort(() => Math.random() - 0.5).slice(0, 2); if (!L.length && M.BY_ID.tackle) L = [M.BY_ID.tackle];
+    return L.map(m => { const lv = Math.max(1, Math.min(m.maxLvl || 5, 1 + Math.floor((Number(p.level) || 1) / 6))); try { return M.instance(m.id, lv); } catch (_) { return m; } });
+  }
+  function makeCaster(a, p) {
+    const N = E(), c = new N.Player(N.DEX_BY[a.dex], {}, a.shiny); a.caster = c; c.psWildAlly = a;
+    for (const k of ['x', 'y', 'r', 'bodyH', 'anim', 'dead', 'hp', 'maxHp', 'aim', 'target']) Object.defineProperty(c, k, { configurable: true, get: () => a[k], set: v => { a[k] = v; } });
+    for (const k of SHARE) Object.defineProperty(c, k, { configurable: true, get: () => p[k], set: () => {} });
+    Object.defineProperty(c, 'baseAtk', { configurable: true, get: () => (Number(p.baseAtk) || 1) * 0.65 });
+    Object.defineProperty(c, 'baseSpd', { configurable: true, get: () => Number(p.baseSpd) || 100 });
+    Object.defineProperty(c, 'floating', { configurable: true, get: () => false });
+    c.hurt = n => allyHurt(a, n); c.ultCd = Infinity; c.ultT = 0;
+  }
+  function toAlly(e, why) {
     const N = E(), p = N.Game.player; if (!p || allies.length >= CFG.maxAllies) { setRole(e, 'idle', { kind: 'leave', t: 0, dur: 999 }); return; }
     let anim = null; try { anim = new N.Sprites.Animator(Number(e.dex), 1, !!e.shiny); } catch (_) {}
-    const a = { kind: 'ally', dex: Number(e.dex), name: e.name, g: e.__g, shiny: !!e.shiny, x: e.x, y: e.y, r: e.r || 12, bodyH: e.bodyH || 40, anim, maxHp: Math.max(60, Math.round((Number(p.maxHp) || 100) * 0.6)), cd: rnd(0.4, 1), hurtCd: 0,
-      type: e.atkType || 'normal', ranged: RANGED.has(e.behavior) || e.psAi === 'sniper', slot: allies.length, idleT: rnd(40, 70), lowSaid: false, dead: false, t: 0, lift: 0 };
-    a.__voice = e.__voice; a.__g = e.__g; a.hp = a.maxHp; a.proxy = { get x() { return a.x; }, get y() { return a.y; }, get r() { return a.r; }, get dead() { return a.dead; }, get hp() { return a.hp; }, get maxHp() { return a.maxHp; }, bodyH: a.bodyH, hurt(n) { allyHurt(a, n); } };
-    removeEnemy(e); allies.push(a); emit('allyJoin', { e: a });
+    const a = { kind: 'ally', dex: Number(e.dex), name: e.name, g: e.__g, shiny: !!e.shiny, x: e.x, y: e.y, r: e.r || 12, bodyH: e.bodyH || 40, anim, maxHp: Math.max(60, Math.round((Number(p.maxHp) || 100) * 0.6)), hurtCd: 0,
+      type: e.atkType || 'normal', slot: allies.length, idleT: rnd(40, 70), lowSaid: false, dead: false, t: 0, lift: 0, next: rnd(0.3, 0.8), mi: 0, okX: e.x, okY: e.y, path: [], recruitT: rnd(12, 20), dodgeT: 0 };
+    a.__voice = e.__voice; a.__g = e.__g; a.hp = a.maxHp;
+    try { makeCaster(a, p); a.moves = movesFor(a, p); } catch (err) { console.warn('[wild]', err); a.moves = []; }
+    removeEnemy(e); allies.push(a); emit('allyJoin', { e: a, why });
     txt(a.x, a.y - 50, label(a) + ' joined your team!', '#9ad8ff'); sfx('shiny'); emo(a, 'heart');
     for (let i = 0; i < 6; i++) fx.push({ kind: 'heart', x: a.x + rnd(-10, 10), y: a.y - a.bodyH, vx: rnd(-20, 20), vy: rnd(-50, -30), t: -i * 0.1, life: 1.3 });
     for (const o of N.EnemyMgr.all()) if (o && !o.dead && dist(o, a) < 260) { if (harmless(o)) emo(o, 'question'); else if (Math.random() < 0.35) { emo(o, 'anger'); bubble(o, V() ? V().line(o, 'traitor')[1] : 'TRAITOR!', 1.6); } }
     if (Number(p.dex) === 530) { try { T().line(530, 'joyous', 'Ha! Welcome to the Gurren Brigade, ' + a.name + '!', 'heart', { prio: true, delay: 0.6 }); } catch (_) {} }
   }
-  function allyHurt(a, n) { if (a.dead || a.hurtCd > 0 || !(n > 0)) return; a.hurtCd = 0.45; a.hp -= n; a.flash = 0.15;
+  function allyHurt(a, n) { if (a.dead || a.hurtCd > 0 || !(n > 0) || (Number(a.caster && a.caster.invuln) || 0) > 0) return; a.hurtCd = 0.45; a.hp -= n; a.flash = 0.15;
     if (!a.lowSaid && a.hp < a.maxHp * 0.35 && a.hp > 0) { a.lowSaid = true; speak(a, 'ally', 'allyLow'); }
     if (a.hp <= 0) { a.hp = 0; a.dead = true; a.leaveT = 0; speak(a, 'ally', 'allyFaint', { prio: true }); emit('allyFaint', { e: a }); txt(a.x, a.y - 44, a.name + ' fainted...', '#9ad8ff'); } }
-  function hitEnemy(a, e, mult) { const N = E(), p = N.Game.player; let m = 1; try { m = N.Types.mult(a.type, e.types || ['normal']); } catch (_) {}
-    const dmg = 10 * (Number(p && p.atk) || 1) * m * (mult || 1), was = e.dead;
-    try { e.hurt(dmg, TYPE_COL[a.type] || '#fff', e.x - a.x, e.y - a.y, 60); N.Stats.dmg(p, 'ally', dmg); } catch (_) {}
-    try { N.FX.burst(e.x, e.y - 10, TYPE_COL[a.type] || '#fff', 8, 140); } catch (_) {}
-    if (!was && e.dead && Math.random() < 0.25) speak(a, 'ally', 'allyKill'); }
   function stepTo(w, gx, gy, sp, dt) {
     const dx = gx - w.x, dy = gy - w.y, d = Math.hypot(dx, dy); if (d < 4) return true; const st = Math.min(d, sp * dt), nx = w.x + dx / d * st, ny = w.y + dy / d * st;
     if (free(nx, ny, w.r)) { w.x = nx; w.y = ny; } else if (free(nx, w.y, w.r)) w.x = nx; else if (free(w.x, ny, w.r)) w.y = ny; else return true;
     w.moved = true; w.dir = Math.atan2(dy, dx); return false;
   }
+  const beats = (a, e) => { try { return E().Types.mult(a.type, e.types || ['normal']) > 1; } catch (_) { return false; } };
+  function pickTarget(a, p, enemies) {
+    let best = null, bs = Infinity;
+    for (const e of enemies) { const dp = dist(e, p); if (dp > 340) continue;
+      const sc = dist(e, a) - (dp < 140 ? 220 : 0) - (e === p.target ? 120 : 0) - (1 - e.hp / Math.max(1, e.maxHp)) * 90 - (beats(a, e) ? 70 : 0);
+      if (sc < bs) { bs = sc; best = e; } }
+    return best;
+  }
   function updateAllies(dt, p, foes) {
-    const k = K();
-    for (let i = allies.length - 1; i >= 0; i--) { const a = allies[i]; a.t += dt; a.moved = false; a.hurtCd -= dt; a.cd -= dt; a.flash = Math.max(0, (a.flash || 0) - dt);
+    const k = K(), N = E(), H = window.PS_HOOPA, enemies = foes.filter(e => !e.gone && !harmless(e) && !e.__turning);
+    for (let i = allies.length - 1; i >= 0; i--) { const a = allies[i]; a.t += dt; a.moved = false; a.hurtCd -= dt; a.flash = Math.max(0, (a.flash || 0) - dt);
       if (a.dead) { a.leaveT += dt; const ang = Math.atan2(a.y - p.y, a.x - p.x); stepTo(a, a.x + Math.cos(ang) * 40, a.y + Math.sin(ang) * 40, 50, dt); if (a.leaveT > 2.5) { a.gone = true; allies.splice(i, 1); } continue; }
-      a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.004 * dt);
-      if (dist(a, p) > 750 && k) { const f = k.nearFree(p.x - 40, p.y + 30, a.r); a.x = f.x; a.y = f.y; }
-      const tg = foes.filter(e => !e.__turning && !harmless(e) && dist(e, p) < CFG.allyRange + 80 && dist(e, a) < CFG.allyRange).sort((x, y) => dist(x, a) - dist(y, a))[0];
-      if (tg) { const want = a.ranged ? 150 : (a.r + (tg.r || 12) + 4), d = dist(a, tg), ang = Math.atan2(tg.y - a.y, tg.x - a.x); a.dir = ang;
-        if (d > want + 6) stepTo(a, tg.x - Math.cos(ang) * want, tg.y - Math.sin(ang) * want, 105, dt); else if (a.ranged && d < want - 40) stepTo(a, a.x - Math.cos(ang) * 30, a.y - Math.sin(ang) * 30, 90, dt);
-        if (a.cd <= 0 && d < (a.ranged ? 240 : want + 14)) { a.cd = CFG.allyCd; try { a.anim && a.anim.play(a.ranged ? 'Shoot' : 'Attack'); } catch (_) {}
-          if (a.ranged) shots.push({ a, x: a.x, y: a.y - 16, tg, sp: 380, t: 0 }); else hitEnemy(a, tg, 1.3); } }
-      else { const off = a.slot % 2 ? 1 : -1, fx2 = p.x + off * 52, fy = p.y + 34; if (dist(a, { x: fx2, y: fy }) > 26) stepTo(a, fx2, fy, dist(a, p) > 220 ? 150 : 95, dt); else a.dir = Math.atan2(p.y - a.y, p.x - a.x); }
-      for (const e of foes) if (!harmless(e) && dist(e, a) < a.r + (e.r || 12)) { let d = 8; try { d = typeof e.dmg === 'function' ? e.dmg() : (e._dmg || 8); } catch (_) {} allyHurt(a, Number(d) || 8); }
-      try { const P = E().Projectiles.all(); for (let j = P.length - 1; j >= 0; j--) { const q = P[j]; if (!q || q.friendly || q.ghost || Math.hypot(q.x - a.x, q.y - (a.y - 10)) > a.r + (q.r || 4)) continue; allyHurt(a, q.dmg || 6); P.splice(j, 1); } } catch (_) {}
+      if (a.caster) for (const key of ['invuln', 'reviveShield', 'shadeInv']) a.caster[key] = Math.max(0, (Number(a.caster[key]) || 0) - dt);
+      a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.006 * dt);
+      if (dist(a, p) > 750 && k) { const f = k.nearFree(p.x - 40, p.y + 30, a.r); a.x = f.x; a.y = f.y; a.okX = f.x; a.okY = f.y; a.path = []; }
+      if (a.tg && a.tg.dead) { if (a.lastHitT > a.t - 1.2 && Math.random() < 0.3) speak(a, 'ally', 'allyKill'); a.tg = null; }
+      if (!a.tg || dist(a.tg, p) > 420 || (a.retarget = (a.retarget || 0) - dt) <= 0) { a.retarget = 0.6; a.tg = pickTarget(a, p, enemies); }
+      const tg = a.tg, def = a.moves && a.moves.length ? a.moves[a.mi % a.moves.length] : null, R = def && H && H.attackRange ? H.attackRange(def) : { min: 0, ideal: 110, max: 180 };
+      const side = a.slot % 2 ? 1 : -1; let goal = null, sp = 105, mode = 'follow';
+      a.dodgeT -= dt; if (a.dodgeT <= 0 && k) { const q = k.incoming(a); if (q) { a.dodge = q; a.dodgeT = 0.3; } }
+      const crowd = enemies.filter(e => dist(e, a) < 150).length, low = a.hp < a.maxHp * 0.35;
+      if (k && (crowd >= 3 || (low && crowd >= 1))) { goal = k.escapePoint(a, enemies, p); sp = 135; mode = 'escape'; }
+      else if (dist(a, p) > 380) { goal = { x: p.x + side * 50, y: p.y + 30 }; sp = 155; mode = 'regroup'; }
+      else if (tg) { const d = dist(a, tg), ang = Math.atan2(tg.y - a.y, tg.x - a.x); mode = 'fight';
+        if (d > R.ideal + 12) goal = { x: tg.x - Math.cos(ang) * R.ideal, y: tg.y - Math.sin(ang) * R.ideal };
+        else if (d < R.min) { goal = { x: a.x - Math.cos(ang) * 40, y: a.y - Math.sin(ang) * 40 }; sp = 120; }
+        else { goal = { x: a.x + Math.cos(ang + side * Math.PI / 2) * 30, y: a.y + Math.sin(ang + side * Math.PI / 2) * 30 }; sp = 55; } a.dir = ang; }
+      else { const fx2 = p.x + side * 52, fy = p.y + 34; if (dist(a, { x: fx2, y: fy }) > 26) goal = { x: fx2, y: fy }; else a.dir = Math.atan2(p.y - a.y, p.x - a.x); }
+      a.mode = mode;
+      if (a.dodgeT > 0 && a.dodge) { const st = sp * 1.8 * dt, nx = a.x + a.dodge.x * st, ny = a.y + a.dodge.y * st; if (free(nx, ny, a.r)) { a.x = nx; a.y = ny; a.moved = true; } }
+      else if (goal) { const step = Math.min(Math.max(0, dist(a, goal)), sp * dt); if (step > 0.5) { try { if (H && H.navigate) { H.navigate(a, goal, step, dt, enemies); a.moved = true; } else stepTo(a, goal.x, goal.y, sp, dt); } catch (_) { stepTo(a, goal.x, goal.y, sp, dt); } } }
+      try { N.World.collide(a); } catch (_) {}
+      if (!free(a.x, a.y, a.r)) { if (free(a.okX, a.okY, a.r)) { a.x = a.okX; a.y = a.okY; } else if (k) { const f = k.nearFree(a.x, a.y, a.r); a.x = f.x; a.y = f.y; } a.path = []; } a.okX = a.x; a.okY = a.y;
+      // attack with its real moves
+      a.next -= dt;
+      if (def && tg && a.next <= 0 && mode !== 'escape' && a.caster) { const d = dist(a, tg); if (d >= R.min && d <= R.max) {
+        a.aim = Math.atan2(tg.y - a.y, tg.x - a.x); a.target = tg;
+        try { N.Player.prototype.cast.call(a.caster, def); N.Combat.hoopaCast(a.caster, def); a.lastHitT = a.t; } catch (err) { console.warn('[wild]', err); }
+        a.mi++; a.next = Math.max(0.35, (def.cd || 1) * 1.2 * (Number(a.caster.cdK) || 1)); } }
+      for (const e of enemies) if (dist(e, a) < a.r + (e.r || 12)) { let d = 8; try { d = typeof e.dmg === 'function' ? e.dmg() : (e._dmg || 8); } catch (_) {} allyHurt(a, Number(d) || 8); }
+      try { const P = N.Projectiles.all(); for (let j = P.length - 1; j >= 0; j--) { const q = P[j]; if (!q || q.friendly || q.ghost || Math.hypot(q.x - a.x, q.y - (a.y - 10)) > a.r + (q.r || 4)) continue; allyHurt(a, q.dmg || 6); P.splice(j, 1); } } catch (_) {}
       if ((a.idleT -= dt) <= 0) { a.idleT = rnd(55, 90); if (!tg) speak(a, 'ally', 'allyIdle'); }
-      if (a.anim) { try { if (!a.anim.once || a.anim.done) a.anim.loop(a.moved ? 'Walk' : 'Idle'); if (Number.isFinite(a.dir)) a.anim.dir = E().Sprites.dirFromAngle(a.dir); a.anim.update(dt); } catch (_) {} } }
-    for (let i = shots.length - 1; i >= 0; i--) { const s = shots[i]; s.t += dt; const tg = s.tg; if (!tg || tg.dead || s.t > 1.5) { shots.splice(i, 1); continue; }
-      const d = Math.hypot(tg.x - s.x, tg.y - 12 - s.y), st = s.sp * dt; if (d <= st) { hitEnemy(s.a, tg, 1); shots.splice(i, 1); continue; } s.x += (tg.x - s.x) / d * st; s.y += (tg.y - 12 - s.y) / d * st; }
+      // it talks the ones like it into joining too
+      if ((a.recruitT -= dt) <= 0) { a.recruitT = rnd(15, 25); if (allies.length < CFG.maxAllies) { const o = enemies.find(e => !special(e) && dist(e, a) < 220 && (Number(e.dex) === a.dex || (V() && V().relation(a, e) === 'kin')));
+        if (o && Math.random() < 0.35) { speak(a, 'ally', 'recruit', { prio: true, other: o }); setTimeout(() => { if (!o.dead && allies.length < CFG.maxAllies) startTurn(o, 'convinced', { ally: a.name }); }, 1600); } } }
+      if (a.anim) { try { if (!a.anim.once || a.anim.done) a.anim.loop(a.moved ? 'Walk' : 'Idle'); if (Number.isFinite(a.dir)) a.anim.dir = N.Sprites.dirFromAngle(a.dir); a.anim.update(dt); } catch (_) {} } }
   }
 
   // ================= update & engine hooks =================
   let runP = null;
-  function reset() { allies.length = 0; shots.length = 0; feuds.length = 0; fx.length = 0; bubbles.length = 0; live.clear(); scene = null; sceneT = rnd(...CFG.sceneFirst); lvl0 = 0; }
+  function reset() { allies.length = 0; feuds.length = 0; fx.length = 0; bubbles.length = 0; live.clear(); scene = null; sceneT = rnd(...CFG.sceneFirst); lvl0 = 0; }
   let lastArea = null;
   function areaChange(a) {   // walking into a rift (or out of one): what the old area's Pokemon were saying stops right there
     lastArea = a; bubbles.length = 0; convo = null; if (scene) endScene();
@@ -434,9 +510,9 @@
     for (const e of foes) {
       if (harmless(e)) { runAct(e, dt, p, foes); hops(e, dt); if (e.__role === 'idle' && dist(e, p) > CFG.despawn && !(e.__act && e.__act.kind === 'follow')) removeEnemy(e); continue; }
       if (e.__wantFeud && !e.__feud && !e.dead) { if (now > e.__wantFeud) e.__wantFeud = 0; else if (dist(e, p) < 520) { const b = foes.find(o => o !== e && !o.dead && !o.__feud && !special(o) && !harmless(o) && !o.__turning && dist(o, e) < 260); if (b) startFeud(e, b); } }
-      if (e.__turnAt && now > e.__turnAt && !e.__turning && dist(e, p) < 320 && allies.length < CFG.maxAllies) startTurn(e, false);
+      if (e.__turnAt && now > e.__turnAt && !e.__turning && dist(e, p) < 320 && allies.length < CFG.maxAllies) startTurn(e, 'heart');
     }
-    updateFeuds(dt, foes); updateTurns(dt); chatter(dt, p, foes); legendTick(dt, p, foes); reactions(p, foes); convoTick(dt, p, foes);
+    updateFeuds(dt, foes); updateTurns(dt); accidents(dt, p, foes); chatter(dt, p, foes); legendTick(dt, p, foes); reactions(p, foes); convoTick(dt, p, foes);
     updateScene(dt, p); updateAllies(dt, p, foes.filter(e => !e.gone));
   }
   let hooked = false;
@@ -457,7 +533,7 @@
         const f = this.__feud; if (f && !f.dead) { this.touchCd = Math.max(Number(this.touchCd) || 0, 0.3);
           const fd = feuds.find(q => q.a === this || q.b === this); if (fd && fd.b === this && !fd.bFights) { const a = Math.atan2(this.y - f.y, this.x - f.x); arguments[1] = { x: this.x + Math.cos(a) * 200, y: this.y + Math.sin(a) * 200, r: 1, dead: false, hp: 1, maxHp: 1, hurt() {} }; }
           else arguments[1] = f; return eup.apply(this, arguments); }
-        const p = N.Game.player; if (allies.length && p && !this.boss) { let best = null, bd = p.dead ? Infinity : dist(this, p) - 40; for (const a of allies) if (!a.dead && dist(this, a) < bd) { bd = dist(this, a); best = a; } if (best) arguments[1] = best.proxy; }
+        const p = N.Game.player; if (allies.length && p && !this.boss) { let best = null, bd = p.dead ? Infinity : dist(this, p) - 40; for (const a of allies) if (!a.dead && dist(this, a) < bd) { bd = dist(this, a); best = a; } if (best) arguments[1] = best.caster || best; }
       }
       return eup.apply(this, arguments); };
     const ed = N.Enemy.prototype.draw;   // climbing / hopping Pokemon leave the ground
@@ -501,7 +577,6 @@
       const t = '♪ ' + label(e) + nat(e); ctx.strokeText(t, e.x, y); ctx.fillText(t, e.x, y); ctx.restore(); }
     for (const e of feuds) for (const w of [e.a, e.b]) { if (w.dead) continue; const y = w.y - (w.bodyH || 40) - 8; ctx.save(); ctx.globalAlpha = 0.6 + 0.4 * Math.sin(now * 10); ctx.fillStyle = '#ff4a3a'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('💢', w.x + 10, y); ctx.restore(); }
     for (const e of live) if (e.__turning && !e.dead) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gr = ctx.createRadialGradient(e.x, e.y - 14, 2, e.x, e.y - 14, 34); gr.addColorStop(0, 'rgba(255,180,220,.5)'); gr.addColorStop(1, 'rgba(255,120,200,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(e.x, e.y - 14, 34, 0, TAU); ctx.fill(); ctx.restore(); }
-    for (const s of shots) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = TYPE_COL[s.a.type] || '#fff'; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(s.x, s.y, 4.5, 0, TAU); ctx.fill(); ctx.restore(); }
     for (const f of fx) { if (f.t < 0) continue; if (f.obj) { ctx.save(); overlay(ctx, f, f.obj, now); ctx.restore(); continue; } const u = f.t / f.life, a = Math.max(0, 1 - u); ctx.save(); ctx.globalAlpha = a;
       if (f.kind === 'heart') heart(ctx, f.x, f.y, 5, '#ff5a8a');
       else if (f.kind === 'note') { ctx.fillStyle = '#7a4cff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(Math.floor(f.x) % 2 ? '♪' : '♫', f.x, f.y); }
