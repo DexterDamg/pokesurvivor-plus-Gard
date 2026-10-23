@@ -1,0 +1,45 @@
+Build 3 dialogue-box correction
+
+- At most three simultaneous speakers, with one active box per Pokemon.
+- Scripted and object-backed lines use the same speaker identity.
+- One pending line per Pokemon; repeated lines cannot fill the queue.
+- A waiting line from an active speaker does not block other speakers.
+- A four-second speaker pause follows each completed line.
+- Priority lines wait for space instead of evicting another speaker.
+- Lake Trio passive dialogue and party-presence gates are preserved.
+- Automated scheduler checks passed; full graphical gameplay is not verified.
+
+Previous build changes retained:
+
+PokeSurvivor revised build 2
+
+Run Start Game.cmd after extracting the entire folder.
+
+Enemy population:
+- Total budget: min(40, 16 + floor((player level - 1) / 3)).
+- Normal enemies leave two reserved slots for bosses. Boss arrivals can replace a normal enemy at the total cap.
+- Standard enemies spawn at visible screen edges, inset by 24 world units. Positions are checked for traversable ground.
+- Normal enemies more than 96 world units outside the viewport are removed without KO, XP or loot. Scripted bosses are retained.
+- Removed the pressure system's extra 24-enemy overflow and delayed distant-enemy recycling.
+- The host controls these rules in multiplayer; clients follow the host's enemy state.
+
+Level progression:
+- Evolution requirements come from the game's own evolution data. Gabite unlocks at 24; Garchomp at 48; Pidgeotto at 18.
+- Basic low-stat Pokemon, including Pidgey, populate the early pool. Strong unevolved species have a stat-based minimum level.
+- Newly unlocked species carry more encounter weight; older rookie species remain possible at reduced relative odds.
+- Shared admission checks cover base-game spawns, waves and rare encounters. Wild evolution also checks the player's level.
+- Scripted Legendary bosses retain their encounter identities. Ordinary evolved bosses obey the evolution gates.
+- Normal HP, damage and speed scale by player level rather than elapsed run time. Special AI patterns begin at level 12.
+
+Lake Trio dialogue:
+- Replaced lonely/overdramatic solo lines with self-contained lines for Uxie, Mesprit and Azelf.
+- Added two pair-specific chat lines per sister pairing and speaker.
+- Named references to absent sisters are blocked. Plural sister/three-member lines require all three guardians alive and present.
+- Spawning sisters do not count as present. A queued line is rechecked when it reaches the display.
+
+Checks passed:
+- JavaScript syntax for every revised module.
+- Actual engine runtime tests: level thresholds; early/late species weights; 1,000 spawn attempts constrained to the cap; visible edge placement; reserved bosses; reward-free culling.
+- Actual dialogue module tests: alone; only Uxie; only Mesprit; both sisters; still-spawning sister; fainted sister; stale queued-line permission.
+
+This build includes the previous dialogue and transformation changes. Legacy definitions/text remain in the supplied obfuscated bundle. Full graphical gameplay and multiplayer have not been soak-tested, and zero lag/crashes cannot be guaranteed.
