@@ -9,6 +9,9 @@
      5-second pulse (stun / confuse / drain / heal, with thanks from her sisters).
    Personalities: Uxie (knowledge) calm, logical, quietly protective · Mesprit (emotion) warm, teasing, empathic ·
    Azelf (willpower) brash, hot-headed, secretly the softest of the three. Needs js/lake-trio.js.
+   Up to THREE talk boxes show at once, stacked just above one another (newest at the bottom), so wild Pokemon
+   (js/wild-life.js) and companions can talk over each other like a real conversation. Pokemon without a local
+   portrait sheet use their PMD SpriteCollab portrait (or, failing that, their own sprite).
    Everything here is drawn only on your own screen (never sent to the other players in co-op). */
 (() => {
   'use strict';
@@ -117,47 +120,82 @@
       item: [['determined', 'Mine! ...What does it do? Doesn\'t matter, it\'s mine!', 'exclaim'], ['happy', 'Ha! Even stronger now!', 'spark']],
       mystic: { power: [['determined', 'Mystical Power! Faster, stronger — ALL of us!', 'spark'], ['shouting', 'Take my willpower, sisters! Hit HARDER!', 'spark'], ['joyous', 'You feel that?! That\'s us!', 'spark']] } } };
 
-  // ================= talk box =================
+  // ================= talk boxes (three, stacked) =================
   const css = document.createElement('style');
   css.textContent = `
-  #ps-lake-talk{position:fixed;left:16px;bottom:132px;z-index:60;width:min(440px,calc(100vw - 32px));display:flex;gap:10px;align-items:stretch;pointer-events:none;
+  .ps-talk{position:fixed;left:16px;bottom:132px;z-index:60;width:min(440px,calc(100vw - 32px));display:flex;gap:10px;align-items:stretch;pointer-events:none;
     padding:8px;border-radius:12px;background:linear-gradient(180deg,#2c519f,#1a3170);border:3px solid #f4f8ff;box-shadow:inset 0 0 0 2px #5b83d6,0 4px 0 rgba(0,0,0,.35);
-    color:#fff;font:15px Pixelify,system-ui,sans-serif;opacity:0;transform:translateY(12px);transition:opacity .2s,transform .2s}
-  #ps-lake-talk.on{opacity:1;transform:none}
-  #ps-lake-talk .pf{flex:none;width:80px;height:80px;border-radius:6px;border:3px solid #f4f8ff;box-shadow:0 0 0 2px #0b1838;background-repeat:no-repeat;background-size:400px 320px;image-rendering:pixelated;background-color:#0b1838}
-  #ps-lake-talk .tx{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
-  #ps-lake-talk .nm{font-weight:700;font-size:16px;margin-bottom:2px;text-shadow:2px 2px 0 #0b1838}
-  #ps-lake-talk .ln{line-height:1.3;text-shadow:1px 1px 0 #0b1838;min-height:2.6em}
-  @media (max-width:700px),(max-height:520px){#ps-lake-talk{bottom:auto;top:58px;font-size:13px}#ps-lake-talk .pf{width:60px;height:60px;background-size:300px 240px}}`;
-  const box = document.createElement('div'); box.id = 'ps-lake-talk';
-  box.innerHTML = '<div class="pf"></div><div class="tx"><div class="nm"></div><div class="ln"></div></div>';
-  const pf = box.querySelector('.pf'), nm = box.querySelector('.nm'), ln = box.querySelector('.ln');
-  const queue = []; let cur = null, lastLow = -1e9;
-  function face(dex, f) { let i = FACE[f] ?? 0; if (HAS[dex] && !HAS[dex].includes(i)) i = BRAVE.includes(f) ? HAS[dex][0] : HAS[dex][HAS[dex].length - 1]; const _ = 0, k = pf.offsetWidth / 40 || 2; pf.style.backgroundImage = 'url(assets/portraits/' + dex + '.png)'; pf.style.backgroundPosition = -(i % 5) * 40 * k + 'px ' + -Math.floor(i / 5) * 40 * k + 'px'; }
+    color:#fff;font:15px Pixelify,system-ui,sans-serif;opacity:0;transform:translateY(12px);transition:opacity .2s,transform .25s,bottom .25s,top .25s;transform-origin:left bottom}
+  .ps-talk.on{opacity:1;transform:none}
+  .ps-talk.old{opacity:.9;transform:scale(.95)}
+  .ps-talk.wild{background:linear-gradient(180deg,#3d6b33,#24461f);box-shadow:inset 0 0 0 2px #7fb36a,0 4px 0 rgba(0,0,0,.35)}
+  .ps-talk.foe{background:linear-gradient(180deg,#8a2f35,#561a20);box-shadow:inset 0 0 0 2px #d06a6a,0 4px 0 rgba(0,0,0,.35)}
+  .ps-talk .pf{position:relative;flex:none;width:80px;height:80px;border-radius:6px;border:3px solid #f4f8ff;box-shadow:0 0 0 2px #0b1838;background-repeat:no-repeat;background-size:400px 320px;image-rendering:pixelated;background-color:#0b1838;overflow:hidden}
+  .ps-talk .pf canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:none}
+  .ps-talk .tx{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+  .ps-talk .nm{font-weight:700;font-size:16px;margin-bottom:2px;text-shadow:2px 2px 0 #0b1838}
+  .ps-talk .ln{line-height:1.3;text-shadow:1px 1px 0 #0b1838;min-height:2.6em}
+  @media (max-width:700px),(max-height:520px){.ps-talk{bottom:auto;top:58px;font-size:13px;transform-origin:left top}.ps-talk .pf{width:60px;height:60px;background-size:300px 240px}}`;
+  const slots = [0, 1, 2].map(i => { const el = document.createElement('div'); el.className = 'ps-talk'; el.id = i ? 'ps-lake-talk-' + (i + 1) : 'ps-lake-talk';
+    el.innerHTML = '<div class="pf"><canvas width="80" height="80"></canvas></div><div class="tx"><div class="nm"></div><div class="ln"></div></div>';
+    return { el, pf: el.querySelector('.pf'), cv: el.querySelector('canvas'), nm: el.querySelector('.nm'), ln: el.querySelector('.ln'), cur: null }; });
+  const box = slots[0].el;
+  const queue = []; let order = [], lastLow = -1e9, lastStart = -1e9, lastType = 0;   // order: the boxes on screen, newest first
+  const LOCAL = new Set([480, 481, 482, 483, 484, 487, 529, 530]);
+  const EMO = { normal: 'Normal', happy: 'Happy', pain: 'Pain', angry: 'Angry', worried: 'Worried', sad: 'Sad', crying: 'Crying', shouting: 'Shouting', teary: 'Teary-Eyed', determined: 'Determined', joyous: 'Joyous', inspired: 'Inspired', surprised: 'Surprised', dizzy: 'Dizzy', sigh: 'Sigh', stunned: 'Stunned' };
+  const SC = (dex, e) => 'https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait/' + String(dex).padStart(4, '0') + '/' + e + '.png';
+  const known = {};   // portrait url -> true (loads) / false (missing) / null (checking)
+  function probe(url) { if (url in known) return known[url]; known[url] = null; const i = new Image(); i.onload = () => { known[url] = true; }; i.onerror = () => { known[url] = false; }; i.src = url; return null; }
+  function face(sl, it) {
+    const dex = Number(it.dex), f = it.face, k = sl.pf.offsetWidth / 40 || 2; sl.cv.style.display = 'none'; sl.drawn = false;
+    if (LOCAL.has(dex)) { let i = FACE[f] ?? 0; if (HAS[dex] && !HAS[dex].includes(i)) i = BRAVE.includes(f) ? HAS[dex][0] : HAS[dex][HAS[dex].length - 1];
+      sl.pf.style.backgroundImage = 'url(assets/portraits/' + dex + '.png)'; sl.pf.style.backgroundSize = ''; sl.pf.style.backgroundPosition = -(i % 5) * 40 * k + 'px ' + -Math.floor(i / 5) * 40 * k + 'px'; return; }
+    const uF = SC(dex, EMO[f] || 'Normal'), uN = SC(dex, 'Normal'); probe(uF); probe(uN);   // the emotion if it exists, Normal behind it
+    sl.pf.style.backgroundImage = 'url(' + uF + '),url(' + uN + ')'; sl.pf.style.backgroundSize = '100% 100%,100% 100%'; sl.pf.style.backgroundPosition = '0 0,0 0';
+  }
+  function spriteFace(sl, it) {   // no portrait anywhere: the Pokemon's own sprite, zoomed in
+    const N = E(); if (!N || sl.drawn) return; sl.drawn = true; try { const a = new N.Sprites.Animator(Number(it.dex), 1, !!it.shiny); const c = sl.cv.getContext('2d'); c.clearRect(0, 0, 80, 80); c.imageSmoothingEnabled = false;
+      c.fillStyle = '#d8e8c0'; c.fillRect(0, 0, 80, 80); c.save(); c.translate(40, 70); c.scale(1.6, 1.6); a.draw(c, 0, 0); c.restore(); sl.cv.style.display = 'block'; setTimeout(() => { if (sl.cur && sl.cur.it === it) { sl.drawn = false; spriteFace(sl, it); } }, 400); } catch (_) {} }
   const recent = {};
   function pick(list) { if (!list || !list.length) return null; const key = list[0][1]; const last = recent[key]; let i = Math.floor(Math.random() * list.length); if (list.length > 1 && i === last) i = (i + 1) % list.length; recent[key] = i; return list[i]; }
+  const busy = () => order.length > 0 || queue.length > 0;
   // say: dex speaks one of the lines; prio lines skip the gap and cut the queue
   function say(dex, list, o) {
     o = o || {}; const ln0 = pick(list); if (!ln0 || !NAME[dex]) return false; const now = clock();
-    if (!o.prio && !o.follow && (cur || queue.length || now - lastLow < CFG.gap)) return false;   // follow: a reply chained to the line just queued
+    if (!o.prio && !o.follow && (busy() || now - lastLow < CFG.gap)) return false;   // follow: a reply chained to the line just queued
     if (!o.prio) lastLow = now;
-    const item = { dex, face: ln0[0], text: ln0[1].replace(/\{name\}/g, o.name || ''), emote: ln0[2], delay: o.delay || 0 };
+    const item = { dex, face: ln0[0], text: ln0[1].replace(/\{name\}/g, o.name || ''), emote: ln0[2], delay: o.delay || 0, prio: !!o.prio };
     if (o.prio && queue.length > 2) queue.splice(0, queue.length - 2);
     if (o.front) queue.unshift(item); else queue.push(item); return true;   // front: urgent, it plays next
   }
   const clock = () => performance.now() / 1000;
-  function show(it) { cur = { it, t: 0, dur: it.dur || Math.max(2.8, Math.min(6, 1.6 + it.text.length * 0.045)) }; nm.textContent = NAME[it.dex]; nm.style.color = COLOR[it.dex]; face(it.dex, it.face); ln.textContent = ''; box.classList.add('on'); if (it.emote) emote(it.dex, it.emote); }
-  function tickBox(dt) {
-    if (!cur) { const nx = queue[0]; if (nx) { nx.delay -= dt; if (nx.delay <= 0) show(queue.shift()); } return; }
-    cur.t += dt; const n = Math.min(cur.it.text.length, Math.floor(cur.t * 45)); if (ln.textContent.length !== n) ln.textContent = cur.it.text.slice(0, n);
-    if (cur.t >= cur.dur) { cur = null; if (!queue.length) box.classList.remove('on'); }
+  function layout() { const small = matchMedia('(max-width:700px),(max-height:520px)').matches;
+    order.forEach((sl, i) => { const h = sl.el.offsetHeight || 100, off = i * (h + 6); if (small) { sl.el.style.top = 58 + off + 'px'; sl.el.style.bottom = 'auto'; } else { sl.el.style.bottom = 132 + off + 'px'; sl.el.style.top = 'auto'; } sl.el.classList.toggle('old', i > 0); }); }
+  function end(sl) { sl.cur = null; sl.el.classList.remove('on', 'old'); order = order.filter(x => x !== sl); layout(); }
+  function show(it) {
+    let sl = slots.find(x => !x.cur); if (!sl) { sl = order[order.length - 1]; end(sl); }
+    sl.cur = { it, t: 0, dur: it.dur || Math.max(2.8, Math.min(6, 1.6 + it.text.length * 0.045)) };
+    sl.nm.textContent = it.name || NAME[it.dex] || ('#' + it.dex); sl.nm.style.color = it.color || COLOR[it.dex] || '#fff';
+    sl.el.classList.toggle('wild', it.kind === 'wild' || it.kind === 'ally'); sl.el.classList.toggle('foe', it.kind === 'foe');
+    face(sl, it); sl.ln.textContent = ''; order.unshift(sl); sl.el.classList.add('on'); layout();
+    lastStart = clock(); lastType = it.text.length / 45;
+    if (it.emote) { if (it.obj) emoteAt(it.obj, it.emote); else emote(it.dex, it.emote); }
   }
+  function tickBox(dt) {
+    for (const sl of order.slice()) { const c = sl.cur; c.t += dt; const n = Math.min(c.it.text.length, Math.floor(c.t * 45)); if (sl.ln.textContent.length !== n) sl.ln.textContent = c.it.text.slice(0, n);
+      if (!LOCAL.has(Number(c.it.dex)) && known[SC(c.it.dex, 'Normal')] === false) spriteFace(sl, c.it);
+      if (c.t >= c.dur) end(sl); }
+    const nx = queue[0]; if (!nx) return; nx.delay -= dt;
+    if (nx.delay <= 0 && clock() - lastStart >= lastType + 0.35 && (slots.some(x => !x.cur) || nx.prio)) show(queue.shift());   // the next line waits for the last one to finish typing
+  }
+  function clearAll() { queue.length = 0; for (const sl of slots) if (sl.cur) end(sl); }
 
   // ================= emote bubbles (world space) =================
   const emotes = [];
   const places = {};   // guests (Dialga, Palkia): where their emotes pop up
   function where(dex) { if (places[dex]) return places[dex]; const p = E()?.Game?.player; if (p && Number(p.dex) === Number(dex)) return p; const s = window.PS_LAKE?._ally?.(dex); return s && !s.dead && s.spawnT >= 1.4 ? s : null; }
-  function emote(dex, kind) { for (let i = emotes.length - 1; i >= 0; i--) if (emotes[i].dex === dex) emotes.splice(i, 1); emotes.push({ dex, kind, t: 0, life: 2.4, hearts: kind === 'heart' ? [0, 1, 2].map(i => ({ dx: (i - 1) * 9, d: i * 0.25 })) : null }); }
+  function emote(dex, kind) { for (let i = emotes.length - 1; i >= 0; i--) if (emotes[i].dex === dex && !emotes[i].obj) emotes.splice(i, 1); emotes.push({ dex, kind, t: 0, life: 2.4, hearts: kind === 'heart' ? [0, 1, 2].map(i => ({ dx: (i - 1) * 9, d: i * 0.25 })) : null }); }
+  function emoteAt(obj, kind, life) { if (!obj) return; for (let i = emotes.length - 1; i >= 0; i--) if (emotes[i].obj === obj) emotes.splice(i, 1); if (emotes.length > 14) emotes.shift(); emotes.push({ obj, kind, t: 0, life: life || 2.2, hearts: kind === 'heart' ? [0, 1, 2].map(i => ({ dx: (i - 1) * 9, d: i * 0.25 })) : null }); }
   function heartPath(ctx, x, y, s) { ctx.beginPath(); ctx.moveTo(x, y + s * 0.35); ctx.bezierCurveTo(x - s * 1.1, y - s * 0.35, x - s * 0.45, y - s * 1.05, x, y - s * 0.4); ctx.bezierCurveTo(x + s * 0.45, y - s * 1.05, x + s * 1.1, y - s * 0.35, x, y + s * 0.35); }
   function drop(ctx, x, y, s, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y - s); ctx.quadraticCurveTo(x + s * 0.8, y, x, y + s * 0.55); ctx.quadraticCurveTo(x - s * 0.8, y, x, y - s); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(x - s * 0.25, y - s * 0.2, s * 0.2, s * 0.35); }
   function drawEmote(ctx, e, x, y) {
@@ -175,7 +213,7 @@
     ctx.restore();
     if (e.hearts) for (const h of e.hearts) { const u = e.t - h.d; if (u <= 0 || u > 1.6) continue; ctx.save(); ctx.globalAlpha = Math.max(0, 1 - u / 1.6); heartPath(ctx, x + h.dx + Math.sin(u * 5 + h.dx) * 4, y - 16 - u * 26, 4.5); ctx.fillStyle = '#ff6a9a'; ctx.fill(); ctx.restore(); }
   }
-  function drawEmotes(ctx) { for (const e of emotes) { const w = where(e.dex); if (!w) continue; const h = Number(w.bodyH) || 40; drawEmote(ctx, e, w.x + 14, w.psLake !== undefined || w.caster ? w.y - 78 : w.y - h - 30); } }   // allies: above their name label
+  function drawEmotes(ctx) { for (const e of emotes) { const w = e.obj ? (e.obj.dead || e.obj.gone ? null : e.obj) : where(e.dex); if (!w) continue; if (e.obj) { drawEmote(ctx, e, w.x + 12, w.y - (Number(w.bodyH) || 40) - 26 - (w.lift || 0)); continue; } const h = Number(w.bodyH) || 40; drawEmote(ctx, e, w.x + 14, w.psLake !== undefined || w.caster ? w.y - 78 : w.y - h - 30); } }   // allies: above their name label
 
   // ================= what they react to =================
   let runP = null, aloneT = 0, chatT = 0, lastHp = 0, low = false, bigCd = 0, bossCd = 0, lvl = 0, lostLastCd = 0;
@@ -211,7 +249,7 @@
     else if (d.type === 'mesprit') {   // Mesprit's 5-second pulse
       if (Math.random() < 0.35 && say(481, L[481].pulse[d.kind]) && d.kind === 'heal') { const others = party().filter(x => x !== 481 && L[x].thanks); const by = others[Math.floor(Math.random() * others.length)]; if (by && Math.random() < 0.5) say(by, L[by].thanks, { delay: 0.2, follow: true }); } }
     else if (d.type === 'item') say(dex, L[dex] && L[dex].item);
-    else if (d.type === 'tether') { const t = clock(); if (t - (onLake.tetherAt || -99) > 15) { onLake.tetherAt = t; say(dex, L[dex] && L[dex].tether, { prio: true, front: true }); if (cur && cur.it.dex !== dex) cur.dur = Math.min(cur.dur, cur.t + 0.4); } }
+    else if (d.type === 'tether') { const t = clock(); if (t - (onLake.tetherAt || -99) > 15) { onLake.tetherAt = t; say(dex, L[dex] && L[dex].tether, { prio: true, front: true }); for (const sl of order) if (sl.cur.it.dex !== dex) sl.cur.dur = Math.min(sl.cur.dur, sl.cur.t + 0.4); } }
     else if (d.type === 'mystical') {   // Mystical Power buffing the sisters
       const S = L[dex] && L[dex].mystic && L[dex].mystic[d.kind]; if (S && Math.random() < (d.kind === 'boost' || d.kind === 'fear' ? 0.5 : 0.35)) say(dex, S); }
     else if (d.type === 'z') { const all = party(); all.forEach((by, i) => say(by, L[by].z, { prio: true, delay: i * 0.25 })); }
@@ -219,8 +257,8 @@
   addEventListener('ps-lake', onLake);
   function watch(dt) {
     const N = E(), g = N?.Game, p = me();
-    if (!p || !g || g.state === 'over' || g.state === 'ui') { if (runP) { runP = null; queue.length = 0; cur = null; box.classList.remove('on'); emotes.length = 0; } return; }
-    if (p !== runP) { runP = p; aloneT = 3; chatT = rnd(...CFG.chatEvery); lastHp = p.hp; low = false; lvl = p.level; bigCd = 0; bossCd = 0; queue.length = 0; cur = null; }
+    if (!p || !g || g.state === 'over' || g.state === 'ui') { if (runP) { runP = null; clearAll(); emotes.length = 0; } return; }
+    if (p !== runP) { runP = p; aloneT = 3; chatT = rnd(...CFG.chatEvery); lastHp = p.hp; low = false; lvl = p.level; bigCd = 0; bossCd = 0; clearAll(); }
     if (g.state !== 'playing' || scene()) { if (scene()) lastHp = p.hp; return; }
     const P = Number(p.dex), allies = live(), alone = !allies.length && !(window.PS_LAKE?.allies || []).some(a => a.spawning);
     // alone: lonely, sad, scared
@@ -239,13 +277,16 @@
   let last = performance.now();
   function loop(now) { requestAnimationFrame(loop); const dt = Math.min(0.1, (now - last) / 1000); last = now; try { watch(dt); tickBox(dt); for (let i = emotes.length - 1; i >= 0; i--) if ((emotes[i].t += dt) > emotes[i].life) emotes.splice(i, 1); } catch (e) { console.warn('[lake-talk]', e); } }
   let hooked = false;
-  function hook() { const N = E(); if (hooked || !N || !N.Ult || !N.Ult.drawUnits) return; hooked = true; const du = N.Ult.drawUnits; N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { if (me() || Object.keys(places).length) drawEmotes(ctx); } catch (e) { console.warn('[lake-talk]', e); } }; }
-  function init() { document.head.append(css); document.body.append(box); for (const d of [480, 481, 482, 483, 484, 487, 529, 530]) { const i = new Image(); i.src = 'assets/portraits/' + d + '.png'; } (function h() { hook(); if (!hooked) setTimeout(h, 200); })(); requestAnimationFrame(loop); }
+  function hook() { const N = E(); if (hooked || !N || !N.Ult || !N.Ult.drawUnits) return; hooked = true; const du = N.Ult.drawUnits; N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { if (me() || Object.keys(places).length || emotes.some(e => e.obj)) drawEmotes(ctx); } catch (e) { console.warn('[lake-talk]', e); } }; }
+  function init() { document.head.append(css); for (const sl of slots) document.body.append(sl.el); for (const d of [480, 481, 482, 483, 484, 487, 529, 530]) { const i = new Image(); i.src = 'assets/portraits/' + d + '.png'; } (function h() { hook(); if (!hooked) setTimeout(h, 200); })(); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
-  // a line from another companion (js/digger-bros.js): queued like the trio's, prio / front like say()
-  function line(dex, f, text, em, o) { o = o || {}; const now = clock(); if (scene() && !o.scene) return false; if (!o.prio && !o.follow && (cur || queue.length || now - lastLow < CFG.gap)) return false; if (!o.prio) lastLow = now;
-    const item = { dex, face: f, text, emote: em, delay: o.delay || 0, dur: o.dur }; if (o.prio && queue.length > 2) queue.splice(0, queue.length - 2); if (o.front) queue.unshift(item); else queue.push(item); return true; }
+  // a line from anyone else (js/digger-bros.js, js/wild-life.js): queued like the trio's, prio / front like say().
+  // o.name / o.color / o.kind ('wild' | 'foe' | 'ally') / o.obj (the Pokemon the emote pops over) for Pokemon outside the NAME list
+  function line(dex, f, text, em, o) { o = o || {}; const now = clock(); if (scene() && !o.scene) return false;
+    if (!o.prio && !o.follow && (busy() || now - lastLow < (o.gap ?? CFG.gap))) return false; if (!o.prio) lastLow = now;
+    const item = { dex, face: f, text, emote: em, delay: o.delay || 0, dur: o.dur, prio: !!o.prio, name: o.name, color: o.color, kind: o.kind, obj: o.obj, shiny: o.shiny };
+    if (o.prio && queue.length > 4) queue.splice(0, queue.length - 4); if (o.front) queue.unshift(item); else queue.push(item); return true; }
   // a cutscene line: shown right away for a fixed time (clears whatever was waiting)
-  function cut(dex, f, text, em, dur) { queue.length = 0; show({ dex, face: f, text, emote: em, dur }); }
-  window.PS_LAKE_TALK = { cut, line, place: (dex, obj) => { if (obj) places[dex] = obj; else delete places[dex]; }, hide: () => { cur = null; queue.length = 0; box.classList.remove('on'); }, lines: L, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, cfg: CFG };
+  function cut(dex, f, text, em, dur) { clearAll(); show({ dex, face: f, text, emote: em, dur }); }
+  window.PS_LAKE_TALK = { cut, line, place: (dex, obj) => { if (obj) places[dex] = obj; else delete places[dex]; }, hide: clearAll, lines: L, faces: FACE, say: (dex, situation, name) => say(Number(dex), (L[dex] || {})[situation], { prio: true, name }), emote, emoteAt, busy, cfg: CFG };
 })();
