@@ -42,58 +42,14 @@
   const label = w => w.name + (w.__g === 'm' || w.g === 'm' ? ' ♂' : w.__g === 'f' || w.g === 'f' ? ' ♀' : '');
   const harmless = e => !!(e && e.__role);
   const COL = { wild: '#c8ffaa', foe: '#ffb0a0', ally: '#9ad8ff' };
-  function say(w, kind, face, text, em, o) { o = o || {}; try { return T().line(w.dex, face, text.replace(/\{(\w+)\}/g, (_, k) => o[k] || ''), em, Object.assign({ name: label(w), color: COL[kind], kind, obj: w, shiny: w.shiny }, o)); } catch (_) { return false; } }
-  const sayL = (w, kind, list, o) => { const l = pick(list); return say(w, kind, l[0], l[1], l[2], o); };
+  function say(w, kind, face, text, em, o) { o = o || {}; try { return T().line(w.dex, face, text.replace(/\{(\w+)\}/g, (_, k) => o[k] || ''), em, Object.assign({ name: label(w) + nat(w), color: COL[kind], kind, obj: w, shiny: w.shiny }, o)); } catch (_) { return false; } }
+  const V = () => window.PS_VOICE;   // js/wild-voice.js: every line is generated from the Pokemon's own nature, type and situation
+  function speak(w, kind, sit, o) { o = o || {}; const v = V(); if (!v) return false; const l = v.line(w, sit, o); return say(w, kind, l[0], l[1], l[2], o); }
+  const vb = (w, k) => (V() ? V().bubble(w, k) : '...');
+  const nat = w => { const v = V() && V().who(w); return v ? ' · ' + v.nature : ''; };
   const emo = (w, k) => { try { T().emoteAt(w, k); } catch (_) {} };
   const bubbles = [];   // little speech bubbles over heads (for small talk that shouldn't fill the talk box)
   function bubble(w, text, life) { if (!w || w.dead) return; for (let i = bubbles.length - 1; i >= 0; i--) if (bubbles[i].obj === w) bubbles.splice(i, 1); if (bubbles.length > 7) bubbles.shift(); bubbles.push({ obj: w, text, t: 0, life: life || 2.2 }); }
-
-  // ================= lines =================
-  const LN = {
-    meet: [['happy', 'Oh! A traveler! Be careful out there, okay?', 'note'], ['normal', 'Nice day for a walk, isn\'t it?', 'note'], ['worried', 'P-please don\'t hurt me... I\'m just passing through!', 'sweat'],
-      ['worried', 'The mean ones have been extra grumpy lately...', 'sweat'], ['happy', 'Mmm... this spot is so sunny and warm.', 'note'], ['sad', 'Have you seen my friend? ...No? Okay...', 'dots'],
-      ['joyous', 'Are you an explorer? That\'s so cool!', 'spark'], ['normal', 'Shh... I\'m looking for berries.', 'dots'], ['happy', 'You look strong! Could you keep the bullies away from here?', 'note']],
-    hurt: [['pain', 'Ow! Why?! I wasn\'t doing anything!', 'tear'], ['crying', 'H-hey! What did I do to you?!', 'tear'], ['pain', 'Ouch! Stop it, please!', 'tear'], ['crying', 'I-I\'m not one of them! I\'m just living here!', 'tear']],
-    provoked: [['angry', 'That\'s IT! You asked for it!', 'anger'], ['shouting', 'Fine! You want a fight?! You GOT one!', 'anger'], ['angry', 'I was minding my own business... NOT ANYMORE!', 'anger']],
-    die: [['crying', 'W-why...?', 'tear'], ['sad', 'I just wanted to... play...', 'tear'], ['crying', 'Mom...?', 'tear'], ['sad', 'It was such... a nice day...', 'tear']],
-    witness: [['shouting', 'NO! Leave them alone!', 'anger'], ['angry', 'You MONSTER!', 'anger'], ['crying', 'Why would you DO that?!', 'tear'], ['crying', 'They never hurt anybody!', 'tear']],
-    witnessSame: [['crying', 'My friend...! NOOO!', 'tear'], ['crying', 'Wake up! Please, WAKE UP!', 'tear'], ['shouting', 'You\'ll pay for that! They were my FAMILY!', 'anger']],
-    taunt: [['angry', 'This is OUR turf! Get lost!', 'anger'], ['shouting', 'An intruder! Get \'em!', 'exclaim'], ['angry', 'You don\'t belong here!', 'anger'], ['happy', 'Hah! You look weak!', 'note'],
-      ['determined', 'Finally, something to beat up!', 'anger'], ['angry', 'Grrr... outsider!', 'anger'], ['shouting', 'You picked the wrong dungeon!', 'exclaim']],
-    low: [['pain', 'I-I\'ll remember this!', 'sweat'], ['worried', 'Ow ow ow! Retreat!', 'sweat'], ['angry', 'N-no fair!', 'anger'], ['pain', 'You haven\'t seen the last of me!', 'sweat']],
-    avenge: [['angry', 'N-no! You\'ll pay for that!', 'anger'], ['shouting', 'Buddy!! ...You MONSTER!', 'anger']],
-    boss: [['determined', 'So YOU\'RE the one making all this noise...', 'anger'], ['angry', 'This is MY domain. Leave... or be buried here.', 'anger'], ['inspired', 'Finally. A challenger worth my time.', 'spark']],
-    thief: [['joyous', 'Shiny things are MINE!', 'spark'], ['happy', 'Ooh, what\'s in your bag? Gimme!', 'note']],
-    turn1: [['worried', '...Wait. Why am I even fighting you?', 'question'], ['sad', 'These guys never even share their berries with me...', 'dots'], ['surprised', 'I\'ve been watching you fight... you\'re kind of amazing.', 'question']],
-    turn2: [['joyous', 'You know what? I\'d rather team up with YOU!', 'heart'], ['happy', 'Forget them! Can I join your team?!', 'heart'], ['determined', 'I\'m switching sides! Let\'s go, partner!', 'heart']],
-    beg: [['teary', 'P-please... I don\'t want to fight anymore... can I come with you instead?', 'tear']],
-    allyKill: [['joyous', 'Got one!', 'spark'], ['determined', 'Take that!', 'anger'], ['happy', 'Did you see that? Did you SEE that?!', 'note']],
-    allyLow: [['pain', 'Ow... I\'m hanging in there!', 'sweat'], ['worried', 'Th-they hit hard...', 'sweat']],
-    allyIdle: [['happy', 'Thanks for letting me tag along!', 'heart'], ['determined', 'I\'ll protect you, partner!', 'exclaim'], ['normal', 'Those guys were mean to me anyway...', 'dots'], ['joyous', 'Team life is SO much better!', 'note']],
-    allyFaint: [['crying', 'S-sorry... I can\'t fight anymore... Thank you for taking me in...', 'tear']],
-    win: [['angry', 'Hmph! And STAY down!', 'anger'], ['joyous', 'HA! That\'ll teach you!', 'spark']],
-    truce: [['sigh', '...Fine. Truce. For now.', 'dots']],
-    home: [['happy', 'Now that THAT\'s settled... I\'m going home.', 'note']] };
-  const BUB = {   // speech-bubble small talk
-    swimTry: ['I can do it! I can sw— *blub blub*', 'Just one stroke... *glub*', 'Paddle, paddle... AAAH!'], swimFail: ['...Water is too wet.', '*cough* Maybe tomorrow.', 'Why can\'t I float?!'], swimOk: ['Ahh~ refreshing!', 'Splish splash~'],
-    climbTry: ['Hup! Hup!', 'Just... a little... higher...!', 'I can see the top!'], climbFall: ['Oof!', 'Owie...', '...One day I\'ll reach the top.'],
-    nap: ['Zzz...', '*snore*', '...five more minutes...'], wake: ['Wha—?!', 'H-huh?! I wasn\'t sleeping!'], eat: ['*munch munch*', 'Nom nom~', 'So juicy!'], sniff: ['Mmm, flowers~', 'So pretty...'],
-    dig: ['There\'s gotta be treasure here...', '*dig dig dig*'], digFound: ['Ooh! Treasure!', 'I found a coin!'], digNone: ['...Nothing. Again.', 'Just dirt...'],
-    tail: ['I\'ll get you this time!', 'Come back here, tail!'], dizzy: ['@_@', 'The ground is spinning...'], gaze: ['That cloud looks like a berry...', 'So peaceful...', 'I wonder what\'s past the trees...'],
-    play: ['Tag! You\'re it!', 'Hehe! Can\'t catch me!'], cry: ['*sniff*...', 'Waaah...'], shiny: ['Ooh, shiny!', 'So sparkly...'], cheer: ['Fight! Fight! Fight!', 'Get \'em!', 'Ooh, that\'s gotta hurt!'],
-    scared: ['Eek!', 'Run away!', 'Not again!'], lvl: ['Whoa! It\'s glowing!', 'What was THAT?!'], traitor: ['TRAITOR!', 'Hey! Get back here!'], bossFlee: ['That one\'s HUGE! Run!', 'Nope nope nope!'],
-    panic: { giratina: ['W-what IS that thing?!', 'The shadows are MOVING!', 'RUN!! Everyone RUN!', 'I don\'t wanna get eaten!', 'It\'s looking at us!'],
-      rift: ['The sky is TEARING!', 'Legendaries?! HERE?!', 'Time is... bending?!', 'Hide! HIDE!'],
-      kamina: ['What is he DOING?!', 'That drill is HUGE!', 'Duck!!', 'He\'s CRAZY!'], kaminaSad: ['...Poor little guy.', '...', 'He was so brave...'], stuck: ['I can\'t move!!', 'My legs won\'t work!', 'Mommyyy!'] } };
-  const GRUDGE = [
-    [['angry', 'HEY! {b}! You stole my Gold Ball!', 'anger'], ['happy', 'Finders keepers! Get lost!', 'note']],
-    [['angry', 'That Oran Berry was MINE, {b}!', 'anger'], ['happy', 'Should\'ve eaten it faster, then!', 'note']],
-    [['angry', 'You stepped on my tail AGAIN!', 'anger'], ['angry', 'Then keep your tail out of my way!', 'anger']],
-    [['shouting', 'You told everyone I can\'t evolve!', 'anger'], ['happy', 'Because you CAN\'T!', 'note']],
-    [['angry', 'This is MY napping spot, {b}!', 'anger'], ['angry', 'Your name isn\'t on it!', 'anger']],
-    [['angry', 'You laughed at my cry!', 'anger'], ['joyous', 'Because it\'s a FUNNY cry!', 'note']]];
-  const GRUDGE_SAME = [[['shouting', 'Give back my Gold Ball, you copycat!', 'anger'], ['angry', 'It\'s MY Gold Ball! We look the same, prove it\'s yours!', 'anger']],
-    [['angry', 'Mom always liked you better!', 'anger'], ['happy', 'That\'s because I\'m the cute one!', 'note']]];
 
   // ================= harmless Pokemon: roles and activities =================
   const seen = new WeakSet(), live = new Set(), fx = [];
@@ -101,7 +57,7 @@
   const special = e => e.boss || e.legend || e.__roamer || e.__maxRaid || e.__wave || e.__legendDen || e.remote || e.golden || e.judge || e.dummy || e.__psCatch;
   function setRole(e, role, act) { e.__role = role; if (!e.__spd0) e.__spd0 = Number(e.spd) || 50; e.__home = { x: e.x, y: e.y }; e.__act = act || null; e.__goal = null; e.__hp0 = Number(e.hp) || 0; }
   function clearRole(e) { e.__role = null; e.__act = null; e.__goal = null; e.__fleeT = 0; e.__sleep = false; }
-  function provoke(e) { if (!e.__role) return; clearRole(e); emo(e, 'anger'); sayL(e, 'foe', LN.provoked, { prio: true }); }
+  function provoke(e) { if (!e.__role) return; clearRole(e); emo(e, 'anger'); speak(e, 'foe', 'provoked', { prio: true }); }
   function template() { const N = E(); const src = N.EnemyMgr.all().find(e => e && !e.dead && !special(e) && e.def && !e.__role); if (src) return src.def; const t = (N.Enemies && N.Enemies.TIERS && N.Enemies.TIERS[0]) || { hp: 17, spd: 56, dmg: 6, xp: 3.5 }; return t; }
   function spawnWild(dex, x, y, o) {   // a real Pokemon (it can be hit and knocked out), harmless by role
     const N = E(), b = template(); o = o || {};
@@ -128,37 +84,38 @@
     if (e.__fleeT > 0) { e.__fleeT -= dt; const f = e.__fleeFrom && !e.__fleeFrom.dead ? e.__fleeFrom : p, a = Math.atan2(e.y - f.y, e.x - f.x); goal(e, e.x + Math.cos(a) * 90, e.y + Math.sin(a) * 90); e.__spdMul = 1.15;
       if (e.__crying && Math.random() < dt * 6) fx.push({ kind: 'tear', x: e.x + rnd(-6, 6), y: e.y - (e.bodyH || 40) * 0.7, vx: rnd(-40, 40), vy: -40, t: 0, life: 0.6, g: 300 }); return; }
     e.__crying = false; e.__spdMul = CFG.idleSpd; e.__sleep = false;
+    if (e.__chat) { e.__goal = null; return; }   // busy talking to someone
     if (e.__role !== 'idle') return;
     let a = e.__act; if (!a || a.t > a.dur || (a.mate && a.mate.dead)) a = e.__act = newAct(e, foes); a.t += dt;
     const home = e.__home || (e.__home = { x: e.x, y: e.y }), H = e.bodyH || 40;
     switch (a.kind) {
       case 'wander': if (!e.__goal || near(e, e.__goal)) { if ((a.w = (a.w || 0) - dt) <= 0) { const ang = Math.random() * TAU, r = rnd(30, 120); goal(e, home.x + Math.cos(ang) * r, home.y + Math.sin(ang) * r); a.w = rnd(1, 3); } else e.__goal = null; } break;
-      case 'nap': e.__goal = null; e.__sleep = true; if (Math.random() < dt * 1.6) fx.push({ kind: 'z', x: e.x + 8, y: e.y - H - 4, vx: rnd(6, 14), vy: -18, t: 0, life: 1.6 }); if (!a.said) { a.said = true; bubble(e, pick(BUB.nap)); }
-        if (dist(e, p) < 90 && !a.woke) { a.woke = true; emo(e, 'exclaim'); bubble(e, pick(BUB.wake)); a.dur = a.t + 1.5; } if (a.woke) e.__sleep = false; break;
-      case 'eat': e.__goal = null; if (!a.said) { a.said = true; fx.push({ kind: 'berry', obj: e, t: 0, life: a.dur }); } if ((a.n = (a.n || 0) - dt) <= 0) { a.n = rnd(1.5, 3); bubble(e, pick(BUB.eat), 1.2); if (Math.random() < 0.3) emo(e, 'note'); } break;
-      case 'sniff': e.__goal = null; if (!a.said) { a.said = true; fx.push({ kind: 'flower', obj: e, t: 0, life: a.dur }); emo(e, 'heart'); bubble(e, pick(BUB.sniff)); } break;
+      case 'nap': e.__goal = null; e.__sleep = true; if (Math.random() < dt * 1.6) fx.push({ kind: 'z', x: e.x + 8, y: e.y - H - 4, vx: rnd(6, 14), vy: -18, t: 0, life: 1.6 }); if (!a.said) { a.said = true; bubble(e, vb(e, 'nap')); }
+        if (dist(e, p) < 90 && !a.woke) { a.woke = true; emo(e, 'exclaim'); bubble(e, vb(e, 'wake')); a.dur = a.t + 1.5; } if (a.woke) e.__sleep = false; break;
+      case 'eat': e.__goal = null; if (!a.said) { a.said = true; fx.push({ kind: 'berry', obj: e, t: 0, life: a.dur }); } if ((a.n = (a.n || 0) - dt) <= 0) { a.n = rnd(1.5, 3); bubble(e, vb(e, 'eat'), 1.2); if (Math.random() < 0.3) emo(e, 'note'); } break;
+      case 'sniff': e.__goal = null; if (!a.said) { a.said = true; fx.push({ kind: 'flower', obj: e, t: 0, life: a.dur }); emo(e, 'heart'); bubble(e, vb(e, 'sniff')); } break;
       case 'dig': e.__goal = null; if (Math.random() < dt * 8) fx.push({ kind: 'dust', x: e.x + rnd(-8, 8), y: e.y + 2, vx: rnd(-50, 50), vy: rnd(-70, -30), t: 0, life: 0.5, g: 200 });
-        if (!a.said) { a.said = true; bubble(e, pick(BUB.dig)); } if (a.t > a.dur - 0.1 && !a.done) { a.done = true; if (Math.random() < 0.25) { try { E().Pickups.drop('coin', e.x, e.y + 10, 1); } catch (_) {} emo(e, 'spark'); bubble(e, pick(BUB.digFound)); } else { emo(e, 'dots'); bubble(e, pick(BUB.digNone)); } } break;
-      case 'tail': { const s = a.t * 5; goal(e, home.x + Math.cos(s) * 26, home.y + Math.sin(s) * 18); e.__spdMul = 1; if (!a.said) { a.said = true; bubble(e, pick(BUB.tail)); }
-        if (a.t > a.dur - 2 && !a.dz) { a.dz = true; e.__goal = null; emo(e, 'question'); bubble(e, pick(BUB.dizzy)); fx.push({ kind: 'stars', obj: e, t: 0, life: 2 }); } if (a.dz) e.__goal = null; break; }
-      case 'gaze': e.__goal = null; if (!a.said) { a.said = true; emo(e, 'dots'); if (Math.random() < 0.6) bubble(e, pick(BUB.gaze), 3); } break;
+        if (!a.said) { a.said = true; bubble(e, vb(e, 'dig')); } if (a.t > a.dur - 0.1 && !a.done) { a.done = true; if (Math.random() < 0.25) { try { E().Pickups.drop('coin', e.x, e.y + 10, 1); } catch (_) {} emo(e, 'spark'); bubble(e, vb(e, 'digFound')); } else { emo(e, 'dots'); bubble(e, vb(e, 'digNone')); } } break;
+      case 'tail': { const s = a.t * 5; goal(e, home.x + Math.cos(s) * 26, home.y + Math.sin(s) * 18); e.__spdMul = 1; if (!a.said) { a.said = true; bubble(e, vb(e, 'tail')); }
+        if (a.t > a.dur - 2 && !a.dz) { a.dz = true; e.__goal = null; emo(e, 'question'); bubble(e, vb(e, 'dizzy')); fx.push({ kind: 'stars', obj: e, t: 0, life: 2 }); } if (a.dz) e.__goal = null; break; }
+      case 'gaze': e.__goal = null; if (!a.said) { a.said = true; emo(e, 'dots'); if (Math.random() < 0.6) bubble(e, vb(e, 'gaze'), 3); } break;
       case 'swim': {
         const types = typesOf(e), wet = types.includes('water');
-        if (a.ph === 0) { goal(e, a.shore.x, a.shore.y); if (near(e, a.shore, 14) || a.t > 6) { a.ph = 1; a.t0 = a.t; bubble(e, pick(wet ? BUB.swimOk : BUB.swimTry)); if (!wet) emo(e, 'sweat'); } }
+        if (a.ph === 0) { goal(e, a.shore.x, a.shore.y); if (near(e, a.shore, 14) || a.t > 6) { a.ph = 1; a.t0 = a.t; bubble(e, vb(e, wet ? 'swimOk' : 'swimTry')); if (!wet) emo(e, 'sweat'); } }
         else if (a.ph === 1) { e.__goal = { x: a.water.x, y: a.water.y }; if (Math.random() < dt * 10) fx.push({ kind: 'drop', x: (e.x + a.water.x) / 2 + rnd(-10, 10), y: (e.y + a.water.y) / 2, vx: rnd(-60, 60), vy: rnd(-110, -60), t: 0, life: 0.6, g: 320 });
-          if (a.t - a.t0 > 3) { a.ph = 2; e.__goal = null; if (!wet) { emo(e, 'tear'); bubble(e, pick(BUB.swimFail)); for (let i = 0; i < 8; i++) fx.push({ kind: 'drop', x: e.x, y: e.y - H * 0.6, vx: rnd(-70, 70), vy: rnd(-90, -20), t: -i * 0.05, life: 0.7, g: 300 }); } else emo(e, 'note'); a.dur = a.t + 2.5; } }
+          if (a.t - a.t0 > 3) { a.ph = 2; e.__goal = null; if (!wet) { emo(e, 'tear'); bubble(e, vb(e, 'swimFail')); for (let i = 0; i < 8; i++) fx.push({ kind: 'drop', x: e.x, y: e.y - H * 0.6, vx: rnd(-70, 70), vy: rnd(-90, -20), t: -i * 0.05, life: 0.7, g: 300 }); } else emo(e, 'note'); a.dur = a.t + 2.5; } }
         break; }
       case 'climb':
-        if (a.ph === 0) { goal(e, a.foot.x, a.foot.y); if (near(e, a.foot, 14) || a.t > 6) { a.ph = 1; a.t0 = a.t; bubble(e, pick(BUB.climbTry)); } }
+        if (a.ph === 0) { goal(e, a.foot.x, a.foot.y); if (near(e, a.foot, 14) || a.t > 6) { a.ph = 1; a.t0 = a.t; bubble(e, vb(e, 'climbTry')); } }
         else if (a.ph === 1) { const k = Math.sin((a.t - a.t0) * 9); e.__goal = { x: a.tree.x, y: a.tree.y }; e.__lift = Math.max(0, k) * 10 + (a.t - a.t0) * 4;
           if (Math.random() < dt * 5) fx.push({ kind: 'dust', x: a.foot.x + (a.tree.x - a.foot.x) * 0.4 + rnd(-6, 6), y: a.foot.y - H * 0.5, vx: rnd(-30, 30), vy: rnd(10, 40), t: 0, life: 0.5, g: 200, c: '120,170,80' });
-          if (a.t - a.t0 > 3.2) { a.ph = 2; e.__lift = 0; e.__goal = null; emo(e, 'sweat'); bubble(e, pick(BUB.climbFall)); fx.push({ kind: 'stars', obj: e, t: 0, life: 2.2 }); txt(e.x, e.y - H - 6, 'Oof!', '#ffe27a'); a.dur = a.t + 2.5; } }
+          if (a.t - a.t0 > 3.2) { a.ph = 2; e.__lift = 0; e.__goal = null; emo(e, 'sweat'); bubble(e, vb(e, 'climbFall')); fx.push({ kind: 'stars', obj: e, t: 0, life: 2.2 }); txt(e.x, e.y - H - 6, 'Oof!', '#ffe27a'); a.dur = a.t + 2.5; } }
         break;
       case 'play': { const m = a.mate; if (!m || m.dead) { a.dur = 0; break; } const s = a.t * 2 + (m.__act === a ? 0 : Math.PI); goal(e, m.x + Math.cos(s) * 60, m.y + Math.sin(s) * 40); e.__spdMul = 0.9;
-        if (!a.said) { a.said = true; bubble(e, pick(BUB.play)); } if (Math.random() < dt * 0.6) emo(e, pick(['note', 'heart'])); break; }
+        if (!a.said) { a.said = true; bubble(e, vb(e, 'play')); } if (Math.random() < dt * 0.6) emo(e, a.angry ? 'anger' : pick(['note', 'heart'])); break; }
       case 'leave': { const ang = a.ang ?? (a.ang = Math.atan2(e.y - p.y, e.x - p.x)); goal(e, e.x + Math.cos(ang) * 80, e.y + Math.sin(ang) * 80); e.__spdMul = 0.8; if (dist(e, p) > 900) removeEnemy(e); a.dur = 999; break; }
       case 'follow': { const m = a.mate; if (!m || m.dead) { a.dur = 0; break; } if (dist(e, m) > 36) goal(e, m.x - 22, m.y + 6); else e.__goal = null; a.dur = 999; break; }
-      case 'cry': e.__goal = null; if (Math.random() < dt * 6) fx.push({ kind: 'tear', x: e.x + rnd(-6, 6), y: e.y - H * 0.7, vx: rnd(-40, 40), vy: -40, t: 0, life: 0.6, g: 300 }); if (!a.said) { a.said = true; bubble(e, pick(BUB.cry)); } break;
+      case 'cry': e.__goal = null; if (Math.random() < dt * 6) fx.push({ kind: 'tear', x: e.x + rnd(-6, 6), y: e.y - H * 0.7, vx: rnd(-40, 40), vy: -40, t: 0, life: 0.6, g: 300 }); if (!a.said) { a.said = true; bubble(e, vb(e, 'cry')); } break;
     }
     if (a.kind !== 'climb') e.__lift = 0;
   }
@@ -167,7 +124,7 @@
   function onHarmlessHit(e, p, foes) {
     if ((e.__hitCd || 0) > clock()) return; e.__hitCd = clock() + 4;
     if (e.__role === 'scene' && scene) abortScene();
-    if (!e.__hurtSaid) { e.__hurtSaid = true; sayL(e, 'wild', LN.hurt, { prio: true }); } else emo(e, 'tear');
+    if (!e.__hurtSaid) { e.__hurtSaid = true; speak(e, 'wild', 'hurt', { prio: true }); } else emo(e, 'tear');
     const r = Math.random();
     if (r < 0.5) { e.__fleeT = 6; e.__fleeFrom = p; e.__crying = true; }
     else if (r < 0.8) provoke(e);
@@ -177,10 +134,10 @@
   // a harmless Pokemon knocked out: last words, and the others react
   let deathCd = 0;
   function onHarmlessDeath(e, p) {
-    const now = clock(); if (now > deathCd && Math.random() < 0.55) { deathCd = now + 2.5; sayL(e, 'wild', LN.die, { prio: true }); }
+    const now = clock(); if (now > deathCd && Math.random() < 0.55) { deathCd = now + 2.5; speak(e, 'wild', 'die', { prio: true }); }
     const W = E().EnemyMgr.all().filter(o => o && !o.dead && harmless(o) && dist(o, e) < 280); let spoke = false;
-    for (const o of W) { emo(o, 'tear'); const same = Number(o.dex) === Number(e.dex);
-      if (!spoke && now > (onHarmlessDeath.cd || 0)) { spoke = true; onHarmlessDeath.cd = now + 3; sayL(o, 'wild', same ? LN.witnessSame : LN.witness, { prio: true, delay: 0.5 }); }
+    for (const o of W) { emo(o, 'tear'); const same = Number(o.dex) === Number(e.dex), mate = same && o.__g && e.__g && o.__g !== e.__g || (o.__act && o.__act.mate === e);
+      if (!spoke && now > (onHarmlessDeath.cd || 0)) { spoke = true; onHarmlessDeath.cd = now + 3; speak(o, 'wild', mate ? 'witnessMate' : same ? 'witnessSame' : 'witness', { prio: true, delay: 0.5 }); }
       const r = Math.random(); if (r < 0.5) { o.__fleeT = 6; o.__fleeFrom = p; o.__crying = true; } else if (r < 0.75 || same && r < 0.9) provoke(o); else o.__act = { kind: 'cry', t: 0, dur: 6 }; }
     if (scene && Object.values(scene.actors).includes(e)) abortScene();
   }
@@ -281,16 +238,16 @@
     else if (r < CFG.idle + CFG.grudge + CFG.turn && calm) e.__turnAt = clock() + rnd(4, 12);
   }
   function startFeud(a, b) {
-    const same = Number(a.dex) === Number(b.dex), pair = pick(same && Math.random() < 0.7 ? GRUDGE_SAME : GRUDGE);
+    const same = Number(a.dex) === Number(b.dex);
     feuds.push({ a, b, t: CFG.feudTime, bFights: Math.random() < 0.75 }); a.__feud = b; b.__feud = a; a.__wantFeud = 0;
-    say(a, 'foe', pair[0][0], pair[0][1], pair[0][2], { prio: true, b: b.name }); say(b, 'foe', pair[1][0], pair[1][1], pair[1][2], { prio: true, delay: 0.3, a: a.name });
+    speak(a, 'foe', same && Math.random() < 0.7 ? 'grudgeSame' : 'grudge', { prio: true, other: b }); speak(b, 'foe', 'grudgeReply', { prio: true, delay: 0.3, other: a });
     emo(a, 'anger'); setTimeout(() => emo(b, 'anger'), 500);
   }
   function endFeud(f, why) {
     feuds.splice(feuds.indexOf(f), 1); const { a, b } = f; a.__feud = null; b.__feud = null;
     const w = !a.dead ? (!b.dead ? null : a) : (!b.dead ? b : null);
-    if (why === 'time' && w == null && !a.dead && !b.dead) { sayL(a, 'foe', LN.truce); return; }
-    if (w && !w.gone) { if (Math.random() < 0.3 && solo()) { sayL(w, 'wild', LN.home, { prio: true }); setRole(w, 'idle', { kind: 'leave', t: 0, dur: 999 }); } else sayL(w, 'foe', LN.win, { prio: true }); }
+    if (why === 'time' && w == null && !a.dead && !b.dead) { speak(a, 'foe', 'truce'); return; }
+    if (w && !w.gone) { if (Math.random() < 0.3 && solo()) { speak(w, 'wild', 'home', { prio: true }); setRole(w, 'idle', { kind: 'leave', t: 0, dur: 999 }); } else speak(w, 'foe', 'win', { prio: true }); }
   }
   function updateFeuds(dt, foes) {
     for (const f of feuds.slice()) { f.t -= dt; const { a, b } = f;
@@ -298,42 +255,43 @@
       for (const [x, y, fights] of [[a, b, true], [b, a, f.bFights]]) { if (!fights) continue; x.__fhit = (x.__fhit || 0) - dt;
         if (dist(x, y) < (x.r || 12) + (y.r || 12) + 10 && x.__fhit <= 0) { x.__fhit = 0.75; let d = 8; try { d = typeof x.dmg === 'function' ? x.dmg() : (x._dmg || 8); } catch (_) {}
           try { y.hurt(Math.max(4, d * 2), '#ff7a3a', y.x - x.x, y.y - x.y, 60); } catch (_) {} if (Math.random() < 0.3) emo(x, 'anger'); } }
-      for (const o of foes) if (harmless(o) && !o.__cheered && dist(o, a) < 220) { o.__cheered = true; if (Math.random() < 0.4) { bubble(o, pick(BUB.cheer)); emo(o, 'note'); } else { emo(o, 'sweat'); o.__fleeT = 2; o.__fleeFrom = a; } } }
+      for (const o of foes) if (harmless(o) && !o.__cheered && dist(o, a) < 220) { o.__cheered = true; if (Math.random() < 0.4) { bubble(o, vb(o, 'cheer')); emo(o, 'note'); } else { emo(o, 'sweat'); o.__fleeT = 2; o.__fleeFrom = a; } } }
   }
-  function startTurn(e, beg) { if (!e || e.__feud || e.__turning || e.dead || harmless(e)) return; e.__turning = { t: 0, said: 0, beg }; e.__turnAt = 0; sayL(e, 'foe', beg ? LN.beg : LN.turn1, { prio: true }); emo(e, beg ? 'tear' : 'question'); }
+  function startTurn(e, beg) { if (!e || e.__feud || e.__turning || e.dead || harmless(e)) return; e.__turning = { t: 0, said: 0, beg }; e.__turnAt = 0; speak(e, 'foe', beg ? 'beg' : 'turn1', { prio: true }); emo(e, beg ? 'tear' : 'question'); }
   function updateTurns(dt) {
     for (const e of live) { const tn = e.__turning; if (!tn) continue; if (e.dead) { e.__turning = null; continue; } tn.t += dt;
-      if (tn.said === 0 && tn.t > 2.4) { tn.said = 1; if (!tn.beg) sayL(e, 'ally', LN.turn2, { prio: true }); emo(e, 'exclaim'); }
+      if (tn.said === 0 && tn.t > 2.4) { tn.said = 1; if (!tn.beg) speak(e, 'ally', 'turn2', { prio: true }); emo(e, 'exclaim'); }
       if (tn.t > 4.2) { e.__turning = null; toAlly(e); } }
   }
-  let chatCd = 0;
+  let chatCd = 0, lowCd = 0;
   function chatter(dt, p, foes) {
-    chatCd -= dt;
+    chatCd -= dt; lowCd -= dt;
+    if (p.hp < p.maxHp * 0.25 && lowCd <= 0) { const h = foes.find(e => !harmless(e) && !special(e) && dist(e, p) < 260); if (h) { lowCd = 30; speak(h, 'foe', 'playerLow'); } }
     for (const e of foes) {
       const st = e.__wl || (e.__wl = { spot: false, low: false });
-      if (harmless(e)) { if (!e.__met && dist(e, p) < 150) { e.__met = true; if (Math.random() < 0.35 && chatCd <= 0) { chatCd = 5; sayL(e, 'wild', LN.meet); } else emo(e, 'question'); } continue; }
+      if (harmless(e)) { if (!e.__met && dist(e, p) < 150) { e.__met = true; if (Math.random() < 0.35 && chatCd <= 0) { chatCd = 5; speak(e, 'wild', 'meetPlayer'); } else emo(e, 'question'); } continue; }
       if (!st.spot && dist(e, p) < 230) { st.spot = true;
-        if ((e.boss || e.legend) && Math.random() < 0.6) sayL(e, 'foe', LN.boss, { prio: true });
-        else if ((e.behavior === 'thief' || e.golden) && Math.random() < 0.4) sayL(e, 'foe', LN.thief);
-        else if (Math.random() < CFG.taunt && chatCd <= 0) { chatCd = 6; sayL(e, 'foe', LN.taunt); }
+        if ((e.boss || e.legend) && Math.random() < 0.6) speak(e, 'foe', 'boss', { prio: true });
+        else if ((e.behavior === 'thief' || e.golden) && Math.random() < 0.4) speak(e, 'foe', 'thief');
+        else if (Math.random() < CFG.taunt && chatCd <= 0) { chatCd = 6; speak(e, 'foe', 'spotPlayer'); }
         else if (Math.random() < CFG.spotEmote) emo(e, pick(['exclaim', 'exclaim', 'anger'])); }
       if (!st.low && e.hp < e.maxHp * 0.3 && !e.boss) { st.low = true;
         if (solo() && !e.__turning && !special(e) && allies.length < CFG.maxAllies && Math.random() < CFG.lowTurn && dist(e, p) < 320) startTurn(e, true);
-        else if (Math.random() < 0.08 && chatCd <= 0) { chatCd = 6; sayL(e, 'foe', LN.low); } else if (Math.random() < 0.35) emo(e, 'sweat'); }
+        else if (Math.random() < 0.08 && chatCd <= 0) { chatCd = 6; speak(e, 'foe', 'lowHp'); } else if (Math.random() < 0.35) emo(e, 'sweat'); }
     }
   }
   // everyone reacts: deaths, bosses, shinies, your level-ups
   let lvl0 = 0;
   function reactions(p, foes) {
     for (const e of [...live]) { if (!e.dead) continue; live.delete(e); if (e.gone) continue;
-      if (e.__role) { onHarmlessDeath(e, p); continue; }
-      for (const o of foes) if (harmless(o) && dist(o, e) < 180) { emo(o, 'sweat'); if (Math.random() < 0.4) { o.__fleeT = 3; o.__fleeFrom = e; if (Math.random() < 0.3) bubble(o, pick(BUB.scared), 1.4); } }
-      if (dist(e, p) < 500 && Math.random() < 0.05 && chatCd <= 0) { const pal = foes.find(o => o !== e && !harmless(o) && Number(o.dex) === Number(e.dex) && dist(o, e) < 220); if (pal) { chatCd = 6; sayL(pal, 'foe', LN.avenge); } } }
+      if (e.__role) { onHarmlessDeath(e, p); continue; } if (V()) V().run.kills++;
+      for (const o of foes) if (harmless(o) && dist(o, e) < 180) { emo(o, 'sweat'); if (Math.random() < 0.4) { o.__fleeT = 3; o.__fleeFrom = e; if (Math.random() < 0.3) bubble(o, vb(o, 'scared'), 1.4); } }
+      if (dist(e, p) < 500 && Math.random() < 0.05 && chatCd <= 0) { const pal = foes.find(o => o !== e && !harmless(o) && Number(o.dex) === Number(e.dex) && dist(o, e) < 220); if (pal) { chatCd = 6; speak(pal, 'foe', 'avenge'); } } }
     for (const o of foes) { if (!harmless(o)) continue;
       if (o.__hp0 != null && o.hp < o.__hp0 - 0.01) onHarmlessHit(o, p, foes); o.__hp0 = o.hp;
-      const big = foes.find(b => (b.boss || b.legend) && dist(b, o) < 350); if (big && o.__bossFled !== big) { o.__bossFled = big; o.__fleeT = 5; o.__fleeFrom = big; emo(o, 'sweat'); if (Math.random() < 0.4) bubble(o, pick(BUB.bossFlee)); }
-      if (!o.__shinySeen) { const sh = foes.find(b => b !== o && b.shiny && dist(b, o) < 220); if (sh) { o.__shinySeen = true; if (Math.random() < 0.3) { emo(o, 'heart'); bubble(o, pick(BUB.shiny)); } } } }
-    const lv = Number(p.level) || 1; if (lv > lvl0) { if (lvl0) for (const o of foes) if (harmless(o) && dist(o, p) < 250) { emo(o, pick(['exclaim', 'spark'])); if (Math.random() < 0.2) bubble(o, pick(BUB.lvl), 1.6); } lvl0 = lv; }
+      const big = foes.find(b => (b.boss || b.legend) && dist(b, o) < 350); if (big && o.__bossFled !== big) { o.__bossFled = big; o.__fleeT = 5; o.__fleeFrom = big; emo(o, 'sweat'); if (Math.random() < 0.4) bubble(o, vb(o, 'bossFlee')); }
+      if (!o.__shinySeen) { const sh = foes.find(b => b !== o && b.shiny && dist(b, o) < 220); if (sh) { o.__shinySeen = true; if (Math.random() < 0.3) { emo(o, 'heart'); bubble(o, vb(o, 'shiny')); } } } }
+    const lv = Number(p.level) || 1; if (lv > lvl0) { if (lvl0) for (const o of foes) if (harmless(o) && dist(o, p) < 250) { emo(o, pick(['exclaim', 'spark'])); if (Math.random() < 0.2) bubble(o, vb(o, 'lvl'), 1.6); } lvl0 = lv; }
   }
 
   // ================= the big moments: Giratina's Void, the Creation Rift, Giga Drill Break =================
@@ -343,18 +301,51 @@
   function panicTick(dt) {
     const N = E(), p = N?.Game?.player; if (!p) return; const k = eventKind();
     if (k !== panicKind) { if (panicKind && !k) for (const e of N.EnemyMgr.all()) if (e && !e.dead && e.__panic) { if (harmless(e)) { e.__fleeT = 5; e.__fleeFrom = p; } e.__panic = null; }
-      panicKind = k; panicT = 0;
+      panicKind = k; panicT = 0; if (k && V()) V().run[k === 'kaminaSad' ? 'simon' : k] = true;
       if (k) { const L = N.EnemyMgr.all().filter(e => e && !e.dead && !e.boss && !e.legend && !e.arceus && dist(e, p) < 750); let shouts = 0;
-        for (const e of L) { if (k === 'kaminaSad') { if (harmless(e)) { emo(e, 'tear'); if (shouts++ < 2) bubble(e, pick(BUB.panic.kaminaSad), 3); } continue; }
+        for (const e of L) { if (k === 'kaminaSad') { if (harmless(e)) { emo(e, 'tear'); if (shouts++ < 2) bubble(e, vb(e, 'kaminaSad'), 3); } continue; }
           const run = Math.random() < 0.55; e.__panic = { run, ang: Math.atan2(e.y - p.y, e.x - p.x) + rnd(-0.5, 0.5), v: rnd(40, 75), t: 0, stuck: false };
-          setTimeout(() => emo(e, run ? 'exclaim' : 'sweat'), rnd(0, 600)); if (shouts < 3 && Math.random() < 0.35) { shouts++; bubble(e, pick(BUB.panic[k]), 2.6); } } } }
+          setTimeout(() => emo(e, run ? 'exclaim' : 'sweat'), rnd(0, 600)); if (shouts < 3 && Math.random() < 0.35) { shouts++; bubble(e, vb(e, k), 2.6); } } } }
     if (!k || k === 'kaminaSad') return; panicT += dt;
     for (const e of N.EnemyMgr.all()) { const pn = e && !e.dead && e.__panic; if (!pn) continue; pn.t += dt;
       if (pn.run && !pn.stuck) { const sp = pn.v * Math.max(0.15, 1 - pn.t / 6), nx = e.x + Math.cos(pn.ang) * sp * dt, ny = e.y + Math.sin(pn.ang) * sp * dt;   // they run... but never far enough
         if (free(nx, ny, e.r || 12)) { e.x = nx; e.y = ny; } else pn.ang += rnd(-1.5, 1.5);
         try { e.anim.loop('Walk'); e.anim.dir = N.Sprites.dirFromAngle(pn.ang); e.anim.update(dt); } catch (_) {}
-        if (pn.t > 4 && !pn.stuck && Math.random() < dt * 0.3) { pn.stuck = true; emo(e, 'tear'); if (Math.random() < 0.4) bubble(e, pick(BUB.panic.stuck), 2); } }
+        if (pn.t > 4 && !pn.stuck && Math.random() < dt * 0.3) { pn.stuck = true; emo(e, 'tear'); if (Math.random() < 0.4) bubble(e, vb(e, 'stuck'), 2); } }
       else { const j = Math.sin(pn.t * 40) * 0.8; e.x += j - (pn.j || 0); pn.j = j; if (Math.random() < dt * 0.25) emo(e, pick(['sweat', 'tear'])); } }
+  }
+
+  // ================= Pokemon talking to each other =================
+  // two harmless Pokemon near each other stop and chat (a sweetheart, a rival type, small talk...); hostile ones banter on the march
+  let convo = null, convoCd = rnd(4, 8);
+  function startConvo(a, b, p, hostile) {
+    const v = V(); if (!v) return; const c = v.chat(a, b, { hostile }); if (!c || !c.lines.length) return;
+    const now = clock(); a.__chatAt = b.__chatAt = now + rnd(25, 40);
+    convo = { a, b, lines: c.lines, outcome: c.outcome, i: 0, wait: 0.2, hostile, box: dist(a, p) < 260 && !(T() && T().busy && T().busy()) };
+    if (!hostile) { a.__chat = b.__chat = true; }
+  }
+  function finishConvo(c) {
+    convo = null; convoCd = rnd(5, 10); c.a.__chat = c.b.__chat = false; const { a, b } = c; if (a.dead || b.dead) return;
+    if (c.outcome === 'love') { for (const w of [a, b]) for (let i = 0; i < 5; i++) fx.push({ kind: 'heart', x: w.x + rnd(-10, 10), y: w.y - (w.bodyH || 40), vx: rnd(-20, 20), vy: rnd(-50, -30), t: -i * 0.12, life: 1.4 });
+      if (harmless(a) && harmless(b)) b.__act = { kind: 'follow', mate: a, t: 0, dur: 999 }; }
+    else if (c.outcome === 'reject' && harmless(a)) a.__act = { kind: 'cry', t: 0, dur: 4 };
+    else if (c.outcome === 'fight') { emo(a, 'anger'); emo(b, 'anger');
+      if (harmless(a) && harmless(b)) { a.__act = { kind: 'play', mate: b, t: 0, dur: 6, angry: true, said: true }; b.__act = { kind: 'play', mate: a, t: 0, dur: 6, angry: true, said: true }; }
+      else if (!harmless(a) && !harmless(b) && solo() && !a.__feud && !b.__feud) startFeud(a, b); }
+  }
+  function convoTick(dt, p, foes) {
+    const now = clock();
+    if (convo) { const c = convo; if (c.a.dead || c.b.dead || c.a.gone || c.b.gone || c.a.__fleeT > 0 || c.b.__fleeT > 0) { finishConvo(c); return; }
+      if ((c.wait -= dt) > 0) return; const ln = c.lines[c.i++]; if (!ln) { finishConvo(c); return; }
+      const [w, face, text, em] = ln, kind = harmless(w) ? 'wild' : 'foe';
+      if (c.box) say(w, kind, face, text, em, { follow: true }); else { bubble(w, text, Math.max(2, text.length / 28 + 1.2)); emo(w, em); }
+      c.wait = text.length / 40 + 1.2; return; }
+    if ((convoCd -= dt) > 0) return; convoCd = 1.5;
+    const ok = e => !e.__chatAt || e.__chatAt < now, H = foes.filter(e => harmless(e) && e.__role === 'idle' && !(e.__fleeT > 0) && ok(e) && dist(e, p) < 520);
+    let best = null; for (const a of H) for (const b of H) { if (a === b || dist(a, b) > 140) continue; const sc = (V() && V().relation(a, b) === 'mate' ? 2 : 1) + Math.random(); if (!best || sc > best.sc) best = { a, b, sc }; }
+    if (best) { startConvo(best.a, best.b, p, false); return; }
+    if (Math.random() < 0.25) { const F = foes.filter(e => !harmless(e) && !special(e) && !e.__feud && !e.__turning && ok(e) && dist(e, p) > 260 && dist(e, p) < 620);
+      for (const a of F) { const b = F.find(o => o !== a && dist(o, a) < 110); if (b) { startConvo(a, b, p, true); return; } } }
   }
 
   // ================= allies =================
@@ -366,21 +357,21 @@
     let anim = null; try { anim = new N.Sprites.Animator(Number(e.dex), 1, !!e.shiny); } catch (_) {}
     const a = { kind: 'ally', dex: Number(e.dex), name: e.name, g: e.__g, shiny: !!e.shiny, x: e.x, y: e.y, r: e.r || 12, bodyH: e.bodyH || 40, anim, maxHp: Math.max(60, Math.round((Number(p.maxHp) || 100) * 0.6)), cd: rnd(0.4, 1), hurtCd: 0,
       type: e.atkType || 'normal', ranged: RANGED.has(e.behavior) || e.psAi === 'sniper', slot: allies.length, idleT: rnd(40, 70), lowSaid: false, dead: false, t: 0, lift: 0 };
-    a.hp = a.maxHp; a.proxy = { get x() { return a.x; }, get y() { return a.y; }, get r() { return a.r; }, get dead() { return a.dead; }, get hp() { return a.hp; }, get maxHp() { return a.maxHp; }, bodyH: a.bodyH, hurt(n) { allyHurt(a, n); } };
+    a.__voice = e.__voice; a.__g = e.__g; a.hp = a.maxHp; a.proxy = { get x() { return a.x; }, get y() { return a.y; }, get r() { return a.r; }, get dead() { return a.dead; }, get hp() { return a.hp; }, get maxHp() { return a.maxHp; }, bodyH: a.bodyH, hurt(n) { allyHurt(a, n); } };
     removeEnemy(e); allies.push(a);
     txt(a.x, a.y - 50, label(a) + ' joined your team!', '#9ad8ff'); sfx('shiny'); emo(a, 'heart');
     for (let i = 0; i < 6; i++) fx.push({ kind: 'heart', x: a.x + rnd(-10, 10), y: a.y - a.bodyH, vx: rnd(-20, 20), vy: rnd(-50, -30), t: -i * 0.1, life: 1.3 });
-    for (const o of N.EnemyMgr.all()) if (o && !o.dead && dist(o, a) < 260) { if (harmless(o)) emo(o, 'question'); else if (Math.random() < 0.35) { emo(o, 'anger'); bubble(o, pick(BUB.traitor), 1.6); } }
+    for (const o of N.EnemyMgr.all()) if (o && !o.dead && dist(o, a) < 260) { if (harmless(o)) emo(o, 'question'); else if (Math.random() < 0.35) { emo(o, 'anger'); bubble(o, V() ? V().line(o, 'traitor')[1] : 'TRAITOR!', 1.6); } }
     if (Number(p.dex) === 530) { try { T().line(530, 'joyous', 'Ha! Welcome to the Gurren Brigade, ' + a.name + '!', 'heart', { prio: true, delay: 0.6 }); } catch (_) {} }
   }
   function allyHurt(a, n) { if (a.dead || a.hurtCd > 0 || !(n > 0)) return; a.hurtCd = 0.45; a.hp -= n; a.flash = 0.15;
-    if (!a.lowSaid && a.hp < a.maxHp * 0.35 && a.hp > 0) { a.lowSaid = true; sayL(a, 'ally', LN.allyLow); }
-    if (a.hp <= 0) { a.hp = 0; a.dead = true; a.leaveT = 0; sayL(a, 'ally', LN.allyFaint, { prio: true }); txt(a.x, a.y - 44, a.name + ' fainted...', '#9ad8ff'); } }
+    if (!a.lowSaid && a.hp < a.maxHp * 0.35 && a.hp > 0) { a.lowSaid = true; speak(a, 'ally', 'allyLow'); }
+    if (a.hp <= 0) { a.hp = 0; a.dead = true; a.leaveT = 0; speak(a, 'ally', 'allyFaint', { prio: true }); txt(a.x, a.y - 44, a.name + ' fainted...', '#9ad8ff'); } }
   function hitEnemy(a, e, mult) { const N = E(), p = N.Game.player; let m = 1; try { m = N.Types.mult(a.type, e.types || ['normal']); } catch (_) {}
     const dmg = 10 * (Number(p && p.atk) || 1) * m * (mult || 1), was = e.dead;
     try { e.hurt(dmg, TYPE_COL[a.type] || '#fff', e.x - a.x, e.y - a.y, 60); N.Stats.dmg(p, 'ally', dmg); } catch (_) {}
     try { N.FX.burst(e.x, e.y - 10, TYPE_COL[a.type] || '#fff', 8, 140); } catch (_) {}
-    if (!was && e.dead && Math.random() < 0.25) sayL(a, 'ally', LN.allyKill); }
+    if (!was && e.dead && Math.random() < 0.25) speak(a, 'ally', 'allyKill'); }
   function stepTo(w, gx, gy, sp, dt) {
     const dx = gx - w.x, dy = gy - w.y, d = Math.hypot(dx, dy); if (d < 4) return true; const st = Math.min(d, sp * dt), nx = w.x + dx / d * st, ny = w.y + dy / d * st;
     if (free(nx, ny, w.r)) { w.x = nx; w.y = ny; } else if (free(nx, w.y, w.r)) w.x = nx; else if (free(w.x, ny, w.r)) w.y = ny; else return true;
@@ -400,7 +391,7 @@
       else { const off = a.slot % 2 ? 1 : -1, fx2 = p.x + off * 52, fy = p.y + 34; if (dist(a, { x: fx2, y: fy }) > 26) stepTo(a, fx2, fy, dist(a, p) > 220 ? 150 : 95, dt); else a.dir = Math.atan2(p.y - a.y, p.x - a.x); }
       for (const e of foes) if (!harmless(e) && dist(e, a) < a.r + (e.r || 12)) { let d = 8; try { d = typeof e.dmg === 'function' ? e.dmg() : (e._dmg || 8); } catch (_) {} allyHurt(a, Number(d) || 8); }
       try { const P = E().Projectiles.all(); for (let j = P.length - 1; j >= 0; j--) { const q = P[j]; if (!q || q.friendly || q.ghost || Math.hypot(q.x - a.x, q.y - (a.y - 10)) > a.r + (q.r || 4)) continue; allyHurt(a, q.dmg || 6); P.splice(j, 1); } } catch (_) {}
-      if ((a.idleT -= dt) <= 0) { a.idleT = rnd(55, 90); if (!tg) sayL(a, 'ally', LN.allyIdle); }
+      if ((a.idleT -= dt) <= 0) { a.idleT = rnd(55, 90); if (!tg) speak(a, 'ally', 'allyIdle'); }
       if (a.anim) { try { if (!a.anim.once || a.anim.done) a.anim.loop(a.moved ? 'Walk' : 'Idle'); if (Number.isFinite(a.dir)) a.anim.dir = E().Sprites.dirFromAngle(a.dir); a.anim.update(dt); } catch (_) {} } }
     for (let i = shots.length - 1; i >= 0; i--) { const s = shots[i]; s.t += dt; const tg = s.tg; if (!tg || tg.dead || s.t > 1.5) { shots.splice(i, 1); continue; }
       const d = Math.hypot(tg.x - s.x, tg.y - 12 - s.y), st = s.sp * dt; if (d <= st) { hitEnemy(s.a, tg, 1); shots.splice(i, 1); continue; } s.x += (tg.x - s.x) / d * st; s.y += (tg.y - 12 - s.y) / d * st; }
@@ -420,7 +411,7 @@
       if (e.__wantFeud && !e.__feud && !e.dead) { if (now > e.__wantFeud) e.__wantFeud = 0; else if (dist(e, p) < 520) { const b = foes.find(o => o !== e && !o.dead && !o.__feud && !special(o) && !harmless(o) && !o.__turning && dist(o, e) < 260); if (b) startFeud(e, b); } }
       if (e.__turnAt && now > e.__turnAt && !e.__turning && dist(e, p) < 320 && allies.length < CFG.maxAllies) startTurn(e, false);
     }
-    updateFeuds(dt, foes); updateTurns(dt); chatter(dt, p, foes); reactions(p, foes);
+    updateFeuds(dt, foes); updateTurns(dt); chatter(dt, p, foes); reactions(p, foes); convoTick(dt, p, foes);
     updateScene(dt, p); updateAllies(dt, p, foes.filter(e => !e.gone));
   }
   let hooked = false;
@@ -482,7 +473,7 @@
     for (const a of allies) { if (a.dead) continue; const y = a.y - (a.bodyH || 40) - 10; ctx.save(); ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030'; ctx.fillStyle = '#9ad8ff';
       const t = 'Ally · ' + label(a); ctx.strokeText(t, a.x, y); ctx.fillText(t, a.x, y); ctx.fillStyle = '#25152f'; ctx.fillRect(a.x - 18, y + 3, 36, 4); ctx.fillStyle = '#5ab0ff'; ctx.fillRect(a.x - 18, y + 3, 36 * Math.max(0, a.hp / a.maxHp), 4); ctx.restore(); }
     if (p) for (const e of N.EnemyMgr.all()) { if (!e || e.dead || !harmless(e) || dist(e, p) > 280) continue; const y = e.y - (e.bodyH || 40) - 12 - (e.__lift || 0); ctx.save(); ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#102010'; ctx.fillStyle = '#c8ffaa';
-      const t = '♪ ' + label(e); ctx.strokeText(t, e.x, y); ctx.fillText(t, e.x, y); ctx.restore(); }
+      const t = '♪ ' + label(e) + nat(e); ctx.strokeText(t, e.x, y); ctx.fillText(t, e.x, y); ctx.restore(); }
     for (const e of feuds) for (const w of [e.a, e.b]) { if (w.dead) continue; const y = w.y - (w.bodyH || 40) - 8; ctx.save(); ctx.globalAlpha = 0.6 + 0.4 * Math.sin(now * 10); ctx.fillStyle = '#ff4a3a'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('💢', w.x + 10, y); ctx.restore(); }
     for (const e of live) if (e.__turning && !e.dead) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gr = ctx.createRadialGradient(e.x, e.y - 14, 2, e.x, e.y - 14, 34); gr.addColorStop(0, 'rgba(255,180,220,.5)'); gr.addColorStop(1, 'rgba(255,120,200,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(e.x, e.y - 14, 34, 0, TAU); ctx.fill(); ctx.restore(); }
     for (const s of shots) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = TYPE_COL[s.a.type] || '#fff'; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(s.x, s.y, 4.5, 0, TAU); ctx.fill(); ctx.restore(); }
