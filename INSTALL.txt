@@ -1,14 +1,11 @@
-PokéSurvivor+ Mega Level-Up Integration — experimental
+POKESURVIVOR MERGED
 
-New: 2% Mega reward roll at every eligible level-up from level 10.
-Once granted, the reward appears in the Mega panel. Choose a Mega form to evolve.
-No Mega Bracelet is required in the source game.
+1. Extract the entire ZIP.
+2. Open Start Game.cmd.
+3. Keep the server window open while playing.
 
-INSTALL: Back up working game. Merge js/ and assets/ directories, and replace index.html from the ZIP.
-Do not overwrite config.js or Firebase files. Wait for GitHub Pages deployment, hard refresh.
-Test solo. This is a compatibility port, NOT a complete verbatim engine integration.
-CO-OP WARNING: Mega transformations are NOT synchronized to friends.
-MECHANICS WARNING: Mega ability handling and native level-up card insertion are NOT yet integrated.
-The new reward is offered in the Mega panel when a level-up chance succeeds.
-REVERT: restore index.html and js/app.min.js from GitHub History, remove the Mega script reference.
-Source licensing/credits included under SOURCE_LICENSES/.
+Do not open index.html directly. No build or extra packages are required on Windows.
+
+The original Firebase settings are preserved. Guest progress follows the original game behavior and is not saved. For your own online server, see SERVER_SETUP.md.
+
+See MERGE-NOTES.md and TEST-RESULTS.md for details.

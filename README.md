@@ -1,3 +1,13 @@
+# PokéSurvivor Merged
+
+Extract the whole ZIP and double-click **Start Game.cmd** on Windows. Keep its window open while playing.
+
+See [MERGE-NOTES.md](MERGE-NOTES.md) for merged features and setup, and [TEST-RESULTS.md](TEST-RESULTS.md) for verification and limits.
+
+---
+
+## Original project information
+
 # PokéSurvivor+
 
 A modded version of [PokéSurvivor](https://github.com/JPTER78/pokesurvivor) by JPTER78: a free, non-profit Pokémon survival fan game that runs in your browser.
