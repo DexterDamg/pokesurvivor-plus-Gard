@@ -33,7 +33,20 @@
   // wildTalk: false = regular wild and enemy Pokemon don't talk; you, your summons (the Lake sisters, your allies) and bosses / legendaries do
   const CFG = { wildTalk: false, idle: 0.25, grudge: 0.035, turn: 0.02, lowTurn: 0.03, maxAllies: 3, sceneFirst: [25, 40], sceneEvery: [50, 80], despawn: 1300,
     taunt: 0.06, spotEmote: 0.14, feudTime: 20, allyCd: 1.1, allyRange: 280, idleSpd: 0.5 };
-  const T = () => window.PS_LAKE_TALK, K = () => window.PS_LAKE?.kit;
+  // movement helpers: the Lake trio's (js/lake-trio.js) when it's loaded, otherwise this file's own copy
+  const KIT = {
+    freeAt: (x, y, r) => { try { return E().World.isFree(x, y, Math.max(6, r * 0.6)); } catch (_) { return true; } },
+    nearFree(x, y, r) { if (KIT.freeAt(x, y, r)) return { x, y }; for (let d = 16; d <= 200; d += 16) for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, nx = x + Math.cos(a) * d, ny = y + Math.sin(a) * d; if (KIT.freeAt(nx, ny, r)) return { x: nx, y: ny }; } return { x, y }; },
+    incoming(s) {   // a hostile shot about to hit: which way to sidestep
+      try { for (const q of E().Projectiles.all()) { if (!q || q.friendly || q.ghost) continue; const vx = Number(q.vx) || 0, vy = Number(q.vy) || 0, m = Math.hypot(vx, vy); if (m < 1) continue;
+        const dx = s.x - q.x, dy = (s.y - 10) - q.y, along = (dx * vx + dy * vy) / m; if (along < 0 || along > 110) continue; const side = (dx * vy - dy * vx) / m; if (Math.abs(side) > (s.r || 12) + 14) continue;
+        const sg = side >= 0 ? 1 : -1; return { x: vy / m * sg, y: -vx / m * sg }; } } catch (_) {} return null; },
+    escapePoint(s, enemies, A) {   // the open spot that's farthest from the crowd, not too far from the one it follows
+      let best = { x: s.x, y: s.y }, bs = -Infinity;
+      for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, x = s.x + Math.cos(a) * 110, y = s.y + Math.sin(a) * 110; if (!KIT.freeAt(x, y, s.r || 12)) continue;
+        let sc = 0; for (const e of enemies) sc += Math.min(260, Math.hypot(e.x - x, e.y - y)); if (A) sc -= Math.max(0, Math.hypot(A.x - x, A.y - y) - 220) * 2; if (sc > bs) { bs = sc; best = { x, y }; } }
+      return best; } };
+  const T = () => window.PS_LAKE_TALK, K = () => window.PS_LAKE?.kit || KIT;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = L => L[Math.floor(Math.random() * L.length)];
@@ -460,7 +473,7 @@
       a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.006 * dt);
       if (dist(a, p) > 750 && k) { const f = k.nearFree(p.x - 40, p.y + 30, a.r); a.x = f.x; a.y = f.y; a.okX = f.x; a.okY = f.y; a.path = []; }
       if (a.tg && a.tg.dead) { if (a.lastHitT > a.t - 1.2 && Math.random() < 0.3) speak(a, 'ally', 'allyKill'); a.tg = null; }
-      if (!a.tg || dist(a.tg, p) > 420 || (a.retarget = (a.retarget || 0) - dt) <= 0) { a.retarget = 0.6; a.tg = pickTarget(a, p, enemies); }
+      if (!a.tg || dist(a.tg, p) > 420 || (a.retarget = (a.retarget || 0) - dt) <= 0) { a.retarget = 2; a.tg = pickTarget(a, p, enemies); }   // sticks with a target for a while
       const tg = a.tg, def = a.moves && a.moves.length ? a.moves[a.mi % a.moves.length] : null, R = def && H && H.attackRange ? H.attackRange(def) : { min: 0, ideal: 110, max: 180 };
       const side = a.slot % 2 ? 1 : -1; let goal = null, sp = 105, mode = 'follow';
       a.dodgeT -= dt; if (a.dodgeT <= 0 && k) { const q = k.incoming(a); if (q) { a.dodge = q; a.dodgeT = 0.3; } }
@@ -468,7 +481,9 @@
       if (k && (crowd >= 3 || (low && crowd >= 1))) { goal = k.escapePoint(a, enemies, p); sp = 135; mode = 'escape'; }
       else if (dist(a, p) > 380) { goal = { x: p.x + side * 50, y: p.y + 30 }; sp = 155; mode = 'regroup'; }
       else if (tg) { const d = dist(a, tg), ang = Math.atan2(tg.y - a.y, tg.x - a.x); mode = 'fight';
-        if (d > R.ideal + 12) goal = { x: tg.x - Math.cos(ang) * R.ideal, y: tg.y - Math.sin(ang) * R.ideal };
+        const close = ['melee', 'dash', 'cone'].includes(def && def.kind);
+        if (close && d > R.max * 0.8) { goal = { x: tg.x - Math.cos(ang) * (a.r + (tg.r || 12)), y: tg.y - Math.sin(ang) * (a.r + (tg.r || 12)) }; sp = 150; }   // close-range moves: charge right in
+        else if (d > R.ideal + 12) goal = { x: tg.x - Math.cos(ang) * R.ideal, y: tg.y - Math.sin(ang) * R.ideal };
         else if (d < R.min) { goal = { x: a.x - Math.cos(ang) * 40, y: a.y - Math.sin(ang) * 40 }; sp = 120; }
         else { goal = { x: a.x + Math.cos(ang + side * Math.PI / 2) * 30, y: a.y + Math.sin(ang + side * Math.PI / 2) * 30 }; sp = 55; } a.dir = ang; }
       else { const fx2 = p.x + side * 52, fy = p.y + 34; if (dist(a, { x: fx2, y: fy }) > 26) goal = { x: fx2, y: fy }; else a.dir = Math.atan2(p.y - a.y, p.x - a.x); }
