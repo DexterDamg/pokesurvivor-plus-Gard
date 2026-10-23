@@ -10,6 +10,13 @@ uso **no comercial** y con atribución a sus artistas.
 Los retratos de Uxie, Mesprit, Azelf, Dialga, Palkia, Giratina, Drilbur y Excadrill (`assets/portraits/480.png` a `484.png`, `487.png`, `529.png` y `530.png`, usados en sus
 diálogos) también son hojas de retratos de SpriteCollab, con la misma licencia.
 
+Los retratos de los Pokémon salvajes que hablan (`js/wild-life.js`) se cargan directamente desde
+[PMD SpriteCollab](https://github.com/PMDCollab/SpriteCollab), con la misma licencia.
+
+El diseño de los taladros de Giga Drill Break y Giga Drill Maximum (`js/kamina-moves.js`, dibujados por código) está
+inspirado en la hoja "Giga Drill" de [Moralde10](https://www.deviantart.com/moralde10). Idea y concepto del Giga Drill:
+Tengen Toppa Gurren Lagann (Gainax / Studio Trigger).
+
 | Artista | Contacto | Sprites (nº de Pokédex) |
 |---|---|---|
 | 3Monika4 | <@270755102178934785> | 20, 61, 63 |

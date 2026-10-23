@@ -17,6 +17,12 @@
      the drill's path) dies instantly, a spiral blast hits everything on screen, the sky fills with rainbow
      fireworks, then a rainbow K.O. It is a suicide move: Kamina falls afterwards. (With Simon out, Kamina's last
      words play and you go on as Simon.) Press the Z-move button twice (the first press asks to confirm).
+   ONCE KAMINA IS GONE and you play as Simon, he keeps Gurren Boomerang and Super Blazing Kick (with his own lines),
+   and Super Bowling Ball Attack (that was him) becomes GIGA DRILL MAXIMUM (ギガドリルマキシマム！！！): thirteen long,
+   thin teal drills shoot out of Simon in a full circle, pierce everything around him, spin, and pull back in.
+   The drills are drawn in the style of the Giga Drill sprite sheet the player supplied (Moralde10, see CREDITS.md):
+   a chrome cone with spiral ridges and a round base, summoned from a white flash with jagged white wings, a teal
+   jet pouring from its base during the charge, white speed streaks on deep navy.
    Solo: the kick's impact frame and the Giga Drill Break cinematic freeze the battle. Co-op: nothing freezes. */
 (() => {
   'use strict';
@@ -45,19 +51,31 @@
       ups: [{ t: '+40% damage', m: { dmg: 1.4 } }, { t: '+30% dive distance', m: { radius: 1.3 } }, { t: '-25% cooldown', m: { cd: 0.75 } }, { t: 'Max: +60% damage, enemies fly farther', m: { dmg: 1.6, fly: 1.5 } }] },
     { id: 'super-bowling-ball', name: 'Super Bowling Ball Attack', type: 'ground', kind: 'dash', psCast: 'super-bowling-ball', cd: 6, dmg: 44, radius: 280, count: 4, knock: 120, maxLvl: 5,
       kanji: 'スーパー・ボウリングボール・アタック！！！', desc: 'Grabs Simon and bowls him through a chain of enemies (he cries the whole way). STRIKE! No Simon? A boulder.',
-      ups: [{ t: '+2 chained enemies', m: { count: 2 } }, { t: '+45% damage', m: { dmg: 1.45 } }, { t: '-25% cooldown', m: { cd: 0.75 } }, { t: 'Max: +3 chained, +50% damage', m: { count: 3, dmg: 1.5 } }] }];
+      ups: [{ t: '+2 chained enemies', m: { count: 2 } }, { t: '+45% damage', m: { dmg: 1.45 } }, { t: '-25% cooldown', m: { cd: 0.75 } }, { t: 'Max: +3 chained, +50% damage', m: { count: 3, dmg: 1.5 } }] },
+    // Simon's own (it replaces Super Bowling Ball Attack once he's on his own)
+    { id: 'giga-drill-maximum', name: 'Giga Drill Maximum', type: 'ground', kind: 'nova', psCast: 'giga-drill-maximum', cd: 5.5, dmg: 58, radius: 210, count: 13, knock: 150, maxLvl: 5, simon: true,
+      kanji: 'ギガドリルマキシマム！！！', desc: 'Thirteen long, thin teal drills burst out of Simon in every direction, pierce everything around him, then pull back in.',
+      ups: [{ t: '+30% reach', m: { radius: 1.3 } }, { t: '+45% damage', m: { dmg: 1.45 } }, { t: '-25% cooldown', m: { cd: 0.75 } }, { t: 'Max: +60% damage, longer drills', m: { dmg: 1.6, radius: 1.2 } }] }];
   const IDS = MOVES.map(m => m.id), BY = Object.fromEntries(MOVES.map(m => [m.id, m]));
   let registered = false, poolHooked = false;
   function register() {
     const M = E()?.Moves; if (!M || !M.BY_ID || !Array.isArray(M.ALL)) return;
     if (!registered) { registered = true; for (const d of MOVES) if (!M.BY_ID[d.id]) { M.ALL.push(d); M.BY_ID[d.id] = d; } }
     if (!poolHooked && typeof M.poolFor === 'function') { poolHooked = true; const orig = M.poolFor;
-      const f = function (mon) { let r = (orig.apply(this, arguments) || []).filter(id => !IDS.includes(id)); if (Number(mon && mon.dex) !== EXCA) return r;
-        const p = E().Game.player, un = IDS.filter(id => !(p && typeof p.hasMove === 'function' && p.hasMove(id)));
+      const f = function (mon) { let r = (orig.apply(this, arguments) || []).filter(id => !IDS.includes(id)); const p = E().Game.player, has = id => p && typeof p.hasMove === 'function' && p.hasMove(id);
+        if (p && isSimon(p) && Number(mon && mon.dex) === DRIL) return [...r, ...['gurren-boomerang', 'super-blazing-kick', 'giga-drill-maximum'].filter(id => !has(id))];   // Simon carries on Kamina's moves
+        if (Number(mon && mon.dex) !== EXCA) return r;
+        const un = IDS.filter(id => !BY[id].simon && !has(id));
         if (p && Number(p.dex) === EXCA && un.length && CFG.forceAt.includes(Number(p.level))) return [un[0], ...r.slice(0, 1)];   // a short pool: the card reliably shows up
         return [...r, ...un]; };
       f.__lake = orig.__lake; M.poolFor = f; }
   }
+  const isSimon = p => !!p && Number(p.dex) === DRIL && !!window.PS_DIGGER?.simon;
+  const simonSays = (list, ch) => { if (Math.random() < (ch ?? 0.3)) { const l = pick(list); line(DRIL, l[0], l[1], l[2]); } };
+  const SIMON = {
+    rang: [['normal', 'Kamina\'s shades... cut them down!', 'spark'], ['determined', 'Gurren Boomerang!! ...Am I doing it right, Kamina?', 'exclaim'], ['normal', 'Fly, shades! Just like he threw them!', 'spark']],
+    kick: [['shouting', 'Man on fire! Kamina, lend me your flames!', 'anger'], ['determined', 'Super Blazing KICK!!', 'exclaim'], ['normal', 'I\'m not scared of anything anymore!', 'anger']],
+    max: [['shouting', 'GIGA DRILL... MAXIMUM!!!', 'exclaim'], ['determined', 'Drills everywhere! Pierce them ALL!', 'spark'], ['normal', 'This is the drill that\'ll pierce the heavens!', 'spark'], ['determined', 'Who the hell do you think I am?!', 'exclaim']] };
   let lastHit = null;
   function strike(p, e, dmg, color, dx, dy, knock, move) {
     const h = lastHit || window.__psHit;
@@ -105,7 +123,7 @@
     const base = tg ? Math.atan2(tg.y - p.y, tg.x - p.x) : (Number(p.aim) || 0), n = Math.max(1, d.count | 0);
     for (let i = 0; i < n; i++) { const a = base + (n === 1 ? 0 : (i / (n - 1) - 0.5) * 0.55);
       rangs.push({ p, d, x: p.x, y: p.y - 18, a, vx: Math.cos(a), vy: Math.sin(a), out: true, went: 0, spin: 0, hits: new Map(), life: 6, ghosts: [] }); }
-    shout(p, d.kanji || BY['gurren-boomerang'].kanji); sfx('click'); ring(p.x, p.y - 18, 10, 70, '255,90,40', 0.35, 4); flames(p.x, p.y - 20, 8, 14);
+    shout(p, d.kanji || BY['gurren-boomerang'].kanji); sfx('click'); if (isSimon(p)) simonSays(SIMON.rang); ring(p.x, p.y - 18, 10, 70, '255,90,40', 0.35, 4); flames(p.x, p.y - 20, 8, 14);
   }
   function updateRangs(dt) {
     for (let i = rangs.length - 1; i >= 0; i--) { const r = rangs[i], d = r.d, sp = (d.speed || 560) * (r.out ? 1 : 1.15);
@@ -132,7 +150,7 @@
     const a = Math.atan2(tg.y - p.y, tg.x - p.x);
     kicks.push({ p, d, a, tg, sx: p.x, sy: p.y, t: 0, dur: Math.max(0.14, Math.min(0.34, dist(tg, p) / 900)), hit: false });
     p.invuln = Math.max(Number(p.invuln) || 0, 0.7); shout(p, d.kanji || BY['super-blazing-kick'].kanji); sfx('fire'); flames(p.x, p.y - 22, 18, 20); ring(p.x, p.y, 10, 60, '255,120,30', 0.35, 4);
-    if (Math.random() < 0.3) line(EXCA, 'shouting', pick(['MAN ON FIRE!!', 'Feel the burn of the Gurren Brigade!', 'Stand back, Simon! This one\'s HOT!']), 'anger');
+    if (isSimon(p)) simonSays(SIMON.kick); else if (Math.random() < 0.3) line(EXCA, 'shouting', pick(['MAN ON FIRE!!', 'Feel the burn of the Gurren Brigade!', 'Stand back, Simon! This one\'s HOT!']), 'anger');
   }
   let freezeT = 0;
   function updateKicks(dt) {
@@ -204,6 +222,29 @@
         balls.splice(i, 1); continue; }
       for (const t of b.tears) { t.t += dt; t.x += t.vx * dt; t.y += t.vy * dt; t.vy += 380 * dt; } b.tears = b.tears.filter(t => t.t < 0.6);
     }
+  }
+
+  // ---- GIGA DRILL MAXIMUM (Simon) ----
+  const maxes = [];
+  function castMaximum(p, d) {
+    maxes.push({ p, d, t: 0, hit: false, n: 13, rot: Math.random() * TAU });
+    shout(p, d.kanji || BY['giga-drill-maximum'].kanji); sfx('quake'); kick(0.5); ring(p.x, p.y, 10, 90, '58,255,216', 0.4, 5); sparks(p.x, p.y - 16, 16, 260, '160,255,240'); simonSays(SIMON.max, 0.35);
+  }
+  const EXT = 0.2, HOLD = 0.55, BACK = 0.25;   // drills shoot out, hold (spinning), pull back in
+  const extOf = m => m.t < EXT ? m.t / EXT : m.t < EXT + HOLD ? 1 : Math.max(0, 1 - (m.t - EXT - HOLD) / BACK);
+  function updateMaxes(dt) {
+    for (let i = maxes.length - 1; i >= 0; i--) { const m = maxes[i], p = m.p, d = m.d; m.t += dt; m.rot += dt * 0.6;
+      if (!m.hit && m.t >= EXT) { m.hit = true; const R = (d.radius || 210) + 14; kick(0.6); sfx('boss');
+        for (const e of alive()) { if (Math.hypot(e.x - p.x, e.y - p.y) > R + (e.r || 12)) continue; strike(p, e, d.dmg * atkOf(p), '#3affd8', e.x - p.x, e.y - p.y, d.knock || 150, d); sparks(e.x, e.y - 12, 8, 220, '160,255,240'); }
+        for (let j = 0; j < m.n; j++) { const a = m.rot + j / m.n * TAU; sparks(p.x + Math.cos(a) * R, p.y - 16 + Math.sin(a) * R * 0.7, 4, 180, '120,255,230'); } ring(p.x, p.y, 20, R, '58,255,216', 0.45, 6); }
+      if (m.t > EXT + HOLD + BACK) maxes.splice(i, 1); }
+  }
+  function drawMaxes(ctx) {
+    const now = performance.now() / 1000;
+    for (const m of maxes) { const p = m.p, e = extOf(m), R = (m.d.radius || 210) * e; if (R < 2) continue; const cx = p.x, cy = p.y - 16;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gr = ctx.createRadialGradient(cx, cy, 2, cx, cy, 46); gr.addColorStop(0, `rgba(180,255,245,${0.8 * e})`); gr.addColorStop(1, 'rgba(40,220,200,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx, cy, 46, 0, TAU); ctx.fill(); ctx.restore();
+      const order = Array.from({ length: m.n }, (_, j) => m.rot + j / m.n * TAU).sort((a, b) => Math.sin(a) - Math.sin(b));   // back ones first
+      for (const a of order) { const sy = Math.sin(a) * 0.7, len = R * Math.hypot(Math.cos(a), sy); drill(ctx, cx + Math.cos(a) * 6, cy + Math.sin(a) * 4, Math.atan2(sy, Math.cos(a)), 11, Math.max(4, len), now + a, 'teal'); } }
   }
 
   // ================= GIGA DRILL BREAK (Z-move) =================
@@ -303,7 +344,7 @@
     window.PS_CAST = function (pl, def, hit, ghost) {
       const id = def && def.psCast; if (!BY[id]) return prevCast ? prevCast.apply(this, arguments) : undefined;
       if (ghost || !pl || pl.dead) return; if (typeof hit === 'function') lastHit = hit;
-      try { if (id === 'gurren-boomerang') castBoomerang(pl, def); else if (id === 'super-blazing-kick') castKick(pl, def); else castBowling(pl, def); } catch (err) { console.warn('[kamina]', err); } };
+      try { if (id === 'gurren-boomerang') castBoomerang(pl, def); else if (id === 'super-blazing-kick') castKick(pl, def); else if (id === 'giga-drill-maximum' || isSimon(pl)) castMaximum(pl, id === 'giga-drill-maximum' ? def : BY['giga-drill-maximum']); else castBowling(pl, def); } catch (err) { console.warn('[kamina]', err); } };
     const uc = N.Ult.cast;
     N.Ult.cast = function (actor) { if (actor && actor === N.Game.player && Number(actor.dex) === EXCA && !actor.psDigger) return tryGiga(actor); return uc.apply(this, arguments); };
     const eup = N.Enemy.prototype.update;
@@ -311,6 +352,11 @@
     const du = N.Ult.drawUnits;
     N.Ult.drawUnits = function (ctx) { du.apply(this, arguments); try { drawWorld(ctx); } catch (err) { console.warn('[kamina]', err); } };
   }
+  // once Simon carries on alone, Kamina's bowling ball (that was Simon) becomes his Giga Drill Maximum, same level
+  function simonMoves() { const p = E().Game.player, M = E().Moves; if (!isSimon(p) || !M || !Array.isArray(p.moves)) return;
+    const old = p.moves.find(m => m && m.id === 'super-bowling-ball'); if (!old) return; let neu = null; try { neu = M.instance('giga-drill-maximum', Math.min(old.lvl || 1, 5)); } catch (_) {} if (!neu) return;
+    for (const arr of [p.moves, ...(Array.isArray(p.slots) ? p.slots : [])]) if (Array.isArray(arr)) for (let i = 0; i < arr.length; i++) if (arr[i] === old) arr[i] = neu;
+    txt(p.x, p.y - 70, 'Super Bowling Ball → GIGA DRILL MAXIMUM!', '#5affe0'); }
   // Kamina's Z-move button is Giga Drill Break, ready from the start
   function ultButton() { const p = E().Game.player; if (!p || Number(p.dex) !== EXCA || p.psDigger) return;
     if (p.ultDef !== ULT_DEF) p.ultDef = ULT_DEF; p.ult = E().Ult.MAX || 300; p.ultCd = 0; p.ultT = 0; }
@@ -330,20 +376,42 @@
       if (b.s && b.s.anim) { ctx.save(); ctx.translate(b.x, b.y - 14); ctx.rotate(b.spin); try { b.s.anim.draw(ctx, 0, 14); } catch (_) {} ctx.restore(); }
       else { ctx.save(); ctx.translate(b.x, b.y - 14); ctx.rotate(b.spin); ctx.fillStyle = '#7a6a5a'; ctx.beginPath(); ctx.arc(0, 0, 15, 0, TAU); ctx.fill(); ctx.strokeStyle = '#4a3a2a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 9, 0, 4); ctx.stroke(); ctx.restore(); }
       ctx.fillStyle = '#7ac8ff'; for (const t of b.tears) { ctx.globalAlpha = 1 - t.t / 0.6; ctx.beginPath(); ctx.arc(t.x, t.y, 3, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1; }
+    drawMaxes(ctx);
     drawParts(ctx, parts);
     drawKanji(ctx, dt);
   }
   // ================= the Giga Drill Break cinematic (drawn above everything) =================
   const ov = document.createElement('canvas'); ov.id = 'ps-kamina'; ov.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:57;display:none';
   function gameCanvas() { let b = null, ar = 0; for (const c of document.querySelectorAll('canvas')) { if (c.id && c.id.startsWith('ps-')) continue; const r = c.getBoundingClientRect(), a = r.width * r.height; if (a > ar) { ar = a; b = { c, r }; } } return b; }
-  function drill(ctx, x, y, a, w, h, now) {   // a steel spiral drill pointing along angle a, with a green glow
+  // Drills in the style of the Giga Drill sheet: chrome cone with spiral ridges crawling to the tip, a round base,
+  // a glowing teal outline; summoned as a white flash with jagged white "wings" that burst off it.
+  const PAL = { chrome: ['#2a2c32', '#f4f6fa', '#a8adb6', '#3a3d45', '#3affd8'], teal: ['#04424e', '#d8fffa', '#38d0e0', '#065a6a', '#3affd8'] };
+  function drill(ctx, x, y, a, w, h, now, pal, glow) {
+    if (!(w > 0.5) || !(h > 0.5)) return; const [dk, hi, md, dk2, gl] = PAL[pal || 'chrome'];
     ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI / 2);
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.shadowColor = '#7dff6a'; ctx.shadowBlur = Math.min(60, w); ctx.fillStyle = 'rgba(125,255,106,.25)'; ctx.beginPath(); ctx.moveTo(-w * 0.62, 4); ctx.lineTo(0, -h * 1.06); ctx.lineTo(w * 0.62, 4); ctx.closePath(); ctx.fill(); ctx.restore();
-    const gr = ctx.createLinearGradient(-w / 2, 0, w / 2, 0); gr.addColorStop(0, '#4a4a58'); gr.addColorStop(0.35, '#c8c8d8'); gr.addColorStop(0.5, '#ffffff'); gr.addColorStop(0.65, '#a8a8b8'); gr.addColorStop(1, '#3a3a48');
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(0, -h); ctx.lineTo(w / 2, 0); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(20,20,30,.75)'; ctx.lineWidth = Math.max(1, w / 16); const n = 9, off = (now * 4) % 1;
-    for (let i = 0; i < n; i++) { const v = (i + off) / n, yy = -h * v, ww = w / 2 * (1 - v); ctx.beginPath(); ctx.moveTo(-ww, yy); ctx.lineTo(ww * 0.9, yy - h / n * 0.8); ctx.stroke(); }
-    ctx.fillStyle = '#2a2a34'; ctx.fillRect(-w * 0.32, 0, w * 0.64, Math.max(3, w * 0.18)); ctx.restore(); }
+    const shape = () => { ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(0, -h); ctx.lineTo(w / 2, 0); ctx.arc(0, 0, w / 2, 0, Math.PI); ctx.closePath(); };
+    if (glow !== false) { ctx.save(); ctx.shadowColor = gl; ctx.shadowBlur = Math.min(36, 6 + w * 0.3); ctx.strokeStyle = gl; ctx.lineWidth = Math.max(2, w * 0.05); shape(); ctx.stroke(); ctx.restore(); }
+    shape(); ctx.save(); ctx.clip();
+    const gr = ctx.createLinearGradient(-w / 2, 0, w / 2, 0); gr.addColorStop(0, dk); gr.addColorStop(0.28, hi); gr.addColorStop(0.5, md); gr.addColorStop(0.78, dk2); gr.addColorStop(1, dk); ctx.fillStyle = gr; ctx.fillRect(-w, -h - 2, 2 * w, h + w);
+    const n = Math.max(3, Math.min(7, Math.round(h / Math.max(8, w * 0.9)))), seg = h / n, slant = Math.min(seg * 0.55, w * 0.35), off = (now * 2.5) % 1;
+    for (let i = -1; i <= n; i++) { const yy = -seg * (i + off);
+      const sg = ctx.createLinearGradient(0, yy, 0, yy + seg * 0.45); sg.addColorStop(0, 'rgba(0,0,0,.55)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = sg; ctx.beginPath(); ctx.moveTo(-w, yy + slant); ctx.lineTo(w, yy - slant); ctx.lineTo(w, yy - slant + seg * 0.45); ctx.lineTo(-w, yy + slant + seg * 0.45); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = Math.max(1, w * 0.035); ctx.beginPath(); ctx.moveTo(-w, yy + slant - 1.5); ctx.lineTo(w, yy - slant - 1.5); ctx.stroke(); }
+    const bg = ctx.createRadialGradient(-w * 0.15, -w * 0.05, w * 0.05, 0, 0, w * 0.6); bg.addColorStop(0, 'rgba(255,255,255,.25)'); bg.addColorStop(1, 'rgba(0,0,0,.45)'); ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(0, 0, w / 2, 0, Math.PI); ctx.fill();
+    ctx.restore(); ctx.strokeStyle = 'rgba(10,12,16,.9)'; ctx.lineWidth = Math.max(1, w * 0.025); shape(); ctx.stroke(); ctx.restore();
+  }
+  function silhouette(ctx, x, y, a, w, h, alpha) {   // the white flash a drill is summoned from (rough-edged teardrop)
+    if (!(alpha > 0)) return; ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI / 2); ctx.globalAlpha = Math.min(1, alpha); ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 18; ctx.fillStyle = '#f4f8ff';
+    const m = 14; ctx.beginPath(); ctx.moveTo(0, -h); for (let i = 1; i <= m; i++) { const v = i / m; ctx.lineTo(w / 2 * Math.pow(v, 0.8) * (1 + (i % 2 ? 0.07 : -0.04)), -h + h * v); }
+    ctx.arc(0, 0, w / 2, 0, Math.PI); for (let i = m; i >= 1; i--) { const v = i / m; ctx.lineTo(-w / 2 * Math.pow(v, 0.8) * (1 + (i % 2 ? -0.04 : 0.07)), -h + h * v); } ctx.closePath(); ctx.fill(); ctx.restore(); }
+  function wings(ctx, x, y, a, w, h, u) {   // jagged white energy bursting off a freshly summoned drill
+    if (!(u < 1) || u < 0) return; ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI / 2); ctx.globalAlpha = 1 - u; ctx.fillStyle = '#f4f8ff'; ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 12;
+    const spread = 1 + u * 0.7, m = 12;
+    for (const sd of [-1, 1]) { const P = [], Q = [];
+      for (let i = 0; i <= m; i++) { const v = i / m, sn = Math.sin(Math.PI * v), bx = sd * (w * 0.62 + w * 0.55 * sn) * spread, by = -h * 0.95 + v * h * 1.25, th = w * 0.16 * sn + 1, jag = (i % 2 ? w * 0.22 : 0) * sn; P.push([bx + sd * (th + jag), by]); Q.push([bx, by]); }
+      ctx.beginPath(); ctx.moveTo(Q[0][0], Q[0][1]); for (const q of P) ctx.lineTo(q[0], q[1]); for (let i = Q.length - 1; i >= 0; i--) ctx.lineTo(Q[i][0], Q[i][1]); ctx.closePath(); ctx.fill(); }
+    ctx.restore(); }
   function drawGiga(dt) {
     const g = gd; if (!g) { if (ov.style.display !== 'none') ov.style.display = 'none'; return; }
     ov.style.display = 'block'; const ctx = ov.getContext('2d'), dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight, now = performance.now() / 1000, t = g.t, p = g.p;
@@ -356,23 +424,17 @@
     const PX = ox + p.x * k, PY = oy + (p.y - 30) * k, TX = ox + g.tx * k, TY = oy + (g.ty - 20) * k;
     // the world goes dark
     ctx.fillStyle = `rgba(0,0,14,${Math.min(0.6, t * 0.6)})`; ctx.fillRect(0, 0, W, H);
-    // "DRILL": a roaring blue-white light column to the heavens behind him (like the show's sky-piercing shot)
-    if (t >= TL.drill && t < TL.rush) { const u = Math.min(1, (t - TL.drill) / 0.35); ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      const col = ctx.createLinearGradient(PX - W * 0.3, 0, PX + W * 0.3, 0); col.addColorStop(0, 'rgba(20,60,200,0)'); col.addColorStop(0.35, `rgba(60,140,255,${0.35 * u})`); col.addColorStop(0.5, `rgba(220,240,255,${0.6 * u})`); col.addColorStop(0.65, `rgba(150,90,255,${0.35 * u})`); col.addColorStop(1, 'rgba(20,60,200,0)');
-      ctx.fillStyle = col; ctx.fillRect(PX - W * 0.3, 0, W * 0.6, PY + 40);
-      for (let i = 0; i < 120; i++) { const x = PX + (((i * 97.13) % 1) - 0.5) * W * 0.9 * (0.3 + ((i * 13.7) % 1)), sp = (now * (1.6 + (i % 5) * 0.3) + i * 0.173) % 1, y = H - sp * (H + 200), len = 60 + (i % 7) * 30;
-        ctx.strokeStyle = i % 4 === 0 ? `rgba(255,255,255,${0.8 * u})` : i % 4 === 1 ? `rgba(170,120,255,${0.5 * u})` : `rgba(80,170,255,${0.6 * u})`; ctx.lineWidth = 1 + (i % 3) * 1.5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + len); ctx.stroke(); }
-      ctx.restore(); }
-    // "BREAK": a blue speed tunnel streaming past him
-    if (t >= TL.rush && t < TL.retract + 0.2) { ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      for (let i = 0; i < 140; i++) { const a = (i * 2.399) % TAU, sp = ((now * 2.8 + i * 0.137) % 1), r0 = 40 + sp * Math.hypot(W, H) * 0.75, len = 60 + sp * 240;
-        ctx.strokeStyle = i % 3 ? 'rgba(90,170,255,.55)' : 'rgba(255,240,140,.7)'; ctx.lineWidth = 1 + sp * 5; ctx.beginPath(); ctx.moveTo(PX + Math.cos(a) * r0, PY + Math.sin(a) * r0); ctx.lineTo(PX + Math.cos(a) * (r0 + len), PY + Math.sin(a) * (r0 + len)); ctx.stroke(); }
+    // "DRILL" and "BREAK": deep navy, with white speed streaks rushing out from the drill
+    if (t >= TL.drill && t < TL.retract + 0.2) { const u = Math.min(1, (t - TL.drill) / 0.3), cx = PX, cy = t >= TL.rush ? PY : PY - Math.min(H * 0.25, 200 * k);
+      ctx.fillStyle = `rgba(8,10,48,${0.78 * u})`; ctx.fillRect(0, 0, W, H); ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 160; i++) { const ang = (i * 2.399) % TAU, sp = (now * (t >= TL.rush ? 3 : 1.8) + i * 0.137) % 1, r0 = 30 + sp * Math.hypot(W, H) * 0.8, len = 40 + sp * 260;
+        ctx.strokeStyle = i % 5 === 0 ? `rgba(120,230,255,${0.7 * u})` : `rgba(255,255,255,${0.75 * u})`; ctx.lineWidth = 1 + sp * 6; ctx.beginPath(); ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0); ctx.lineTo(cx + Math.cos(ang) * (r0 + len), cy + Math.sin(ang) * (r0 + len)); ctx.stroke(); }
       ctx.restore(); }
     world();
-    // the gigantic yellow-and-blue trail of the charge
-    if (g.trail.length > 1 && t < TL.fire + 0.9) { const fade = t < TL.retract ? 1 : Math.max(0, 1 - (t - TL.retract) / 1.1); ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      for (const [wid, col] of [[320, `rgba(20,70,255,${0.3 * fade})`], [240, `rgba(60,140,255,${0.42 * fade})`], [170, `rgba(120,200,255,${0.5 * fade})`], [110, `rgba(255,210,30,${0.8 * fade})`], [60, `rgba(255,245,150,${0.9 * fade})`], [24, `rgba(255,255,255,${fade})`]]) {
-        ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.beginPath(); ctx.moveTo(g.sx, g.sy - 30); for (const q of g.trail) ctx.lineTo(q.x, q.y - 30); ctx.stroke(); }
+    // the teal energy jet pouring out of the drill's base during the charge
+    if (g.trail.length > 1 && t < TL.fire + 0.9) { const fade = t < TL.retract ? 1 : Math.max(0, 1 - (t - TL.retract) / 1.1), pts = [{ x: g.sx, y: g.sy }, ...g.trail]; ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = fade;
+      for (const [mul, col] of [[1, '#22e07a'], [0.78, '#8ff4ff'], [0.38, '#eaffff']]) { ctx.strokeStyle = col; for (let i = 0; i < pts.length - 1; i++) { const wv = 170 * (0.75 + 0.25 * Math.sin(i * 0.7 - now * 14)) * Math.min(1, (i + 1) / 8);
+        ctx.lineWidth = wv * mul; ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y - 30); ctx.lineTo(pts[i + 1].x, pts[i + 1].y - 30); ctx.stroke(); } }
       ctx.restore(); }
     // the shades: thrown, split in two, a tornado of cuts, then clamping the enemy
     const T0 = { x: g.tx, y: g.ty - 16 };
@@ -387,16 +449,19 @@
     for (const q of g.gp) { const a = 1 - q.t / q.life; ctx.save(); ctx.globalCompositeOperation = 'lighter';
       if (q.kind === 'streak') { const m = Math.hypot(q.vx, q.vy) || 1; ctx.strokeStyle = `rgba(${q.c},${a})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx / m * q.size * 3, q.y - q.vy / m * q.size * 3); ctx.stroke(); }
       else { ctx.fillStyle = `rgba(${q.c},${a})`; ctx.beginPath(); ctx.arc(q.x, q.y, q.size, 0, TAU); ctx.fill(); } ctx.restore(); }
-    let dw = 0, dh = 0;
-    if (t >= TL.giga && t < TL.retract + 0.4) { const skyH = (H / k) * 0.85;   // small at "GIGA", sky-high at "DRILL", huge and leading the charge at "BREAK"
-      if (t < TL.drill) { const u = Math.min(1, (t - TL.giga) / 0.6); dw = 16 * u; dh = 36 * u; }
-      else if (t < TL.rush) { const u = Math.min(1, (t - TL.drill) / 0.7), e = 1 - Math.pow(1 - u, 3); dw = 16 + (130 - 16) * e; dh = 36 + (skyH - 36) * e; }
-      else { const u = Math.min(1, (t - TL.rush) / 0.25); dw = 130 + 30 * u; dh = skyH + (260 - skyH) * u; }
-      if (t > TL.retract) { const s = Math.max(0, 1 - (t - TL.retract) / 0.4); dw *= s; dh *= s; }
-      const turn = t >= TL.rush ? Math.min(1, (t - TL.rush) / 0.2) : 0, up = -Math.PI / 2, a = up + (((g.dir ?? up) - up + Math.PI * 3) % TAU - Math.PI) * turn;
-      const hx = p.x + (turn ? Math.cos(a) * 16 : 12), hy = p.y - (p.bodyH || 50) * (1 - turn) + (turn ? Math.sin(a) * 16 - 30 : 0);
-      drill(ctx, hx, hy, a, dw, dh, now);
-      for (const b of g.bolts) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(200,255,190,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); let bx = hx, by = hy; ctx.moveTo(bx, by); for (let i = 1; i <= 8; i++) { bx = hx + Math.sin(b.seed + i * 3.1) * dw * 0.9; by = hy - dh * i / 8; ctx.lineTo(bx, by); } ctx.stroke(); ctx.restore(); } }
+    if (t >= TL.giga && t < TL.retract + 0.4) { const skyH = (H / k) * 0.3, up = -Math.PI / 2, hx0 = p.x + 12, hy0 = p.y - (p.bodyH || 50); let hx = hx0, hy = hy0, dw = 0, dh = 0;
+      if (t < TL.drill) {   // "GIGA....": a white flash grows in steps on his raised hand, then the drill bursts out of it
+        const s = t - TL.giga, sc = [0.3, 0.5, 0.75, 1][Math.min(3, Math.floor(s / 0.11))]; dw = 16; dh = 44;
+        if (s < 0.45) silhouette(ctx, hx, hy, up, dw * sc, dh * sc, 1); else { drill(ctx, hx, hy, up, dw, dh, now); wings(ctx, hx, hy, up, dw, dh, (s - 0.45) / 0.6); silhouette(ctx, hx, hy, up, dw, dh, 1 - (s - 0.45) / 0.1); } }
+      else if (t < TL.rush) {   // "DRILL!!!": it flashes white and grows in steps into the Giga Drill, towering over him
+        const s = t - TL.drill, H0 = skyH, W0 = H0 * 0.52; dw = W0; dh = H0; hy = hy0 - W0 * 0.42;
+        if (s < 0.5) { const sc = [0.25, 0.45, 0.7, 1][Math.min(3, Math.floor(s / 0.12))]; drill(ctx, hx0, hy0, up, 16, 44, now); silhouette(ctx, hx, hy0 - W0 * sc * 0.42, up, W0 * sc, H0 * sc, 1); }
+        else { drill(ctx, hx, hy, up, W0, H0, now); wings(ctx, hx, hy, up, W0, H0, (s - 0.5) / 0.9); silhouette(ctx, hx, hy, up, W0, H0, 1 - (s - 0.5) / 0.12); } }
+      else {   // "BREAK": the Giga Drill swings onto the enemy and leads the charge
+        const u = Math.min(1, (t - TL.rush) / 0.2), dir = g.dir ?? up, a = up + ((dir - up + Math.PI * 3) % TAU - Math.PI) * u; dw = skyH * 0.44 + (100 - skyH * 0.44) * u; dh = skyH + (190 - skyH) * u;
+        if (t > TL.retract) { const s2 = Math.max(0, 1 - (t - TL.retract) / 0.4); dw *= s2; dh *= s2; }
+        hx = hx0 * (1 - u) + (p.x + Math.cos(a) * 30) * u; hy = (hy0 - skyH * 0.44 * 0.42) * (1 - u) + (p.y - 30 + Math.sin(a) * 30) * u; drill(ctx, hx, hy, a, dw, dh, now); }
+      if (t >= TL.drill && t < TL.rush) for (const b of g.bolts) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(160,255,240,.9)'; ctx.lineWidth = 2.5; ctx.beginPath(); let bx = hx, by = hy; ctx.moveTo(bx, by); for (let i = 1; i <= 8; i++) { bx = hx + Math.sin(b.seed + i * 3.1) * dw * 0.9; by = hy - dh * i / 8; ctx.lineTo(bx, by); } ctx.stroke(); ctx.restore(); } }
     // the spiral blast from the pierce
     if (g.blastT != null) { g.blastT += dt; const u = Math.min(1, g.blastT / 0.9), R = 40 + u * 520; ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - u;
       for (let arm = 0; arm < 4; arm++) { ctx.strokeStyle = arm % 2 ? 'rgba(125,255,106,.9)' : 'rgba(255,255,255,.9)'; ctx.lineWidth = 8 * (1 - u) + 2; ctx.beginPath(); for (let i = 0; i < 60; i++) { const a = i * 0.2 + arm * TAU / 4 + g.blastT * 6, r = i / 60 * R; ctx.lineTo(g.tx + Math.cos(a) * r, g.ty - 20 + Math.sin(a) * r * 0.6); } ctx.stroke(); }
@@ -418,8 +483,8 @@
     const fire = (y, size) => { const gr = ctx.createLinearGradient(0, y - size, 0, y); gr.addColorStop(0, '#fff3a0'); gr.addColorStop(0.4, '#ff8a1a'); gr.addColorStop(1, '#c80000'); return gr; };
     if (t < TL.throw) { const s = Math.round(Math.min(W / 9, 84) * (t < 0.2 ? 1.6 - t * 3 : 1)); title('FINISHING MOVE!!!', H * 0.3, s, fire(H * 0.3, s)); }
     if (t >= TL.giga && t < TL.drill) title('GIGA....', H * 0.18, Math.round(Math.min(W / 10, 72)), '#cfe6ff');
-    if (t >= TL.drill && t < TL.rush) { const s = Math.round(Math.min(W / 8, 96) * (t - TL.drill < 0.15 ? 1.5 : 1)); title('DRILL!!!', H * 0.18, s, '#e8f4ff'); }
-    if (t >= TL.rush && t < TL.fire) { const s = Math.round(Math.min(W / 15, 62)); title('BREEEAAAAKKKKAAAHHHHH!!!', H * 0.16, s, '#ffe04a'); title('ギガドリルブレイク！！！', H * 0.16 + s * 1.2, Math.round(s * 0.8), fire(H * 0.16 + s * 1.2, s * 0.8), true); }
+    if (t >= TL.drill && t < TL.rush) { const s = Math.round(Math.min(W / 8, 96) * (t - TL.drill < 0.15 ? 1.5 : 1)); title('DRILL!!!', H * 0.84, s, '#e8f4ff'); }
+    if (t >= TL.rush && t < TL.fire) { const s = Math.round(Math.min(W / 15, 62)); title('BREEEAAAAKKKKAAAHHHHH!!!', H * 0.16, s, '#ffe04a'); title('GIGA DRILL BREAK', H * 0.84, Math.round(Math.min(W / 13, 70)), '#5affe0'); title('ギガドリルブレイク！！！', H * 0.16 + s * 1.2, Math.round(s * 0.8), fire(H * 0.16 + s * 1.2, s * 0.8), true); }
     if (t >= TL.ko && t < TL.end) { const u = Math.min(1, (t - TL.ko) / 0.35), bounce = u < 1 ? 1.5 - 0.5 * u : 1 + Math.sin((t - TL.ko) * 6) * 0.03, size = Math.round(Math.min(W / 4, 240) * bounce);
       ctx.save(); ctx.font = `900 ${size}px Pixelify, system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.globalAlpha = t > TL.end - 0.5 ? (TL.end - t) / 0.5 : 1;
       const gr = ctx.createLinearGradient(W / 2 - size * 1.5, 0, W / 2 + size * 1.5, 0); for (let i = 0; i <= 6; i++) gr.addColorStop(i / 6, `hsl(${(i * 60 + now * 220) % 360},100%,60%)`);
@@ -438,10 +503,11 @@
       if (gd) { if (N.Game.player !== gd.p || st === 'over' || st === 'ui') { const g = gd; gd = null; window.PS_KAMINA.active = false; if (g.so) { try { B().game.soloHold(false); } catch (_) {} } } else updateGiga(dt); }
       if (dying) { const d = dying; d.p.invuln = Math.max(Number(d.p.invuln) || 0, 0.3); try { if (d.p.anim.cur !== 'Faint') d.p.anim.play('Faint'); } catch (_) {} if ((d.t -= dt) <= 0 || st === 'over' || st === 'ui') { dying = null; if (st === 'playing') fallNow(d.p); } }
       if (freezeT > 0) { freezeT -= dt; if (freezeT <= 0) { const q = kicks.find(k => k.hit && !k.cracked); if (q) { q.cracked = true; crack(q); } } }
-      else if (st === 'playing' && !gd) { updateRangs(dt); updateKicks(dt); updateBalls(dt); updateParts(dt); }
-      if (st !== 'playing' && st !== 'choice' && !gd) { rangs.length = 0; kicks.length = 0; for (const f of flyers) f.e.__kamFly = null; flyers.length = 0; for (const b of balls) if (b.s) b.s.thrown = false; balls.length = 0; parts.length = 0; kanji.length = 0; }
+      else if (st === 'playing' && !gd) { updateRangs(dt); updateKicks(dt); updateBalls(dt); updateMaxes(dt); updateParts(dt); }
+      simonMoves();
+      if (st !== 'playing' && st !== 'choice' && !gd) { rangs.length = 0; kicks.length = 0; for (const f of flyers) f.e.__kamFly = null; flyers.length = 0; for (const b of balls) if (b.s) b.s.thrown = false; balls.length = 0; maxes.length = 0; parts.length = 0; kanji.length = 0; }
       drawGiga(dt); } catch (e) { console.warn('[kamina]', e); } }
   function init() { document.body.append(ov); requestAnimationFrame(loop); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
-  window.PS_KAMINA = { active: false, cfg: CFG, moves: IDS, giga: p => { const pl = p || E().Game.player; armedAt = performance.now() / 1000; return tryGiga(pl); }, get state() { return gd && { t: gd.t, killed: gd.killed }; }, _dbg: () => ({ rangs: rangs.length, kicks: kicks.length, flyers: flyers.length, balls: balls.length, parts: parts.length }) };
+  window.PS_KAMINA = { active: false, cfg: CFG, moves: IDS, giga: p => { const pl = p || E().Game.player; armedAt = performance.now() / 1000; return tryGiga(pl); }, get state() { return gd && { t: gd.t, killed: gd.killed }; }, get dying() { return !!dying; }, _dbg: () => ({ rangs: rangs.length, kicks: kicks.length, flyers: flyers.length, balls: balls.length, maxes: maxes.length, parts: parts.length }) };
 })();
