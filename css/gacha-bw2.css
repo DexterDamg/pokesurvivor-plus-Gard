@@ -1,0 +1,86 @@
+
+  @font-face{font-family:'PSBW';src:url('../assets/fonts/PixelifySans.ttf') format('truetype');font-weight:400 700;font-display:swap}
+  #scr-gacha.ps-bw2{--bw-ink:#404850;--bw-shade:#c0c8d0;--bw-line:#283040;--bw-white:#f8f8f8}
+  #scr-gacha.ps-bw2, #scr-gacha.ps-bw2 *{font-family:'PSBW','Pixelify',monospace !important;-webkit-font-smoothing:none;font-smooth:never;letter-spacing:.5px}
+
+  /* window: BW2 bottom-screen stripes in a dark double frame */
+  #scr-gacha.ps-bw2 .box{max-width:720px;padding:0 0 14px;border-radius:12px;border:3px solid var(--bw-line);
+    background:repeating-linear-gradient(135deg,#dbe9f6 0 10px,#cddff1 10px 20px);
+    box-shadow:inset 0 0 0 3px var(--bw-white),0 8px 0 rgba(0,0,0,.35);overflow:hidden}
+  #scr-gacha.ps-bw2 .box > .row.between{margin:0;padding:8px 12px 8px 16px;align-items:center;
+    background:linear-gradient(180deg,#3a3a42 0,#1c1c22 100%);border-bottom:4px solid #d03838;box-shadow:0 3px 0 #801818}
+  #scr-gacha.ps-bw2 .box > .row.between h2{margin:0;font-size:26px;font-weight:400;color:var(--bw-white);text-transform:uppercase;letter-spacing:3px;
+    text-shadow:2px 0 #6a6a78,0 2px #6a6a78,2px 2px #6a6a78}
+  #scr-gacha.ps-bw2 [data-back]{background:linear-gradient(180deg,#ffffff 0 50%,#e0e8f0 50% 100%) !important;color:var(--bw-ink) !important;
+    border:2px solid var(--bw-line) !important;border-radius:16px !important;box-shadow:0 3px 0 #10141c !important;font-weight:700;
+    text-shadow:1px 0 var(--bw-shade),0 1px var(--bw-shade),1px 1px var(--bw-shade)}
+  #scr-gacha.ps-bw2 [data-back]::before{content:'\21A9  '}
+
+  /* one banner: no region tabs, no pity / shiny-ticket counters, no rules list */
+  #scr-gacha.ps-bw2 #gacha-gens, #scr-gacha.ps-bw2 #gacha-pity, #scr-gacha.ps-bw2 #gacha-owned, #scr-gacha.ps-bw2 #gacha-rates .note{display:none !important}
+
+  #scr-gacha.ps-bw2 .split{display:flex !important;flex-direction:column;gap:10px;margin:12px 14px 0 !important}
+  #scr-gacha.ps-bw2 .split > div:first-child{display:contents}
+
+  /* banner: a battle scene, with the region text in a DS text box at the bottom */
+  #scr-gacha.ps-bw2 #banner{order:1;display:flex;flex-direction:column;padding:0 !important;border-radius:10px;border:3px solid var(--bw-line) !important;
+    box-shadow:inset 0 0 0 2px var(--bw-white),0 4px 0 rgba(0,0,0,.25);
+    background:linear-gradient(180deg,#78b8f0 0,#b8e0fc 46%,#e8f6ff 58%,#a8d088 58%,#88b868 100%) !important}
+  #scr-gacha.ps-bw2 #banner::before, #scr-gacha.ps-bw2 #banner::after{display:none !important}
+  #scr-gacha.ps-bw2 #banner-title{order:0;align-self:flex-start;margin:10px 0 0 !important;padding:4px 26px 4px 14px;font-size:22px !important;font-weight:700;
+    color:var(--bw-ink);background:var(--bw-white);border:2px solid var(--bw-line);border-left:0;border-radius:0 18px 18px 0;
+    box-shadow:0 3px 0 rgba(0,0,0,.25);text-shadow:2px 0 var(--bw-shade),0 2px var(--bw-shade),2px 2px var(--bw-shade)}
+  #scr-gacha.ps-bw2 #gacha-feat{order:1;display:flex;justify-content:space-around;align-items:flex-end;height:auto !important;margin:6px 10px 0 !important}
+  #scr-gacha.ps-bw2 #gacha-feat canvas{height:190px;max-height:none !important;width:auto;filter:none !important;image-rendering:pixelated;margin-top:-34px;
+    background:radial-gradient(ellipse 46% 11% at 50% 86%,#e4f2c8 0 55%,#b4d890 60% 88%,#6f9a50 92% 100%,transparent 101%) no-repeat}
+  #scr-gacha.ps-bw2 #banner-desc, #scr-gacha.ps-bw2 #gacha-owned{order:2;margin:0 !important;padding:0 14px;background:var(--bw-white);color:var(--bw-ink) !important;
+    font-size:15px !important;line-height:1.45;opacity:1 !important;text-shadow:1px 0 var(--bw-shade),0 1px var(--bw-shade),1px 1px var(--bw-shade)}
+  #scr-gacha.ps-bw2 #banner-desc{padding-top:8px;border-top:3px solid var(--bw-line);box-shadow:inset 0 2px 0 #7888a0}
+  #scr-gacha.ps-bw2 #gacha-owned{order:3;padding-bottom:8px;color:#506888 !important}
+
+  /* odds: only Rare, in a BW2 summary plate */
+  #scr-gacha.ps-bw2 #gacha-rates{order:2;display:flex !important;align-items:stretch;gap:0;max-height:none !important;overflow:visible !important;padding:0 !important;
+    background:var(--bw-white) !important;border:2px solid var(--bw-line) !important;border-radius:10px !important;box-shadow:0 3px 0 rgba(0,0,0,.25) !important}
+  #scr-gacha.ps-bw2 #gacha-rates > *{order:2}
+  #scr-gacha.ps-bw2 #gacha-rates h3{order:0;margin:0 !important;padding:6px 14px;display:flex;align-items:center;font-size:16px;font-weight:700;color:var(--bw-white);
+    text-transform:uppercase;letter-spacing:2px;background:linear-gradient(180deg,#3a3a42,#1c1c22);border-radius:8px 0 0 8px;
+    text-shadow:1px 0 #6a6a78,0 1px #6a6a78,1px 1px #6a6a78}
+  #scr-gacha.ps-bw2 #gacha-rates > div{display:none !important}
+  #scr-gacha.ps-bw2 #gacha-rates > div:has([title="Rare"]){order:1;display:flex !important;flex:1;justify-content:space-between;align-items:center;
+    padding:6px 14px;margin:0;border:0;font-size:16px;font-weight:700;color:var(--bw-ink);text-shadow:1px 0 var(--bw-shade),0 1px var(--bw-shade),1px 1px var(--bw-shade)}
+  #scr-gacha.ps-bw2 #gacha-rates > div:has([title="Rare"]) > span:first-child{color:#2870c8 !important;display:flex;align-items:center;gap:6px}
+  #scr-gacha.ps-bw2 #gacha-rates .rarity-ball img{width:16px;height:16px}
+
+  /* pull buttons: BW2 battle command buttons */
+  #scr-gacha.ps-bw2 .split > div:first-child > .row{order:3;margin:0 !important;gap:8px}
+  #scr-gacha.ps-bw2 .split .row .btn{position:relative;padding:10px 8px !important;border-radius:14px !important;border:3px solid var(--bw-line) !important;
+    font-size:16px !important;font-weight:700;color:var(--bw-white) !important;text-shadow:2px 0 rgba(0,0,0,.45),0 2px rgba(0,0,0,.45),2px 2px rgba(0,0,0,.45);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.55),0 4px 0 #10141c !important;transition:transform .08s,filter .08s}
+  #scr-gacha.ps-bw2 .split .row .btn:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px)}
+  #scr-gacha.ps-bw2 .split .row .btn:active:not(:disabled){transform:translateY(3px);box-shadow:inset 0 0 0 2px rgba(255,255,255,.55),0 1px 0 #10141c !important}
+  #scr-gacha.ps-bw2 .split .row .btn:disabled{filter:grayscale(.75) brightness(.85);opacity:.85}
+  #scr-gacha.ps-bw2 #pull-1{background:linear-gradient(180deg,#68b0f8 0 50%,#3080e0 50% 100%) !important}
+  #scr-gacha.ps-bw2 #pull-10{background:linear-gradient(180deg,#f87870 0 50%,#d83830 50% 100%) !important}
+  #scr-gacha.ps-bw2 #pull-100{background:linear-gradient(180deg,#78d070 0 50%,#38a838 50% 100%) !important}
+  #scr-gacha.ps-bw2 #pull-10b, #scr-gacha.ps-bw2 #pull-100b{background:linear-gradient(180deg,#ffd860 0 50%,#e8a818 50% 100%) !important}
+  #scr-gacha.ps-bw2 .split .row .btn img{vertical-align:middle}
+
+  /* tickets: small DS text box */
+  #scr-gacha.ps-bw2 #gacha-tickets{order:4;margin:0 !important;padding:6px 12px;background:var(--bw-white);border:2px solid var(--bw-line);border-radius:10px;
+    color:var(--bw-ink) !important;font-size:14px !important;text-shadow:1px 0 var(--bw-shade),0 1px var(--bw-shade),1px 1px var(--bw-shade)}
+  #scr-gacha.ps-bw2 #gacha-tickets b{color:#d03838}
+
+  /* phones held sideways: keep the pull buttons on screen */
+  @media (max-height:520px){
+    #scr-gacha.ps-bw2 .box{max-height:calc(100dvh - 54px);overflow-y:auto}
+    #scr-gacha.ps-bw2 .box > .row.between{padding:4px 10px}
+    #scr-gacha.ps-bw2 .box > .row.between h2{font-size:18px}
+    #scr-gacha.ps-bw2 .split{gap:6px;margin:6px 8px 0 !important}
+    #scr-gacha.ps-bw2 #banner-title{font-size:16px !important;margin-top:6px !important}
+    #scr-gacha.ps-bw2 #gacha-feat canvas{height:90px;margin-top:-16px}
+    #scr-gacha.ps-bw2 #banner-desc{display:none}
+    #scr-gacha.ps-bw2 #gacha-owned{padding-top:4px;border-top:3px solid var(--bw-line)}
+    #scr-gacha.ps-bw2 .split .row .btn{padding:5px 6px !important;font-size:13px !important}
+    #scr-gacha.ps-bw2 #gacha-rates h3, #scr-gacha.ps-bw2 #gacha-rates > div:has([title="Rare"]){font-size:13px;padding:3px 10px}
+  }
+#scr-gacha.ps-bw2 #gacha-rates{display:block!important} #scr-gacha.ps-bw2 #gacha-feat canvas{transform:none;margin:0;max-width:30%;height:auto} #scr-gacha.ps-bw2 #banner{min-height:0} #scr-gacha.ps-bw2 #gacha-owned,#scr-gacha.ps-bw2 #gacha-pity{display:block!important} #scr-gacha.ps-bw2 #ps-gtag,#scr-gacha.ps-bw2 #ps-gshiny{position:static!important;display:inline-block;margin:4px} #scr-gacha.ps-bw2 #ps-grates{color:#404850} #scr-gacha.ps-bw2 #ps-gpool{background:#e0e8f0}
